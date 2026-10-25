@@ -44,6 +44,7 @@ export function PlusIcon({ size = 20 }: GlyphProps) {
   )
 }
 
+/** Camera glyph, iOS language: soft body + viewfinder hump + twin lens. */
 export function CameraIcon({ size = 20 }: GlyphProps) {
   return (
     <svg
@@ -54,13 +55,17 @@ export function CameraIcon({ size = 20 }: GlyphProps) {
       aria-hidden="true"
       focusable="false"
     >
+      <rect x="2.8" y="5.2" width="14.4" height="10.8" rx="3" stroke="currentColor" strokeWidth="1.5" />
       <path
-        d="M2.5 6.8c0-1 .8-1.8 1.8-1.8h1.5l1-1.6h4.4l1 1.6h1.5c1 0 1.8.8 1.8 1.8v7.4c0 1-.8 1.8-1.8 1.8H4.3c-1 0-1.8-.8-1.8-1.8V6.8z"
+        d="M7.3 5.2l1-1.5c.2-.3.5-.5.9-.5h1.6c.4 0 .7.2.9.5l1 1.5"
         stroke="currentColor"
         strokeWidth="1.5"
+        strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <circle cx="10" cy="10.4" r="3.1" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="10" cy="10.6" r="2.9" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="10" cy="10.6" r="0.85" fill="currentColor" />
+      <circle cx="14.35" cy="8" r="0.72" fill="currentColor" opacity="0.9" />
     </svg>
   )
 }
@@ -198,6 +203,34 @@ export function ChevronDownIcon({ size = 14 }: GlyphProps) {
         d="M4 6.2l4 4 4-4"
         stroke="currentColor"
         strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+/** Minimal hourglass — the one-hour mark (same glyph as the favicon). */
+export function HourglassIcon({ size = 13 }: GlyphProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 14 14"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M3.1 1.6h7.8M3.1 12.4h7.8"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      <path
+        d="M4.4 1.6v1.7L7 5.9l2.6-2.6V1.6M4.4 12.4v-1.7L7 8.1l2.6 2.6v1.7"
+        stroke="currentColor"
+        strokeWidth="1.2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />

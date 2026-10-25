@@ -49,7 +49,8 @@ button {
   --surface: rgba(16, 18, 23, var(--veil));
   --surface-strong: rgba(16, 18, 23, 0.72);
   --surface-raised: rgba(24, 26, 32, 0.82);
-  --surface-solid: #1d2026;
+  /* Frosted glass for chips that sit on the fully revealed photo. */
+  --surface-glass: rgba(22, 24, 29, 0.55);
   --line: rgba(243, 239, 231, 0.14);
   --line-soft: rgba(243, 239, 231, 0.08);
   --accent: #e8b04b;
@@ -71,7 +72,7 @@ button {
   --surface: rgba(246, 231, 200, var(--veil));
   --surface-strong: rgba(246, 231, 200, 0.8);
   --surface-raised: rgba(252, 243, 220, 0.92);
-  --surface-solid: #fbf2da;
+  --surface-glass: rgba(252, 245, 224, 0.62);
   --line: rgba(61, 36, 18, 0.18);
   --line-soft: rgba(61, 36, 18, 0.1);
   --accent: #c45c26;
@@ -444,8 +445,7 @@ button {
 }
 
 /* Folded state leaves a quiet affordance at the corner it folded into.
-   Solid chip — it sits on the fully revealed photo, where translucent
-   glass would read as a smudge. */
+   Frosted glass over the fully revealed photo, tinted per theme. */
 .chat-reopen-hint {
   position: absolute;
   left: max(16px, env(safe-area-inset-left));
@@ -458,10 +458,12 @@ button {
   padding: 0 16px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  background: var(--surface-solid);
+  background: var(--surface-glass);
   color: var(--ink-soft);
   font-size: 13px;
   font-weight: 600;
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
   box-shadow: 0 8px 24px var(--shadow);
   cursor: pointer;
   animation: hint-rise 0.45s 0.25s ease both;
@@ -567,6 +569,13 @@ button {
   margin-bottom: 6px;
   font-size: 15px;
   color: var(--ink-soft);
+}
+
+/* Minimal hourglass inline in the welcome copy. */
+.chat-empty-hourglass {
+  display: inline-flex;
+  vertical-align: -2px;
+  color: var(--accent);
 }
 
 .chat-loading-older {
@@ -859,23 +868,25 @@ button {
 }
 
 /* ---------- Backdrop slot ring (bottom-right, chat folded) ----------
-   Solid chip like the reopen hint: it only ever sits on the revealed,
-   fully sharp photo. */
+   Frosted glass like the reopen hint — translucent, theme-tinted, only
+   ever sitting on the revealed photo. */
 
 .bg-slot-ring {
   position: absolute;
-  right: max(18px, env(safe-area-inset-right));
-  bottom: max(18px, env(safe-area-inset-bottom));
+  right: max(10px, env(safe-area-inset-right));
+  bottom: max(10px, env(safe-area-inset-bottom));
   z-index: 5;
-  width: 34px;
-  height: 34px;
+  width: 20px;
+  height: 20px;
   display: grid;
   place-items: center;
   border-radius: 50%;
   border: 1px solid var(--line);
-  background: var(--surface-solid);
+  background: var(--surface-glass);
   color: var(--ink-soft);
-  box-shadow: 0 6px 18px var(--shadow);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  box-shadow: 0 4px 12px var(--shadow);
   animation: hint-rise 0.45s 0.3s ease both;
   pointer-events: none;
 }

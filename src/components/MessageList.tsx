@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import type { ChatEntry, ChatStatus } from '../lib/chatTypes'
 import { useLang } from '../lib/i18n'
 import MessageRow from './MessageRow'
+import { HourglassIcon } from './icons'
 import { useChatScroll } from './useChatScroll'
 
 interface Props {
@@ -87,9 +88,11 @@ export default function MessageList({
         {entries.length === 0 && (
           <p className="chat-empty">
             <strong>{zh ? '欢迎来到一小时聊天室' : 'Welcome to the one-hour room'}</strong>
-            {zh
-              ? '每条消息只存在一个小时 ⏳ 留下的都是此刻，畅所欲言吧。'
-              : 'Every message lives for just one hour ⏳ Say what matters, now.'}
+            {zh ? '每条消息只存在一个小时' : 'Every message lives for just one hour'}{' '}
+            <span className="chat-empty-hourglass">
+              <HourglassIcon size={13} />
+            </span>{' '}
+            {zh ? '留下的都是此刻，畅所欲言吧。' : 'Say what matters, now.'}
           </p>
         )}
         {entries.map((entry, index) => (

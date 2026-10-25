@@ -9,8 +9,8 @@ import { subscribeTick } from '../lib/tick'
  * Shown in the bottom-right corner while the chat is folded away.
  */
 
-const RING_RADIUS = 8
-const RING_SIZE = 21
+const RING_RADIUS = 6
+const RING_SIZE = 14
 const CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 
 export default function BgSlotRing({ since }: { since: number }) {
@@ -43,7 +43,7 @@ export default function BgSlotRing({ since }: { since: number }) {
           r={RING_RADIUS}
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth="1.6"
           opacity="0.25"
         />
         <circle
@@ -52,7 +52,7 @@ export default function BgSlotRing({ since }: { since: number }) {
           r={RING_RADIUS}
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth="1.6"
           strokeLinecap="round"
           strokeDasharray={CIRCUMFERENCE}
           strokeDashoffset={CIRCUMFERENCE * (1 - fraction)}
