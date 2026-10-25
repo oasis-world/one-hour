@@ -29,3 +29,32 @@ export async function fileToChatImage(file: File | Blob): Promise<Blob> {
     bitmap.close()
   }
 }
+
+const AVATAR_EDGE = 256
+
+/** Center-crop to a square, cap at 256px — avatar-friendly, a few KB. */
+export async function fileToAvatarImage(file: File | Blob): Promise<Blob> {
+  const bitmap = await createImageBitmap(file)
+  try {
+    const side = Math.min(bitmap.width, bitmap.height)
+    const scale = Math.min(1, AVATAR_EDGE / side)
+    const out = Math.max(1, Math.round(side * scale))
+    const sx = (bitmap.width - side) / 2
+    const sy = (bitmap.height - side) / 2
+
+    const canvas = document.createElement('canvas')
+    canvas.width = out
+    canvas.height = out
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('canvas unavailable')
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, out, out)
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', 0.86),
+    )
+    if (!blob) throw new Error('canvas.toBlob failed')
+    return blob
+  } finally {
+    bitmap.close()
+  }
+}

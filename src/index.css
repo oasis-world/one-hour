@@ -33,6 +33,15 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Phones: the page itself never pinch-zooms or double-tap-zooms — the
+   photo viewer runs its own pinch on pointer events (touch-action: none
+   there), which this does not affect. Vertical panning stays. */
+html,
+body,
+#root {
+  touch-action: pan-y;
+}
+
 button {
   font: inherit;
   -webkit-tap-highlight-color: transparent;
@@ -160,7 +169,7 @@ button {
   background: rgba(42, 28, 18, 0.16);
 }
 
-/* ---------- Top bar: vertical icon column (avatar / online / theme / lang) ---------- */
+/* ---------- Top bar: the avatar button (account popover) ---------- */
 
 .top-bar {
   position: absolute;
@@ -173,46 +182,24 @@ button {
   gap: 8px;
 }
 
-/* The four controls unfold as one column; on phones they pop in below the
-   toggle chip with a stagger. */
-.top-bar-icons {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
+/* Chat folded: the corner controls step aside — only the reopen hint
+   stays, over the fully revealed photo. */
+.top-bar,
+.settings-bar {
+  transition: opacity 0.35s ease, visibility 0.35s ease;
 }
 
-.top-bar-icons > * {
-  animation: chip-in 0.34s cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
-  animation-delay: calc(var(--chip-i, 0) * 45ms);
-}
-
-@keyframes chip-in {
-  from {
-    opacity: 0;
-    transform: translateY(-10px) scale(0.7);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* Mobile toolbar toggle: chevron flips when the column is open. */
-.top-chevron {
-  display: grid;
-  place-items: center;
-  transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.25);
-}
-
-.top-chevron.is-open {
-  transform: rotate(180deg);
+.app-shell:not(.is-chat-open) .top-bar,
+.app-shell:not(.is-chat-open) .settings-bar {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .top-avatar-btn {
   position: relative;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: none;
   border-radius: 50%;
@@ -227,7 +214,7 @@ button {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  padding: 1.5px;
+  padding: 2px;
   background: conic-gradient(from 210deg, #e8b84b, #2d8aad, #e8b84b, #5c3a1e, #e8b84b);
   box-shadow: 0 3px 10px var(--shadow);
   -webkit-mask:
@@ -245,69 +232,16 @@ button {
   transform: scale(1.06);
 }
 
-.top-avatar-img,
-.top-avatar-letter {
+/* DiceBear face fills the ring; the size itself comes from the inline
+   <img> style. */
+.top-avatar-img {
   width: 100%;
   height: 100%;
   border-radius: 50%;
   object-fit: cover;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   border: 2px solid rgba(14, 16, 20, 0.55);
-  background: linear-gradient(165deg, #f6e7c8, #e8d4a4);
-  color: #5c3a1e;
-  font-size: 13px;
-  font-weight: 800;
   user-select: none;
-}
-
-/* Shared glass chip for the icon column. */
-.top-chip {
-  position: relative;
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  border: 1px solid var(--line);
-  background: var(--surface-raised);
-  color: var(--ink-soft);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.top-chip svg {
-  color: var(--ok);
-}
-
-.top-chip-btn {
-  cursor: pointer;
-  transition: transform 0.15s ease, color 0.15s ease;
-}
-
-.top-chip-btn svg {
-  color: inherit;
-  transition: color 0.15s ease;
-}
-
-.top-chip-btn:hover {
-  color: var(--accent);
-  transform: scale(1.08);
-}
-
-/* The people chip wraps a hit-area button so the whole chip opens the
-   online-member list (badge stays perched outside the button). */
-.top-chip-hit {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: inherit;
-  padding: 0;
 }
 
 /* ---------- Online members popover ---------- */
@@ -408,32 +342,6 @@ button {
   color: var(--ink-mute);
 }
 
-/* Online-count badge perched on the people chip. */
-.top-badge {
-  position: absolute;
-  top: -4px;
-  right: -7px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: var(--ok);
-  color: #08130d;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 15px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  border: 1px solid var(--surface-raised);
-  box-shadow: 0 2px 6px var(--shadow);
-}
-
-.top-lang-btn {
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-}
-
 /* ---------- Chat stage: center column + collapse choreography ---------- */
 
 .chat-stage {
@@ -442,6 +350,12 @@ button {
   display: flex;
   justify-content: center;
   z-index: 20;
+  /* The backdrop around the column folds the chat on click. */
+  cursor: pointer;
+}
+
+.chat-column {
+  cursor: default;
 }
 
 /* Click-anywhere-to-reopen target (only when collapsed). */
@@ -470,50 +384,17 @@ button {
     max-width: 100vw;
   }
 
-  /* Corner controls on the narrow screen — slightly larger for touch. */
+  /* Corner avatar on the narrow screen — sized for touch, and centered
+     at the top like a room header. */
   .top-bar {
-    gap: 7px;
-  }
-
-  .top-bar-icons {
-    gap: 9px;
+    left: 50%;
+    top: max(10px, env(safe-area-inset-top));
+    transform: translateX(-50%);
   }
 
   .top-avatar-btn {
-    width: 34px;
-    height: 34px;
-  }
-
-  .top-avatar-letter {
-    font-size: 12px;
-  }
-
-  .top-avatar-letter svg {
-    width: 17px;
-    height: 17px;
-  }
-
-  .top-chip {
-    width: 32px;
-    height: 32px;
-  }
-
-  .top-chip svg {
-    width: 15px;
-    height: 15px;
-  }
-
-  .top-badge {
-    min-width: 15px;
-    height: 15px;
-    top: -3px;
-    right: -6px;
-    font-size: 10px;
-    line-height: 14px;
-  }
-
-  .top-lang-btn {
-    font-size: 10.5px;
+    width: 40px;
+    height: 40px;
   }
 }
 
@@ -556,7 +437,8 @@ button {
   }
 }
 
-/* Folded state leaves a quiet affordance at the corner it folded into.
+/* Folded state leaves a quiet affordance at the corner it folded into —
+   the corner controls are hidden with it, so it owns the corner again.
    Frosted glass over the fully revealed photo, tinted per theme. */
 .chat-reopen-hint {
   position: absolute;
@@ -638,9 +520,16 @@ button {
   height: 0;
 }
 
-/* The signature fade: messages dissolve into the top edge and rise out of
-   the bottom one. A mask, not an overlay, so the translucent surface shows
-   through and rows visibly melt at both edges. */
+/* Flex children must keep their content height: rows carry overflow:hidden
+   (the dissolve), which zeroes their automatic minimum size — without this
+   the log squishes every row instead of overflowing, and never scrolls. */
+.chat-log > * {
+  flex-shrink: 0;
+}
+
+/* The signature fade: messages dissolve into the top edge only — the
+   bottom stays crisp. A mask, not an overlay, so the translucent surface
+   shows through and rows visibly melt at the top. */
 .chat-log {
   -webkit-mask-image: linear-gradient(
     180deg,
@@ -648,10 +537,7 @@ button {
     rgba(0, 0, 0, 0.28) 3.5%,
     rgba(0, 0, 0, 0.85) 8%,
     #000 14%,
-    #000 86%,
-    rgba(0, 0, 0, 0.85) 92%,
-    rgba(0, 0, 0, 0.28) 96.5%,
-    transparent 100%
+    #000 100%
   );
   mask-image: linear-gradient(
     180deg,
@@ -659,10 +545,7 @@ button {
     rgba(0, 0, 0, 0.28) 3.5%,
     rgba(0, 0, 0, 0.85) 8%,
     #000 14%,
-    #000 86%,
-    rgba(0, 0, 0, 0.85) 92%,
-    rgba(0, 0, 0, 0.28) 96.5%,
-    transparent 100%
+    #000 100%
   );
 }
 
@@ -697,25 +580,6 @@ button {
   color: var(--ink-mute);
 }
 
-.chat-day-divider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 14px 6px 8px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: var(--ink-mute);
-}
-
-.chat-day-divider::before,
-.chat-day-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--line);
-}
-
 /* ---------- One message row ---------- */
 
 .msg-row {
@@ -725,18 +589,13 @@ button {
   gap: 0 10px;
   padding: 4px 10px;
   border-radius: 10px;
-  max-height: 640px; /* the dissolve animation collapses through this */
-  overflow: hidden;
+  /* Overflow stays visible so the hover toolbar can float above the row
+     top; only the dissolve animation clips (see .is-expiring). */
   transition: background 0.12s ease;
 }
 
 .msg-row:hover {
   background: var(--row-hover);
-}
-
-.msg-row.is-grouped {
-  padding-top: 1px;
-  padding-bottom: 1px;
 }
 
 .msg-row.is-pending .msg-body {
@@ -749,6 +608,8 @@ button {
 
 /* The one-hour farewell: blur + lift away, then fold the row shut. */
 .msg-row.is-expiring {
+  overflow: hidden; /* the fold-shut needs clipping; rows normally don't */
+  max-height: 640px;
   animation: msg-dissolve 1s cubic-bezier(0.4, 0, 0.4, 1) forwards;
   pointer-events: none;
 }
@@ -801,6 +662,13 @@ button {
   overflow: hidden;
 }
 
+/* DiceBear face in the same gutter slot (size set inline by AvatarBadge). */
+.msg-avatar-img {
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+}
+
 .msg-main {
   min-width: 0;
   min-inline-size: 0;
@@ -822,11 +690,14 @@ button {
   text-overflow: ellipsis;
 }
 
-.msg-time {
-  font-size: 10.5px;
-  color: var(--ink-mute);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+/* Small centered dot between the name and the countdown ring. */
+.msg-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--ink-mute);
+  opacity: 0.75;
+  flex-shrink: 0;
 }
 
 .msg-body {
@@ -854,6 +725,7 @@ button {
   cursor: zoom-in;
   margin-top: 4px;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+  -webkit-touch-callout: none; /* long-press opens our sheet, not the OS menu */
 }
 
 .msg-image:hover {
@@ -983,13 +855,70 @@ button {
    Frosted glass like the reopen hint — translucent, theme-tinted, only
    ever sitting on the revealed photo. */
 
-.bg-slot-ring {
+/* Folded-corner cluster: slot ring +, for feed photos, the source link.
+   Sits above the click-anywhere reopen veil so the link stays tappable. */
+.bg-corner {
   position: absolute;
   right: max(10px, env(safe-area-inset-right));
   bottom: max(10px, env(safe-area-inset-bottom));
-  z-index: 5;
-  width: 20px;
-  height: 20px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: hint-rise 0.45s 0.3s ease both;
+}
+
+.bg-slot-ring {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface-glass);
+  color: var(--ink-soft);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  box-shadow: 0 4px 12px var(--shadow);
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.bg-slot-ring:hover {
+  color: var(--accent);
+}
+
+/* mm:ss readout: floats above the ring on hover (desktop) or tap (touch). */
+.bg-tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  white-space: nowrap;
+  padding: 5px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: 11.5px;
+  font-weight: 700;
+  box-shadow: 0 8px 22px var(--shadow);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.18s ease, visibility 0.18s ease;
+}
+
+.bg-slot-ring:hover .bg-tip,
+.bg-slot-ring.is-tip-open .bg-tip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.bg-link-btn {
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -999,8 +928,13 @@ button {
   backdrop-filter: blur(12px) saturate(1.2);
   -webkit-backdrop-filter: blur(12px) saturate(1.2);
   box-shadow: 0 4px 12px var(--shadow);
-  animation: hint-rise 0.45s 0.3s ease both;
-  pointer-events: none;
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.bg-link-btn:hover {
+  color: var(--accent);
+  transform: scale(1.08);
 }
 
 /* ---------- Composer (the pill) ---------- */
@@ -1121,6 +1055,14 @@ button {
 
 /* ---------- Popovers (plus menu / emoji panel) ---------- */
 
+/* Hover zone: a side button plus the popover it reveals, so the pointer
+   can travel between them without the popover closing. */
+.composer-zone {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+}
+
 .popover {
   position: absolute;
   bottom: calc(100% + 12px);
@@ -1179,7 +1121,7 @@ button {
 }
 
 .emoji-panel {
-  right: 0;
+  right: -54px; /* align its right edge with the send button's */
   width: min(320px, calc(100vw - 40px));
   padding: 12px;
   transform-origin: bottom right;
@@ -1225,6 +1167,10 @@ button {
   -webkit-backdrop-filter: blur(18px);
   animation: viewer-in 0.25s ease both;
   cursor: zoom-out;
+  /* Gestures own the pointer: swipes/pans must not scroll the page. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 @keyframes viewer-in {
@@ -1236,13 +1182,46 @@ button {
   }
 }
 
+/* Three-cell film strip: current centered, neighbors a screen away. */
+.viewer-strip {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  will-change: transform;
+}
+
+.viewer-cell {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
 .image-viewer img {
   max-width: min(94vw, 1200px);
   max-height: 90dvh;
   border-radius: 12px;
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6);
   animation: viewer-img 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
-  cursor: default;
+  cursor: grab;
+  touch-action: none;
+  will-change: transform;
+}
+
+@media (max-width: 820px) {
+  /* Phones: the photo bleeds edge to edge. */
+  .image-viewer {
+    padding: 0;
+  }
+
+  .image-viewer img {
+    max-width: 100vw;
+    max-height: 100dvh;
+    border-radius: 0;
+    box-shadow: none;
+  }
 }
 
 @keyframes viewer-img {
@@ -1511,6 +1490,16 @@ button {
 @media (max-width: 820px) {
   .chat-log-wrap {
     padding: 26px 0 92px;
+  }
+
+  /* Dock sits a touch lower; camera / emoji glyphs read bigger on touch. */
+  .composer-dock {
+    bottom: max(15px, env(safe-area-inset-bottom));
+  }
+
+  .composer-side-btn svg {
+    width: 24px;
+    height: 24px;
   }
 
   .msg-image {

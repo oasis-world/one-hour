@@ -4,13 +4,20 @@ import BackgroundStage from './components/BackgroundStage'
 import Composer from './components/Composer'
 import ImageViewer from './components/ImageViewer'
 import MessageList from './components/MessageList'
+import ProfilePage from './components/ProfilePage'
+import SettingsBar from './components/SettingsBar'
 import TopBar from './components/TopBar'
+import WelcomeModal from './components/WelcomeModal'
 import { ChatBubbleIcon, ThinXIcon } from './components/icons'
 import { useChatRoom } from './components/useChatRoom'
 import { useAccount } from './lib/useAccount'
+import { useUserProfile } from './lib/userProfile'
+import { watchAccountForProfileSync } from './lib/profileCloud'
+import { useMobileKeyboard } from './lib/useMobileKeyboard'
+import './lib/settingsRuntime'
 import { fileToChatImage } from './lib/imageBlob'
 import { setLang, useLang } from './lib/i18n'
-import { loadTheme, loadVeil, saveBgTtlMs, saveTheme, saveVeil, type ThemeName } from './lib/settings'
+import { loadTheme, loadVeil, type ThemeName } from './lib/settings'
 
 /**
  * 一小时 / one-hour — the ephemeral chat room. Every message, text or
@@ -18,9 +25,9 @@ import { loadTheme, loadVeil, saveBgTtlMs, saveTheme, saveVeil, type ThemeName }
  *
  * Layout: the chat column sits center screen (50% wide desktop, 90% on
  * phones), the composer pill docks 20px above the bottom, and the newest
- * photo in the room paints the blurred fullscreen backdrop. Closing the
- * chat folds the whole column into the bottom-left corner and reveals the
- * backdrop in full clarity; a click anywhere unfolds it back.
+ * photo in the room paints the blurred fullscreen backdrop. The top-left
+ * avatar holds the account menu, the bottom-left gear the room settings;
+ * first visits pass through the welcome gate to pick a face + nickname.
  */
 
 type FoldState = 'open' | 'folding' | 'folded' | 'unfolding'
@@ -30,14 +37,41 @@ const UNFOLD_MS = 540
 
 export default function App() {
   const account = useAccount()
+  const profile = useUserProfile()
   const room = useChatRoom(true)
   const lang = useLang()
   const zh = lang === 'zh'
   const [fold, setFold] = useState<FoldState>('open')
-  const [accountOpen, setAccountOpen] = useState(false)
-  const [viewerSrc, setViewerSrc] = useState<string | null>(null)
+  /** Which account dialog view is open, if any. */
+  const [accountView, setAccountView] = useState<'closed' | 'signin' | 'bind'>('closed')
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [welcomeOpen, setWelcomeOpen] = useState(false)
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null)
+  /** Composer popover open (plus/emoji) — mobile hides the gear meanwhile. */
+  const [composerMenuOpen, setComposerMenuOpen] = useState(false)
+  /**
+   * A blank click that just dismissed a composer popover must not also
+   * fold the chat: the popover closes on pointerdown, before this click
+   * lands, so a plain boolean guard races. The dismissal timestamp is
+   * recorded synchronously in the callback — an effect would flush too
+   * late to guard the click that follows.
+   */
+  const menuClosedAt = useRef(0)
+  const menuWasOpen = useRef(false)
+  const handleMenuOpenChange = (open: boolean) => {
+    setComposerMenuOpen(open)
+    if (open) {
+      menuWasOpen.current = true
+    } else if (menuWasOpen.current) {
+      menuWasOpen.current = false
+      menuClosedAt.current = Date.now()
+    }
+  }
   const [toast, setToast] = useState<string | null>(null)
   const toastTimer = useRef<number | null>(null)
+
+  // Signed-in players carry their profile in the cloud; guests stay local.
+  useEffect(() => watchAccountForProfileSync(), [])
 
   const systemTheme = (): ThemeName => {
     try {
@@ -51,8 +85,8 @@ export default function App() {
   const [theme, setTheme] = useState<ThemeName>(() => loadTheme() ?? systemTheme())
   const [veil, setVeil] = useState<number>(() => loadVeil())
 
-  // The settings dialog (designed separately) adjusts these via the
-  // window helpers below; the events hot-swap the running shell.
+  // The settings surfaces adjust these via the window helpers; the
+  // events hot-swap the running shell.
   useEffect(() => {
     const onVeil = () => setVeil(loadVeil())
     const onTheme = () => setTheme(loadTheme() ?? systemTheme())
@@ -100,18 +134,28 @@ export default function App() {
     }
   }
 
-  // The backdrop follows the newest photo in the log.
-  const latestImage = useMemo(() => {
-    for (let i = room.entries.length - 1; i >= 0; i -= 1) {
-      const entry = room.entries[i]
-      if (!entry.expiring && (entry.imageUrl || entry.localImage)) {
-        return (entry.imageUrl ?? entry.localImage) as string
-      }
+  // The backdrop follows the newest photo in the log; the viewer browses
+  // every live photo, oldest → newest.
+  const chatImages = useMemo(() => {
+    const urls: string[] = []
+    for (const entry of room.entries) {
+      if (entry.expiring || entry.state) continue
+      const url = entry.imageUrl ?? entry.localImage
+      if (url) urls.push(url)
     }
-    return null
+    return urls
   }, [room.entries])
 
+  const latestImage = chatImages.length > 0 ? chatImages[chatImages.length - 1] : null
+
+  const openImage = (src: string) => {
+    const idx = chatImages.indexOf(src)
+    if (idx >= 0) setViewerIndex(idx)
+  }
+
   const chatMounted = fold !== 'folded'
+  const shellRef = useRef<HTMLDivElement>(null)
+  useMobileKeyboard(shellRef)
   const shellClass = [
     'app-shell',
     theme === 'warm' ? 'theme-warm' : '',
@@ -119,15 +163,22 @@ export default function App() {
   ].join(' ')
 
   return (
-    <div className={shellClass} style={{ ['--veil' as string]: String(veil) }}>
+    <div ref={shellRef} className={shellClass} style={{ ['--veil' as string]: String(veil) }}>
       <BackgroundStage imageUrl={latestImage} revealed={fold === 'folded'} />
 
       <TopBar
         account={account}
+        profile={profile}
+        onSignIn={() => setAccountView('signin')}
+        onOpenProfile={() => setProfileOpen(true)}
+        onOpenWelcome={() => setWelcomeOpen(true)}
+      />
+
+      <SettingsBar
         members={room.presence}
         selfId={room.identity?.userId ?? null}
         theme={theme}
-        onAvatarClick={() => setAccountOpen(true)}
+        suppressed={composerMenuOpen}
         onToggleTheme={() => window.setOneHourTheme?.(theme === 'dark' ? 'warm' : 'dark')}
         onToggleLang={() => setLang(zh ? 'en' : 'zh')}
       />
@@ -149,7 +200,17 @@ export default function App() {
       )}
 
       {chatMounted ? (
-        <div className="chat-stage">
+        <div
+          className="chat-stage"
+          onClick={(e) => {
+            // Desktop: the stage showing around the column is one big
+            // "fold the chat" hit target; a click that only dismissed a
+            // composer popover shouldn't fold the room as well.
+            if (e.target !== e.currentTarget) return
+            if (composerMenuOpen || Date.now() - menuClosedAt.current < 400) return
+            closeChat()
+          }}
+        >
           <div
             className={`chat-column${
               fold === 'folding' ? ' is-folded' : fold === 'unfolding' ? ' is-unfolding' : ''
@@ -160,13 +221,19 @@ export default function App() {
               selfId={room.identity?.userId ?? null}
               status={room.status}
               layoutKey={fold === 'unfolding'}
-              onImageClick={setViewerSrc}
+              onImageClick={openImage}
               onRetry={room.retry}
+              onRemove={room.remove}
+              onToast={showToast}
               onLoadOlder={room.loadOlder}
             />
 
             {room.identity ? (
-              <Composer onSend={handleSend} onImagePicked={handleImagePicked} />
+              <Composer
+                onSend={handleSend}
+                onImagePicked={handleImagePicked}
+                onMenuOpenChange={handleMenuOpenChange}
+              />
             ) : (
               <div className="composer-dock">
                 <div className="composer" style={{ alignItems: 'center', minHeight: 52 }}>
@@ -202,41 +269,42 @@ export default function App() {
         </>
       )}
 
-      {viewerSrc && <ImageViewer src={viewerSrc} onClose={() => setViewerSrc(null)} />}
-      {accountOpen && (
-        <AccountDialog account={account} onClose={() => setAccountOpen(false)} />
+      {viewerIndex != null && chatImages[viewerIndex] && (
+        <ImageViewer
+          images={chatImages}
+          index={viewerIndex}
+          onIndexChange={setViewerIndex}
+          onClose={() => setViewerIndex(null)}
+        />
+      )}
+      {accountView !== 'closed' && (
+        <AccountDialog
+          account={account}
+          initialMode={accountView === 'signin' ? 'signin' : 'bind'}
+          onClose={() => setAccountView('closed')}
+          onOpenProfile={() => {
+            setAccountView('closed')
+            setProfileOpen(true)
+          }}
+        />
+      )}
+      {profileOpen && (
+        <ProfilePage
+          account={account}
+          onClose={() => setProfileOpen(false)}
+          onOpenSignIn={() => {
+            setProfileOpen(false)
+            setAccountView('bind')
+          }}
+        />
+      )}
+      {(!profile || welcomeOpen) && (
+        <WelcomeModal
+          mode={profile ? 'edit' : 'welcome'}
+          onClose={profile ? () => setWelcomeOpen(false) : undefined}
+        />
       )}
       {toast && <div className="app-toast">{toast}</div>}
     </div>
   )
-}
-
-/**
- * Runtime hooks for the future settings dialog: persist a value and ping
- * the shell through a custom event so the change applies without a reload.
- *   window.setOneHourVeil(0.6)          — chat background opacity 0–0.92
- *   window.setOneHourTheme('warm')      — 'warm' | 'dark' | null (= auto)
- *   window.setOneHourBgTtl(600000)      — backdrop rotation slot, ms (≥15s)
- */
-declare global {
-  interface Window {
-    setOneHourVeil?(value: number): void
-    setOneHourTheme?(theme: 'warm' | 'dark' | null): void
-    setOneHourBgTtl?(ms: number): void
-  }
-}
-
-if (typeof window !== 'undefined') {
-  window.setOneHourVeil = (value: number) => {
-    saveVeil(value)
-    window.dispatchEvent(new Event('one-hour:veil'))
-  }
-  window.setOneHourTheme = (theme: 'warm' | 'dark' | null) => {
-    saveTheme(theme)
-    window.dispatchEvent(new Event('one-hour:theme'))
-  }
-  window.setOneHourBgTtl = (ms: number) => {
-    saveBgTtlMs(ms)
-    window.dispatchEvent(new Event('one-hour:bg-ttl'))
-  }
 }

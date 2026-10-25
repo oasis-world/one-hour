@@ -1,0 +1,113 @@
+/* ============================================================
+   一小时 / one-hour — the DiceBear style catalog dropdown
+   (welcome / profile avatar picker) plus the neutral disc an
+   AvatarBadge shows while a style chunk is still loading.
+   ============================================================ */
+
+/* Loading placeholder: keeps the slot, never shifts layout. */
+.avatar-pending {
+  display: block;
+  flex-shrink: 0;
+  background: var(--row-hover);
+  border: 1.5px solid var(--line-soft);
+}
+
+/* ---------- Style catalog panel ---------- */
+
+.style-picker {
+  width: 100%;
+  margin: 2px 0 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  animation: popover-rise 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+  transform-origin: top center;
+}
+
+.style-picker-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2px;
+  padding: 6px;
+  max-height: 248px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.style-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px 4px 4px 6px;
+  border-radius: 11px;
+  transition: background 0.14s ease;
+}
+
+.style-row:hover {
+  background: var(--row-hover);
+}
+
+.style-row.is-current {
+  background: var(--accent-soft);
+}
+
+.style-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+
+.style-row-face {
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+}
+
+.style-row-name {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.style-row.is-current .style-row-name {
+  color: var(--accent);
+}
+
+.style-row-reroll {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-mute);
+  cursor: pointer;
+  transition: color 0.14s ease, background 0.14s ease;
+}
+
+.style-row-reroll:hover {
+  color: var(--accent);
+  background: var(--row-hover);
+}
+
+@media (max-width: 420px) {
+  .style-picker-list {
+    grid-template-columns: 1fr;
+  }
+}

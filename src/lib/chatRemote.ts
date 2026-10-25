@@ -15,6 +15,17 @@ const MESSAGES_TABLE = 'chat_messages'
 const IMAGES_BUCKET = 'chat-images'
 export const CHAT_PAGE_SIZE = 40
 
+/** Clients refresh their presence stamp on this cadence. */
+const PRESENCE_HEARTBEAT_MS = 60_000
+/**
+ * A member whose stamp is staler than this is a phantom: the client died
+ * without the realtime server noticing (kill / crash), and the entry
+ * would otherwise haunt the online list until a server restart. The
+ * tradeoff is clock skew — a device >3min fast would ghost itself; NTP
+ * keeps real devices within seconds.
+ */
+const PRESENCE_GHOST_AFTER_MS = 3 * 60_000
+
 export interface ChatCursor {
   createdAt: string
   id: string
@@ -37,14 +48,24 @@ export interface RoomCallbacks {
 }
 
 export interface RoomHandle {
-  track(identity: { userId: string; displayName: string; avatarUrl: string | null }): void
+  track(identity: {
+    userId: string
+    displayName: string
+    avatar: { style: string; seed: string } | null
+    avatarUrl: string | null
+  }): void
   send(draft: {
     id: string
     content: string
     displayName: string
+    avatar?: { style: string; seed: string }
+    avatarUrl?: string | null
     imageBlob?: Blob
   }): Promise<{ ok: true } | { ok: false; error: 'network' | 'rejected' }>
-  deleteMessage(id: string): Promise<{ ok: true } | { ok: false; error: 'network' | 'rejected' }>
+  /** Author deletes one own message: dissolve here, purge the cloud row
+   *  and, through the storage API (SQL deletes on storage.objects are
+   *  platform-blocked), the photo object under the author's folder. */
+  deleteMessage(id: string, imagePath?: string | null): Promise<{ ok: true } | { ok: false; error: 'network' | 'rejected' }>
   leave(): void
 }
 
@@ -52,12 +73,46 @@ interface MessageRow {
   id: string
   user_id: string
   display_name: string
+  avatar_style: string | null
+  avatar_seed: string | null
+  avatar_url: string | null
   content: string
   image_url: string | null
   created_at: string
 }
 
 export const ROOM_TOPIC = 'chat:global'
+
+/** Set once the RPC answers 403/404 — schema not migrated; stop calling. */
+let purgeRpcAvailable = true
+
+/**
+ * Safety net for projects where the pg_cron purge is not scheduled: the
+ * function is SECURITY DEFINER and granted to every authenticated player,
+ * so any online client can sweep the whole room's expired rows (and
+ * orphaned photos). Best effort — never blocks the caller. A 403/404 (or
+ * the function missing) disables the fallback for the session instead of
+ * hammering the console every cycle.
+ */
+export async function purgeExpiredRemote(): Promise<void> {
+  if (!purgeRpcAvailable) return
+  const ctx = await chatContext()
+  if (!ctx) return
+  try {
+    const { error } = await ctx.rpc('purge_expired_chat_messages')
+    // 403/404 (HTTP) and 42501 (permission denied) are permanent states —
+    // retrying every cycle only hammers the console.
+    if (
+      error &&
+      (error.code === '403' || error.code === '404' || error.code === '42501' ||
+        /permission denied|does not exist/i.test(error.message ?? ''))
+    ) {
+      purgeRpcAvailable = false
+    }
+  } catch {
+    // Network hiccup: pg_cron remains the primary sweeper.
+  }
+}
 
 async function chatContext(): Promise<SupabaseClient | null> {
   if (!isSupabaseConfigured()) return null
@@ -78,7 +133,9 @@ export async function fetchChatPage(before?: ChatCursor): Promise<ChatPage | nul
   try {
     let query = ctx
       .from(MESSAGES_TABLE)
-      .select('id, user_id, display_name, content, image_url, created_at')
+      // '*' rather than an explicit list: the row picks up the avatar
+      // columns once the schema migration runs, without breaking before.
+      .select('*')
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
@@ -133,11 +190,14 @@ export async function joinChatRoom(options: {
     channel
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState<PresencePayload>()
-        // One member per userId, keeping the freshest track.
+        const now = Date.now()
+        // One member per userId, keeping the freshest track — and hiding
+        // phantoms whose client stopped refreshing its stamp.
         const latestByUser = new Map<string, PresencePayload>()
         for (const entries of Object.values(state)) {
           for (const entry of entries) {
             if (!entry?.userId) continue
+            if (now - entry.enteredAt > PRESENCE_GHOST_AFTER_MS) continue
             const kept = latestByUser.get(entry.userId)
             if (!kept || entry.enteredAt > kept.enteredAt) {
               latestByUser.set(entry.userId, entry)
@@ -149,6 +209,8 @@ export async function joinChatRoom(options: {
           .map((entry) => ({
             userId: entry.userId,
             displayName: entry.displayName,
+            avatarStyle: entry.avatarStyle ?? null,
+            avatarSeed: entry.avatarSeed ?? null,
             avatarUrl: entry.avatarUrl ?? null,
             enteredAt: entry.enteredAt,
           }))
@@ -182,11 +244,34 @@ export async function joinChatRoom(options: {
     return null
   }
 
+  /** Latest tracked identity — re-sent by the heartbeat to keep the
+   *  presence stamp fresh (phantom pruning reads it). */
+  let lastIdentity: Parameters<RoomHandle['track']>[0] | null = null
+  let heartbeat: ReturnType<typeof setInterval> | null = null
+
   return {
     track(identity) {
+      lastIdentity = identity
+      // One heartbeat per channel: every minute the player re-announces
+      // itself, so peers can tell a live tab from a phantom.
+      if (!heartbeat) {
+        heartbeat = setInterval(() => {
+          if (!lastIdentity) return
+          void channel.track({
+            userId: lastIdentity.userId,
+            displayName: lastIdentity.displayName,
+            avatarStyle: lastIdentity.avatar?.style ?? null,
+            avatarSeed: lastIdentity.avatar?.seed ?? null,
+            avatarUrl: lastIdentity.avatarUrl,
+            enteredAt: Date.now(),
+          })
+        }, PRESENCE_HEARTBEAT_MS)
+      }
       void channel.track({
         userId: identity.userId,
         displayName: identity.displayName,
+        avatarStyle: identity.avatar?.style ?? null,
+        avatarSeed: identity.avatar?.seed ?? null,
         avatarUrl: identity.avatarUrl,
         enteredAt: Date.now(),
       })
@@ -210,23 +295,42 @@ export async function joinChatRoom(options: {
           }
           imageUrl = ctx.storage.from(IMAGES_BUCKET).getPublicUrl(path).data.publicUrl
         }
-        const { error } = await ctx.from(MESSAGES_TABLE).insert({
+        const base = {
           id: draft.id,
           user_id: uid,
           display_name: draft.displayName,
           content: draft.content || '',
           image_url: imageUrl,
+        }
+        let { error } = await ctx.from(MESSAGES_TABLE).insert({
+          ...base,
+          avatar_style: draft.avatar?.style ?? null,
+          avatar_seed: draft.avatar?.seed ?? null,
+          avatar_url: draft.avatarUrl ?? null,
         })
+        if (error && isMissingColumnError(error)) {
+          // Schema not migrated yet: the avatar is cosmetic, the words are
+          // not — retry once without the unknown columns.
+          ({ error } = await ctx.from(MESSAGES_TABLE).insert(base))
+        }
         if (error) return { ok: false, error: 'rejected' }
         return { ok: true }
       } catch {
         return { ok: false, error: 'network' }
       }
     },
-    async deleteMessage(id) {
+    async deleteMessage(id, imagePath) {
       try {
         const { error } = await ctx.from(MESSAGES_TABLE).delete().eq('id', id)
         if (error) return { ok: false, error: 'rejected' }
+        if (imagePath) {
+          // Best effort: an orphaned object is a leak, never a lost word.
+          try {
+            await ctx.storage.from(IMAGES_BUCKET).remove([imagePath])
+          } catch {
+            // Object already gone or folder policy changed.
+          }
+        }
         return { ok: true }
       } catch {
         return { ok: false, error: 'network' }
@@ -234,6 +338,11 @@ export async function joinChatRoom(options: {
     },
     leave() {
       // Untrack first so the server drops this presence immediately.
+      if (heartbeat) {
+        clearInterval(heartbeat)
+        heartbeat = null
+      }
+      lastIdentity = null
       void (async () => {
         try {
           await channel.untrack()
@@ -253,6 +362,8 @@ export async function joinChatRoom(options: {
 interface PresencePayload {
   userId: string
   displayName: string
+  avatarStyle?: string | null
+  avatarSeed?: string | null
   avatarUrl?: string | null
   enteredAt: number
 }
@@ -262,6 +373,9 @@ function rowToMessage(row: MessageRow): ChatMessage {
     id: row.id,
     userId: row.user_id,
     displayName: row.display_name,
+    avatarStyle: row.avatar_style ?? null,
+    avatarSeed: row.avatar_seed ?? null,
+    avatarUrl: row.avatar_url ?? null,
     content: row.content,
     at: new Date(row.created_at).getTime(),
     serverCreatedAt: row.created_at,
@@ -272,4 +386,12 @@ function rowToMessage(row: MessageRow): ChatMessage {
 function isNetworkError(error: { message?: string }): boolean {
   const msg = (error.message ?? '').toLowerCase()
   return /fetch|network|timeout|failed to fetch/.test(msg)
+}
+
+/** PostgREST "column not found" (schema not migrated to avatars yet). */
+function isMissingColumnError(error: { message?: string; code?: string }): boolean {
+  return (
+    error.code === 'PGRST204' ||
+    /could not find the .*avatar_(style|seed|url) column/i.test(error.message ?? '')
+  )
 }

@@ -1,77 +1,151 @@
+import { useRef } from 'react'
 import type { ChatEntry } from '../lib/chatTypes'
-import { useLang } from '../lib/i18n'
+import { t } from '../lib/i18n'
+import type { RoomReactionMap } from '../lib/chatReactions'
 import { isAutoTravelerName } from '../lib/nickname'
 import { userAvatarTint, userNameColor } from '../lib/identity'
+import AvatarBadge from './AvatarBadge'
 import CountdownRing from './CountdownRing'
 import { TravelerGlyph } from './icons'
-
-/** Twitter-style clock: 20:45. */
-function formatClock(at: number): string {
-  const d = new Date(at)
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-function dayLabel(at: number, zh: boolean): string {
-  const d = new Date(at)
-  const now = new Date()
-  const sameYear = d.getFullYear() === now.getFullYear()
-  if (zh) {
-    const base = `${d.getMonth() + 1}月${d.getDate()}日`
-    return sameYear ? base : `${d.getFullYear()}年${base}`
-  }
-  const monthDay = d.toLocaleString('en-US', { month: 'short', day: 'numeric' })
-  return sameYear ? monthDay : `${monthDay}, ${d.getFullYear()}`
-}
-
-function sameDay(a: number, b: number): boolean {
-  const da = new Date(a)
-  const db = new Date(b)
-  return (
-    da.getFullYear() === db.getFullYear() &&
-    da.getMonth() === db.getMonth() &&
-    da.getDate() === db.getDate()
-  )
-}
+import MsgHoverBar from './MsgHoverBar'
+import MsgReactions from './MsgReactions'
 
 interface Props {
   entry: ChatEntry
-  previous: ChatEntry | null
   mine: boolean
+  menuOpen: boolean
+  reactions: RoomReactionMap | undefined
   onImageClick: (src: string) => void
   onRetry: () => void
+  onOpenMenu: (
+    entry: ChatEntry,
+    anchor: { x: number; y: number },
+    sheet: boolean,
+    confirm?: boolean,
+  ) => void
+  onReact: (entryId: string, emoji: string) => void
+  onCopy: (entry: ChatEntry) => void
 }
 
-/**
- * One message row (Discord layout): avatar gutter, name, clock and the
- * hour-glass countdown, then the text and/or photo. Rows carry their own
- * farewell — `.is-expiring` plays the dissolve while the sync layer
- * removes them from the list underneath.
- */
-export default function MessageRow({ entry, previous, mine, onImageClick, onRetry }: Props) {
-  const lang = useLang()
-  const zh = lang === 'zh'
-  const newDay = !previous || !sameDay(previous.at, entry.at)
-  const grouped =
-    !newDay &&
-    previous !== null &&
-    previous.userId === entry.userId &&
-    entry.at - previous.at < 7 * 60_000
+/** Touch form factors (phones, tablets) get the long-press sheet. */
+function isTouchUI(): boolean {
+  try {
+    return (
+      globalThis.matchMedia?.('(hover: none), (pointer: coarse)').matches ?? false
+    )
+  } catch {
+    return false
+  }
+}
 
+const TOUCH = typeof window === 'undefined' ? false : isTouchUI()
+
+/**
+ * One message row (every row carries its own header — each message owns a
+ * personal one-hour countdown): avatar gutter, name, a dot separator and
+ * the hour-glass countdown, then the text and/or photo. No clock is shown:
+ * the message lifetime is fixed at one hour, so the countdown is the only
+ * time that matters. Desktop hover shows the quick toolbar; right-click
+ * opens the context menu; on touch a 500ms long-press opens the bottom
+ * sheet (scrolling aborts the press). Rows carry their own farewell —
+ * `.is-expiring` plays the dissolve while the sync layer removes them
+ * from the list underneath.
+ */
+export default function MessageRow({
+  entry,
+  mine,
+  menuOpen,
+  reactions,
+  onImageClick,
+  onRetry,
+  onOpenMenu,
+  onReact,
+  onCopy,
+}: Props) {
   const imageSrc = entry.imageUrl ?? entry.localImage ?? null
 
-  const row = (
+  // Mobile long-press → bottom sheet. Scrolling (pointermove / cancel)
+  // aborts the press; interactive children opt out via the closest() guard.
+  const pressTimer = useRef<number | null>(null)
+  const pressStart = useRef<{ x: number; y: number } | null>(null)
+  const sheetFired = useRef(false)
+
+  const cancelPress = () => {
+    if (pressTimer.current !== null) {
+      window.clearTimeout(pressTimer.current)
+      pressTimer.current = null
+    }
+    pressStart.current = null
+  }
+  const endPress = () => {
+    cancelPress()
+    sheetFired.current = false
+  }
+  const openSheet = () => {
+    pressTimer.current = null
+    pressStart.current = null
+    sheetFired.current = true
+    try {
+      navigator.vibrate?.(15)
+    } catch {
+      // Haptics are best-effort.
+    }
+    onOpenMenu(entry, { x: window.innerWidth / 2, y: window.innerHeight / 2 }, true)
+  }
+
+  return (
     <div
       id={`msg-${entry.id}`}
       className={[
         'msg-row',
         mine ? 'is-mine' : '',
-        grouped ? 'is-grouped' : '',
         entry.state ? `is-${entry.state}` : '',
         entry.expiring ? 'is-expiring' : '',
+        menuOpen ? 'is-menu-open' : '',
       ].join(' ')}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (entry.expiring) return
+        if (TOUCH) {
+          // Native long-press menu (or our timer losing the race): the
+          // sheet is already open when our timer won — swallow the dup.
+          if (sheetFired.current) return
+          cancelPress()
+          openSheet()
+          return
+        }
+        onOpenMenu(entry, { x: e.clientX, y: e.clientY }, false)
+      }}
+      onPointerDown={(e) => {
+        if (!TOUCH || entry.expiring || e.pointerType === 'mouse') return
+        const target = e.target as HTMLElement | null
+        if (target?.closest?.('button, a, textarea, input')) return
+        sheetFired.current = false
+        pressStart.current = { x: e.clientX, y: e.clientY }
+        if (pressTimer.current !== null) window.clearTimeout(pressTimer.current)
+        pressTimer.current = window.setTimeout(openSheet, 500)
+      }}
+      onPointerMove={(e) => {
+        const start = pressStart.current
+        if (!start) return
+        if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) cancelPress()
+      }}
+      onPointerUp={endPress}
+      onPointerCancel={endPress}
     >
       <div className="msg-gutter" aria-hidden="true">
-        {!grouped && (
+        {entry.avatarUrl || (entry.avatarStyle && entry.avatarSeed) ? (
+          <AvatarBadge
+            look={{
+              style: entry.avatarStyle ?? 'lorelei',
+              seed: entry.avatarSeed ?? '',
+              url: entry.avatarUrl || null,
+            }}
+            size={32}
+            className="msg-avatar-img"
+          />
+        ) : (
           <span
             className="msg-avatar"
             style={{ background: userAvatarTint(entry.userId) }}
@@ -85,24 +159,17 @@ export default function MessageRow({ entry, previous, mine, onImageClick, onRetr
         )}
       </div>
       <div className="msg-main">
-        {!grouped && (
-          <div className="msg-head">
-            <span className="msg-name" style={{ color: userNameColor(entry.userId) }}>
-              {entry.displayName}
-              {mine && (
-                <span style={{ opacity: 0.45, fontWeight: 600 }}>
-                  {zh ? '（我）' : ' (you)'}
-                </span>
-              )}
-            </span>
-            <span className="msg-time">{formatClock(entry.at)}</span>
-            <CountdownRing entry={entry} />
-          </div>
-        )}
+        <div className="msg-head">
+          <span className="msg-name" style={{ color: userNameColor(entry.userId) }}>
+            {entry.displayName}
+          </span>
+          <span className="msg-dot" aria-hidden="true" />
+          <CountdownRing entry={entry} />
+        </div>
         <div className="msg-body">
           {entry.content}
           {entry.state === 'pending' && (
-            <span className="msg-state">{zh ? '发送中…' : ' sending…'}</span>
+            <span className="msg-state">{t('发送中…', ' sending…')}</span>
           )}
           {entry.state === 'failed' && (
             <button
@@ -119,7 +186,7 @@ export default function MessageRow({ entry, previous, mine, onImageClick, onRetr
                 font: 'inherit',
               }}
             >
-              {zh ? '重试' : 'retry'}
+              {t('重试', 'retry')}
             </button>
           )}
         </div>
@@ -133,19 +200,19 @@ export default function MessageRow({ entry, previous, mine, onImageClick, onRetr
             onClick={() => !entry.expiring && onImageClick(imageSrc)}
           />
         )}
+        {!entry.expiring && reactions && (
+          <MsgReactions reactions={reactions} onToggle={(emoji) => onReact(entry.id, emoji)} />
+        )}
+        {!entry.expiring && (
+          <MsgHoverBar
+            mine={mine}
+            onReact={(emoji) => onReact(entry.id, emoji)}
+            onCopy={() => onCopy(entry)}
+            onDelete={(anchor) => onOpenMenu(entry, anchor, false, true)}
+            onMore={(anchor) => onOpenMenu(entry, anchor, false)}
+          />
+        )}
       </div>
     </div>
   )
-
-  if (newDay) {
-    return (
-      <>
-        <div className="chat-day-divider">
-          <span>{dayLabel(entry.at, zh)}</span>
-        </div>
-        {row}
-      </>
-    )
-  }
-  return row
 }

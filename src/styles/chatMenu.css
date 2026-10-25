@@ -1,0 +1,388 @@
+/* ============================================================
+   Message actions — hover toolbar, context menu, mobile sheet,
+   reaction pills. A port of the oasis-game room chat styling
+   (Discord parity); sizes and structure follow the oasis values,
+   colors read the shell's CSS vars so warm / dark both work.
+   ============================================================ */
+
+/* ---- Desktop hover toolbar (row's top-right, pure CSS reveal) ---- */
+
+.msg-hoverbar {
+  position: absolute;
+  top: -14px;
+  right: 8px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px 4px;
+  /* Opaque Discord-dark pill by default; parchment variant below. */
+  background: #2b2d31;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition:
+    opacity 0.1s ease,
+    transform 0.1s ease;
+}
+
+.app-shell.theme-warm .msg-hoverbar {
+  background: #f6e7c8;
+  border: 2px solid #3d2412;
+  box-shadow: 2px 2px 0 rgba(61, 36, 18, 0.3);
+}
+
+.msg-row:hover .msg-hoverbar,
+.msg-row:focus-within .msg-hoverbar,
+.msg-row.is-menu-open .msg-hoverbar {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+/* Touch input has no hover: the floating toolbar never appears there.
+   Mobile opens the same actions via long-press bottom sheet instead. */
+@media (hover: none) {
+  .msg-hoverbar {
+    display: none;
+  }
+}
+
+.msg-hoverbar-btn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 0;
+}
+
+.msg-hoverbar-btn.is-emoji {
+  font-size: 16px;
+}
+
+.msg-hoverbar-btn:hover {
+  background: var(--row-hover);
+  color: var(--ink);
+}
+
+.msg-hoverbar-btn.is-danger:hover {
+  color: var(--danger);
+}
+
+.msg-hoverbar-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  background: var(--line);
+}
+
+/* Touch devices: kill the native long-press menu (copy / look up) so our
+   500ms long-press sheet is the only reaction. The composer textarea
+   re-enables selection so it stays editable. */
+@media (hover: none), (pointer: coarse) {
+  .msg-row {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* The row whose menu is open stays highlighted. */
+.msg-row.is-menu-open {
+  background: var(--row-hover);
+}
+
+/* ---- Context menu (desktop) / bottom sheet (mobile) ---- */
+
+.msg-menu {
+  position: fixed;
+  z-index: 400;
+  /* One fixed width for every entry point (right-click, hover-bar More,
+     long-press sheet): no content-dependent wobble between openings. 260px
+     fits the six-emoji quick row without clipping; the palette below wraps. */
+  width: 260px;
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px var(--shadow);
+  backdrop-filter: blur(18px) saturate(1.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  animation: msg-menu-in 0.1s ease-out;
+}
+
+@keyframes msg-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Mobile long-press sheet (Discord parity): bottom-centered card with the
+   same emoji row + action items, dimmed backdrop closes on outside tap. */
+.msg-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 399;
+  padding: 0;
+  border: 0;
+  background: rgba(12, 9, 5, 0.45);
+  cursor: default;
+}
+
+.msg-menu.is-sheet {
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  top: auto;
+  width: auto;
+  max-width: 560px;
+  margin: 0 auto;
+  max-height: min(62vh, 480px);
+  animation: msg-sheet-in 0.18s ease-out;
+}
+
+@keyframes msg-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.msg-menu-emojis {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 2px 8px;
+}
+
+.msg-menu-emoji {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Hover tints only for real hover-capable pointers — on touch phones the
+   finger resting over the fresh menu would leave items looking pressed. */
+@media (hover: hover) and (pointer: fine) {
+  .msg-menu-emoji:hover {
+    background: var(--row-hover);
+  }
+
+  .msg-menu-item:hover {
+    background: var(--row-hover);
+  }
+
+  .msg-menu-item.is-danger:hover {
+    background: var(--accent-soft);
+  }
+
+  .msg-menu-pick:hover {
+    background: var(--row-hover);
+  }
+}
+
+.msg-menu-emoji:active,
+.msg-menu-item:active,
+.msg-menu-pick:active {
+  background: var(--row-hover);
+}
+
+.msg-menu-sep {
+  height: 1px;
+  margin: 2px 6px 6px;
+  background: var(--line);
+}
+
+.msg-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.msg-menu-item.is-danger {
+  color: var(--danger);
+}
+
+.msg-menu-label {
+  text-align: left;
+  flex: 1;
+}
+
+.msg-menu-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+/* Expand chevron on fold-out items (Add Reaction): points right when
+   collapsed, rotates down when the emoji grid is open. */
+.msg-menu-chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: transform 0.12s ease;
+}
+
+.msg-menu-chevron.is-open {
+  transform: rotate(90deg);
+}
+
+/* Add-Reaction fold-out: wrapped emoji grid under the item, scrolls
+   internally so the wheel never reaches the page (and never closes us). */
+.msg-menu-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-height: 172px;
+  overflow-y: auto;
+  padding: 2px 4px 8px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.msg-menu-picker::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.msg-menu-picker::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
+}
+
+.msg-menu-picker::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.msg-menu-pick {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* ---- Reaction pills under a message ---- */
+
+.msg-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.msg-reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  font-size: 14px;
+  line-height: 1.3;
+  color: var(--ink);
+  background: var(--row-hover);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.msg-reaction:hover {
+  border-color: var(--accent);
+}
+
+.msg-reaction.is-own {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.msg-reaction-count {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* Delete confirmation: the menu swaps to this inline view first. */
+.msg-menu-confirm {
+  padding: 4px 2px;
+  min-width: 176px;
+}
+
+.msg-menu-confirm-text {
+  margin: 2px 8px 10px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ink-soft);
+}
+
+.msg-menu-confirm-row {
+  display: flex;
+  gap: 6px;
+  padding: 0 4px 4px;
+}
+
+.msg-menu-confirm-btn {
+  flex: 1;
+  min-height: 34px;
+  border: none;
+  border-radius: 10px;
+  background: var(--row-hover);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.14s ease;
+}
+
+.msg-menu-confirm-btn:hover {
+  filter: brightness(1.15);
+}
+
+.msg-menu-confirm-btn.is-danger {
+  background: var(--danger);
+  color: #fff6ec;
+}

@@ -1,0 +1,167 @@
+import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useLang } from '../lib/i18n'
+import { useImeEnter } from '../lib/ime'
+import { useAccount } from '../lib/useAccount'
+import { pushProfileToCloud } from '../lib/profileCloud'
+import {
+  cleanNickname,
+  loadUserProfile,
+  NICKNAME_MAX,
+  randomNickname,
+  randomProfile,
+  saveUserProfile,
+  type UserProfile,
+} from '../lib/userProfile'
+import { randomAvatarSeed } from '../lib/avatar'
+import AvatarEditor from './AvatarEditor'
+import { HourglassIcon, ThinXIcon } from './icons'
+
+/**
+ * The avatar + nickname picker, in two modes:
+ * - 'welcome' — first visit gate: welcome copy, random identity, confirm
+ *   enters the room (no close).
+ * - 'edit' — reopened from the account menu ("New avatar & nickname"):
+ *   starts from the current look, closable, save applies in place.
+ */
+export default function WelcomeModal({
+  mode = 'welcome',
+  onClose,
+}: {
+  mode?: 'welcome' | 'edit'
+  onClose?: () => void
+}) {
+  const lang = useLang()
+  const zh = lang === 'zh'
+  const account = useAccount()
+  const editing = mode === 'edit'
+  const [draft, setDraft] = useState<UserProfile>(() =>
+    editing ? (loadUserProfile() ?? randomProfile(undefined, lang)) : randomProfile(undefined, lang),
+  )
+  const ime = useImeEnter()
+
+  // Edit mode is dismissable; the first-visit gate is not.
+  useEffect(() => {
+    if (!onClose) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const reroll = () => setDraft((prev) => randomProfile(prev, lang))
+
+  /** Adopt a style from the catalog; the row button also rolls a new seed. */
+  const pickStyle = (style: string, rerollSeed: boolean) => {
+    setDraft((prev) => ({
+      ...prev,
+      style,
+      seed: rerollSeed ? randomAvatarSeed() : prev.seed,
+      // Choosing a generated look drops any custom photo.
+      avatarUrl: null,
+    }))
+  }
+
+  const confirm = () => {
+    const nickname =
+      cleanNickname(draft.nickname) || randomNickname(draft.nickname, lang)
+    saveUserProfile({
+      nickname,
+      style: draft.style,
+      seed: draft.seed,
+      avatarUrl: draft.avatarUrl ?? null,
+    })
+    // Returning player with a live session: the pick belongs in the cloud.
+    if (account.status === 'signedIn') void pushProfileToCloud()
+    onClose?.()
+  }
+
+  const onNickEnter = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    // An IME's Enter commits the candidates — never our business logic.
+    if (ime.imeConsumesEnter(e)) return
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    confirm()
+  }
+
+  return (
+    <div
+      className="welcome-backdrop"
+      role="presentation"
+      onClick={(e) => {
+        // Edit mode is dismissable by clicking the backdrop; the
+        // first-visit gate is not dismissable at all.
+        if (e.target === e.currentTarget) onClose?.()
+      }}
+    >
+      <div
+        className="welcome-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label={zh ? '欢迎' : 'Welcome'}
+      >
+        <h2 className="welcome-title">
+          <HourglassIcon size={15} />
+          {editing
+            ? zh
+              ? '我的形象'
+              : 'Your look'
+            : zh
+              ? '一小时聊天室'
+              : 'the one-hour room'}
+        </h2>
+
+        {editing ? (
+          <p className="welcome-copy">
+            {zh ? '换一个头像，或直接修改昵称。' : 'Reroll the avatar, or edit your nickname.'}
+          </p>
+        ) : (
+          <p className="welcome-copy">
+            <strong>{zh ? '欢迎来到一小时聊天室' : 'Welcome to the one-hour room'}</strong>
+            {zh
+              ? '每条消息只存在一个小时，留下的都是此刻，畅所欲言吧。'
+              : 'Every message lives for just one hour. Say what matters, now.'}
+          </p>
+        )}
+
+        <AvatarEditor
+          look={draft}
+          size={116}
+          rerollLabel={zh ? '换一个头像和昵称' : 'Reroll avatar and nickname'}
+          onReroll={reroll}
+          onPickStyle={pickStyle}
+          onUploaded={(url) => setDraft((prev) => ({ ...prev, avatarUrl: url }))}
+        />
+
+        <label className="field welcome-field">
+          <span>{zh ? '我的昵称' : 'My nickname'}</span>
+          <input
+            type="text"
+            value={draft.nickname}
+            maxLength={NICKNAME_MAX}
+            spellCheck={false}
+            autoComplete="off"
+            onChange={(e) => setDraft({ ...draft, nickname: e.target.value })}
+            onKeyDown={onNickEnter}
+            {...ime.imeProps}
+          />
+        </label>
+
+        <button type="button" className="btn-accent welcome-confirm" onClick={confirm}>
+          {editing ? (zh ? '保存' : 'Save') : zh ? '开始聊天' : 'Enter the room'}
+        </button>
+
+        {editing && onClose && (
+          <button
+            type="button"
+            className="account-close"
+            onClick={onClose}
+            aria-label={zh ? '关闭' : 'Close'}
+          >
+            <ThinXIcon size={15} />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}

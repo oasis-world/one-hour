@@ -9,8 +9,102 @@
     />
     <meta name="theme-color" content="#0e1014" />
     <title>一小时 · one hour</title>
+    <style>
+      /* Inline splash: paints with the document itself — no white flash,
+         no waiting for the JS bundle or any stylesheet. The app removes
+         it once the shell has mounted (src/main.tsx). */
+      html,
+      body {
+        background: #0e1014;
+      }
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(120% 90% at 20% 10%, #23283a 0%, transparent 55%),
+          radial-gradient(120% 100% at 85% 90%, #3a2a24 0%, transparent 60%),
+          #0e1014;
+        opacity: 1;
+        transition: opacity 0.4s ease;
+      }
+      #splash.is-done {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .splash-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+          'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .splash-mark {
+        color: #e8b04b;
+        animation: splash-pulse 1.6s ease-in-out infinite;
+      }
+      .splash-word {
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        color: #f3efe7;
+        opacity: 0.85;
+      }
+      .splash-word span {
+        color: #e8b04b;
+        margin: 0 2px;
+      }
+      @keyframes splash-pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: none;
+        }
+        50% {
+          opacity: 0.55;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .splash-mark {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="splash" aria-hidden="true">
+      <div class="splash-inner">
+        <svg
+          class="splash-mark"
+          width="44"
+          height="44"
+          viewBox="0 0 14 14"
+          fill="none"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path
+            d="M3.1 1.6h7.8M3.1 12.4h7.8"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+          <path
+            d="M4.4 1.6v1.7L7 5.9l2.6-2.6V1.6M4.4 12.4v-1.7L7 8.1l2.6 2.6v1.7"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <div class="splash-word">一小时 <span>·</span> one hour</div>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

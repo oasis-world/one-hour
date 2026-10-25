@@ -1,35 +1,37 @@
 import { useEffect, useRef } from 'react'
 import type { PresenceMember } from '../lib/chatTypes'
 import { useLang } from '../lib/i18n'
-import { isAutoTravelerName } from '../lib/nickname'
 import { userAvatarTint, userNameColor } from '../lib/identity'
-import { TravelerGlyph } from './icons'
+import AvatarBadge from './AvatarBadge'
 
 /**
- * Online-members popover, opened from the people chip in the top bar:
- * one row per live presence entry — avatar tile, name (self marked),
- * and when they entered. Makes the online count verifiable at a glance.
+ * Online-members popover: one row per live presence entry — DiceBear
+ * face (or letter tile for peers on older clients), name (self marked),
+ * and when they entered. Opens from the settings bar on small screens
+ * placement flips so it grows away from the corner.
  */
 export default function OnlineList({
   members,
   selfId,
   onClose,
+  placement = 'top',
 }: {
   members: PresenceMember[]
   selfId: string | null
   onClose: () => void
+  placement?: 'top' | 'bottom'
 }) {
   const lang = useLang()
   const zh = lang === 'zh'
   const popRef = useRef<HTMLDivElement>(null)
 
-  // Click outside closes — clicks on the top bar itself are the toggle
-  // chip's business, not ours.
+  // Click outside closes — clicks on the corner controls that own this
+  // popover are their own business.
   useEffect(() => {
     const onDown = (e: PointerEvent) => {
       const target = e.target as HTMLElement | null
       if (popRef.current?.contains(target)) return
-      if (target?.closest?.('.top-bar')) return
+      if (target?.closest?.('.top-bar') || target?.closest?.('.settings-bar')) return
       onClose()
     }
     document.addEventListener('pointerdown', onDown)
@@ -37,23 +39,36 @@ export default function OnlineList({
   }, [onClose])
 
   return (
-    <div className="online-pop" ref={popRef} role="dialog" aria-label={zh ? '在线列表' : 'Online members'}>
+    <div
+      className={`online-pop${placement === 'bottom' ? ' is-bottom' : ''}`}
+      ref={popRef}
+      role="dialog"
+      aria-label={zh ? '在线列表' : 'Online members'}
+    >
       <header className="online-pop-head">
         {zh ? `在线 · ${members.length}` : `Online · ${members.length}`}
       </header>
       <ul className="online-pop-list">
         {members.map((member) => (
           <li key={member.userId} className="online-pop-row">
-            <span
-              className="online-pop-avatar"
-              style={{ background: userAvatarTint(member.userId) }}
-            >
-              {isAutoTravelerName(member.displayName) ? (
-                <TravelerGlyph size={14} />
-              ) : (
-                member.displayName.slice(0, 1).toUpperCase()
-              )}
-            </span>
+            {member.avatarUrl || (member.avatarStyle && member.avatarSeed) ? (
+              <AvatarBadge
+                look={{
+                  style: member.avatarStyle ?? 'lorelei',
+                  seed: member.avatarSeed ?? '',
+                  url: member.avatarUrl || null,
+                }}
+                size={28}
+                className="online-pop-face"
+              />
+            ) : (
+              <span
+                className="online-pop-avatar"
+                style={{ background: userAvatarTint(member.userId) }}
+              >
+                {member.displayName.slice(0, 1).toUpperCase()}
+              </span>
+            )}
             <span className="online-pop-name" style={{ color: userNameColor(member.userId) }}>
               {member.displayName}
             </span>

@@ -51,17 +51,19 @@ export function useChatRoom(enabled: boolean) {
   }, [userId])
 
   const displayName = identity?.displayName
-  const avatarUrl = identity?.avatarUrl
+  const avatarUrl = identity?.avatarUrl ?? null
+  const avatarKey = `${identity?.avatar ? `${identity.avatar.style}:${identity.avatar.seed}` : ''}|${avatarUrl ?? ''}`
   useEffect(() => {
     if (!identity || apiRef.current == null) return
     apiRef.current.updateIdentity(identity)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, displayName, avatarUrl])
+  }, [userId, displayName, avatarKey, avatarUrl])
 
   const send = useCallback((text: string, imageBlob?: Blob) => {
     apiRef.current?.send(text, imageBlob)
   }, [])
   const retry = useCallback(() => apiRef.current?.retry(), [])
+  const remove = useCallback((id: string) => apiRef.current?.remove(id), [])
   const loadOlder = useCallback(() => {
     return (
       apiRef.current?.loadOlder() ?? Promise.resolve({ loaded: 0, hasMore: false })
@@ -75,6 +77,7 @@ export function useChatRoom(enabled: boolean) {
     status: (active ? status : 'connecting') as ChatStatus,
     send,
     retry,
+    remove,
     loadOlder,
     identity,
   }

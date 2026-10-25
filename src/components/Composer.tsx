@@ -1,12 +1,18 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { EMOJI_LIST } from '../lib/emoji'
 import { useLang } from '../lib/i18n'
+import { useHoverCapable } from '../lib/media'
+import { useHoverReveal } from '../lib/useHoverReveal'
+import { useImeEnter } from '../lib/ime'
 import { CameraIcon, EmojiIcon, PlusIcon, SendIcon, UploadIcon } from './icons'
+import { PhotoIcon } from './userIcons'
 
 interface Props {
   onSend: (text: string) => void
-  /** Photo picked from camera (mobile) or the upload menu (desktop). */
+  /** Photo picked from camera or the photo library. */
   onImagePicked: (file: File) => void
+  /** Notifies the shell while a popover is up (mobile hides the gear). */
+  onMenuOpenChange?: (open: boolean) => void
 }
 
 function isCoarsePointer(): boolean {
@@ -18,9 +24,8 @@ function isCoarsePointer(): boolean {
 }
 
 /**
- * The composer's left button follows the *form factor*, not just touch
- * capability: phones and narrow windows get the camera, wide pointers get
- * the plus menu (a mouse on a touch laptop keeps its keyboard Enter-send).
+ * The plus menu follows the *form factor*: phones get the camera /
+ * photo-library pair, wide pointers get the single "Upload image" item.
  */
 function useMobileFormFactor(): boolean {
   const [mobile, setMobile] = useState(() =>
@@ -36,11 +41,12 @@ function useMobileFormFactor(): boolean {
 }
 
 /**
- * The composer pill: plus (camera on touch devices) on the left, the field,
- * emoji and the round send arrow on the right. Elegant and quiet in both
- * themes — everything reads the shell's CSS vars.
+ * The composer pill: the plus (camera / photo library) on the left, the
+ * field, emoji and the round send arrow on the right. Desktop hovers on
+ * the plus / emoji buttons reveal their popovers directly; touch devices
+ * tap to toggle.
  */
-export default function Composer({ onSend, onImagePicked }: Props) {
+export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Props) {
   const lang = useLang()
   const zh = lang === 'zh'
   const [draft, setDraft] = useState('')
@@ -49,11 +55,31 @@ export default function Composer({ onSend, onImagePicked }: Props) {
   const [multiline, setMultiline] = useState(false)
   const coarse = isCoarsePointer()
   const mobileForm = useMobileFormFactor()
-  const composingRef = useRef(false)
+  const ime = useImeEnter()
   const rootRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
+
+  // Desktop: hovering a side button opens its popover (grace-closable so
+  // the pointer can travel from the button into the panel).
+  const hover = useHoverCapable()
+  const plusHover = useHoverReveal(
+    hover,
+    () => {
+      setPlusOpen(true)
+      setEmojiOpen(false)
+    },
+    () => setPlusOpen(false),
+  )
+  const emojiHover = useHoverReveal(
+    hover,
+    () => {
+      setEmojiOpen(true)
+      setPlusOpen(false)
+    },
+    () => setEmojiOpen(false),
+  )
 
   // Auto-grow: mirror the content height, capped by CSS max-height.
   useLayoutEffect(() => {
@@ -78,10 +104,16 @@ export default function Composer({ onSend, onImagePicked }: Props) {
     return () => document.removeEventListener('pointerdown', onDown)
   }, [plusOpen, emojiOpen])
 
+  useEffect(() => {
+    onMenuOpenChange?.(plusOpen || emojiOpen)
+  }, [plusOpen, emojiOpen, onMenuOpenChange])
+
+  /**
+   * Insert without touching focus: mousedown on the panel is prevented,
+   * so the field keeps (or keeps losing) the keyboard exactly as it was.
+   */
   const insertEmoji = (emoji: string) => {
-    const el = inputRef.current
     setDraft((prev) => prev + emoji)
-    el?.focus()
   }
 
   const submit = () => {
@@ -102,17 +134,11 @@ export default function Composer({ onSend, onImagePicked }: Props) {
   return (
     <div className="composer-dock" ref={rootRef}>
       <div className={`composer${multiline ? ' is-multiline' : ''}`}>
-        {mobileForm ? (
-          <button
-            type="button"
-            className="composer-side-btn"
-            aria-label={zh ? '拍照发送' : 'Take & send photo'}
-            title={zh ? '拍照发送' : 'Take & send photo'}
-            onClick={() => pickFile(cameraInputRef)}
-          >
-            <CameraIcon />
-          </button>
-        ) : (
+        <div
+          className="composer-zone"
+          onMouseEnter={plusHover.onEnter}
+          onMouseLeave={plusHover.onLeave}
+        >
           <button
             type="button"
             className={`composer-side-btn${plusOpen ? ' is-active' : ''}`}
@@ -126,7 +152,44 @@ export default function Composer({ onSend, onImagePicked }: Props) {
           >
             <PlusIcon />
           </button>
-        )}
+
+          {plusOpen && (
+            <div className="popover plus-menu" role="menu">
+              {mobileForm ? (
+                <>
+                  <button
+                    type="button"
+                    className="plus-menu-item"
+                    role="menuitem"
+                    onClick={() => pickFile(cameraInputRef)}
+                  >
+                    <CameraIcon size={17} />
+                    {zh ? '拍照' : 'Take photo'}
+                  </button>
+                  <button
+                    type="button"
+                    className="plus-menu-item"
+                    role="menuitem"
+                    onClick={() => pickFile(uploadInputRef)}
+                  >
+                    <PhotoIcon size={17} />
+                    {zh ? '从相册选择' : 'Photo library'}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="plus-menu-item"
+                  role="menuitem"
+                  onClick={() => pickFile(uploadInputRef)}
+                >
+                  <UploadIcon size={17} />
+                  {zh ? '上传图片' : 'Upload image'}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
         <textarea
           ref={inputRef}
@@ -136,39 +199,54 @@ export default function Composer({ onSend, onImagePicked }: Props) {
           maxLength={500}
           placeholder={zh ? '说点什么…' : 'Say something…'}
           onChange={(e) => setDraft(e.target.value)}
-          onCompositionStart={() => {
-            composingRef.current = true
-          }}
-          onCompositionEnd={() => {
-            window.setTimeout(() => {
-              composingRef.current = false
-            }, 0)
-          }}
+          {...ime.imeProps}
           onKeyDown={(e) => {
             if (e.key !== 'Enter' || e.shiftKey) return
-            // Guard IME confirmation (Chinese candidates) — that Enter
-            // commits the composition, it must not send.
-            if (composingRef.current || e.nativeEvent.isComposing || e.keyCode === 229) {
-              return
-            }
+            // Guard IME confirmation (candidates) — that Enter commits
+            // the composition, it must not send.
+            if (ime.imeConsumesEnter(e)) return
             e.preventDefault()
             submit()
           }}
         />
 
-        <button
-          type="button"
-          className={`composer-side-btn${emojiOpen ? ' is-active' : ''}`}
-          aria-label={zh ? '表情' : 'Emoji'}
-          title={zh ? '表情' : 'Emoji'}
-          aria-expanded={emojiOpen}
-          onClick={() => {
-            setEmojiOpen((v) => !v)
-            setPlusOpen(false)
-          }}
+        <div
+          className="composer-zone"
+          onMouseEnter={emojiHover.onEnter}
+          onMouseLeave={emojiHover.onLeave}
         >
-          <EmojiIcon />
-        </button>
+          <button
+            type="button"
+            className={`composer-side-btn${emojiOpen ? ' is-active' : ''}`}
+            aria-label={zh ? '表情' : 'Emoji'}
+            title={zh ? '表情' : 'Emoji'}
+            aria-expanded={emojiOpen}
+            onClick={() => {
+              setEmojiOpen((v) => !v)
+              setPlusOpen(false)
+            }}
+          >
+            <EmojiIcon />
+          </button>
+
+          {emojiOpen && (
+            <div className="popover emoji-panel" role="dialog" aria-label="表情选择">
+              <div className="emoji-grid" onMouseDown={(e) => e.preventDefault()}>
+                {EMOJI_LIST.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    className="emoji-cell"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => insertEmoji(emoji)}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         <button
           type="button"
@@ -180,40 +258,9 @@ export default function Composer({ onSend, onImagePicked }: Props) {
         >
           <SendIcon />
         </button>
-
-        {plusOpen && (
-          <div className="popover plus-menu" role="menu">
-            <button
-              type="button"
-              className="plus-menu-item"
-              role="menuitem"
-              onClick={() => pickFile(uploadInputRef)}
-            >
-              <UploadIcon />
-              {zh ? '上传图片' : 'Upload image'}
-            </button>
-          </div>
-        )}
-
-        {emojiOpen && (
-          <div className="popover emoji-panel" role="dialog" aria-label="表情选择">
-            <div className="emoji-grid">
-              {EMOJI_LIST.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  className="emoji-cell"
-                  onClick={() => insertEmoji(emoji)}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Camera (mobile) — capture opens the rear camera directly. */}
+      {/* Camera — capture opens the rear camera directly. */}
       <input
         ref={cameraInputRef}
         type="file"
@@ -226,7 +273,7 @@ export default function Composer({ onSend, onImagePicked }: Props) {
           if (file) onImagePicked(file)
         }}
       />
-      {/* Gallery / disk upload (desktop menu item). */}
+      {/* Photo library / disk upload. */}
       <input
         ref={uploadInputRef}
         type="file"

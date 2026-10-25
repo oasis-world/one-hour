@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { fetchRandomBackgroundUrl, preloadImage } from '../lib/backgroundFeed'
+import { fetchRandomBackground, type BackgroundPhoto } from '../lib/backgroundFeed'
 import { loadBgTtlMs } from '../lib/settings'
 import BgSlotRing from './BgSlotRing'
 
@@ -25,12 +25,14 @@ export default function BackgroundStage({
   imageUrl: string | null
   revealed: boolean
 }) {
-  const [fallbackUrl, setFallbackUrl] = useState<string | null>(null)
+  const [fallback, setFallback] = useState<BackgroundPhoto | null>(null)
   /** Chat photo that already served its full slot — it yields to the feed. */
   const [demotedUrl, setDemotedUrl] = useState<string | null>(null)
 
   const liveChat = imageUrl && imageUrl !== demotedUrl ? imageUrl : null
-  const live = liveChat ?? fallbackUrl
+  const live = liveChat ?? fallback?.url ?? null
+  /** Feed photos link to their resolved source; chat photos stay private. */
+  const cornerLink = liveChat ? null : (fallback?.source ?? null)
 
   // Refs for the async rotate() — kept fresh in effects (never in render).
   const latestImageRef = useRef(imageUrl)
@@ -50,17 +52,20 @@ export default function BackgroundStage({
     if (rotatingRef.current) return
     rotatingRef.current = true
     try {
-      const url = await fetchRandomBackgroundUrl()
-      if (!url) return
-      // Resolve before swapping layers so a dead URL never blanks the stage.
-      if (!(await preloadImage(url))) return
+      // fetchRandomBackground resolves the blob first — a dead URL or a
+      // CORS wall never blanks the stage.
+      const photo = await fetchRandomBackground()
+      if (!photo) return
       const current = liveRef.current
       if (current && current === latestImageRef.current) {
         // The chat photo on screen held its full slot — demote it. A newer
         // chat photo (different URL) still takes over immediately after.
         setDemotedUrl(current)
       }
-      setFallbackUrl(url)
+      setFallback((prev) => {
+        if (prev?.url.startsWith('blob:')) URL.revokeObjectURL(prev.url)
+        return photo
+      })
     } finally {
       rotatingRef.current = false
     }
@@ -119,7 +124,7 @@ export default function BackgroundStage({
       ))}
       <div className="bg-blur" />
       <div className="bg-scrim" />
-      {revealed && live && <BgSlotRing since={slotSince} />}
+      {revealed && live && <BgSlotRing since={slotSince} link={cornerLink} />}
     </div>
   )
 }

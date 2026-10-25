@@ -61,7 +61,9 @@ export default function CountdownRing({ entry }: { entry: ChatEntry }) {
           strokeWidth="1.6"
           strokeLinecap="round"
           strokeDasharray={CIRCUMFERENCE}
-          strokeDashoffset={CIRCUMFERENCE * (1 - fraction)}
+          /* Negative offset keeps the arc's tail at 12 o'clock so the
+             leading edge retreats clockwise — a clockwise depletion. */
+          strokeDashoffset={-CIRCUMFERENCE * (1 - fraction)}
           transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
           style={{ transition: 'stroke-dashoffset 1s linear' }}
         />

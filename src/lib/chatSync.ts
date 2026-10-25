@@ -1,6 +1,7 @@
 import {
   fetchChatPage,
   joinChatRoom,
+  purgeExpiredRemote,
   type ChatCursor,
   type RoomHandle,
 } from './chatRemote'
@@ -8,6 +9,7 @@ import {
   compareEntries,
   loadChatCache,
   loadChatCacheBefore,
+  pruneChatCache,
   removeChatCacheEntry,
   saveChatCache,
 } from './chatCache'
@@ -20,7 +22,7 @@ import {
   removeFromOutbox,
   type ChatOutboxItem,
 } from './chatOutbox'
-import { isExpired } from './expiry'
+import { isExpired, MESSAGE_TTL_MS } from './expiry'
 import type { ChatEntry, ChatStatus, ChatMessage, PresenceMember } from './chatTypes'
 import type { ChatIdentity } from './identity'
 
@@ -52,6 +54,8 @@ export interface ChatApi {
   retry(): void
   /** Load and prepend the page older than the current oldest message. */
   loadOlder(): Promise<{ loaded: number; hasMore: boolean }>
+  /** Author deletes one own message: dissolve here, purge the cloud row. */
+  remove(id: string): void
   updateIdentity(identity: ChatIdentity): void
   leave(): void
 }
@@ -62,6 +66,8 @@ const INITIAL_PAGE = 60
 /** Dissolve animation length — removal waits for it to finish. */
 const DISSOLVE_MS = 1050
 const SWEEP_INTERVAL_MS = 1000
+/** Client-side purge fallback cadence (pg_cron stays the primary). */
+const PURGE_INTERVAL_MS = 120_000
 
 export function enterChat(
   initialIdentity: ChatIdentity,
@@ -73,6 +79,8 @@ export function enterChat(
   let flushing = false
   let retryTimer: ReturnType<typeof setTimeout> | null = null
   let sweepTimer: ReturnType<typeof setInterval> | null = null
+  let purgeTimer: ReturnType<typeof setInterval> | null = null
+  let firstPurgeTimer: ReturnType<typeof setTimeout> | null = null
   let closed = false
   let loadingOlder = false
   let hasMoreOlder = true
@@ -108,7 +116,7 @@ export function enterChat(
     const flagged: ChatEntry = { ...entry, expiring: true }
     entries = replace(entries, flagged)
     emit(flagged)
-    setTimeout(() => {
+      setTimeout(() => {
       // Someone may have re-added a row with this id (server echo after a
       // local delete race) — only drop what is still flagged.
       const still = entries.find((e) => e.id === id)
@@ -119,7 +127,9 @@ export function enterChat(
       dropEntry(id)
       expiringIds.delete(id)
     }, DISSOLVE_MS)
-    if (cloudDelete && handle) void handle.deleteMessage(id)
+    if (cloudDelete) {
+      void handle?.deleteMessage(id, imagePathOf(entry.imageUrl))
+    }
   }
 
   const sweep = () => {
@@ -148,6 +158,17 @@ export function enterChat(
    */
   const mergeIntoEntry = (message: ChatMessage, existing?: ChatEntry): ChatEntry => {
     const merged: ChatEntry = { ...message }
+    // Optimistic echo carried the author's look; a server row without it
+    // (schema not migrated, older sender) keeps the local face.
+    if (existing?.avatarStyle && !merged.avatarStyle) {
+      merged.avatarStyle = existing.avatarStyle
+    }
+    if (existing?.avatarSeed && !merged.avatarSeed) {
+      merged.avatarSeed = existing.avatarSeed
+    }
+    if (existing?.avatarUrl && !merged.avatarUrl) {
+      merged.avatarUrl = existing.avatarUrl
+    }
     if (existing?.localImage && !merged.imageUrl) {
       merged.localImage = existing.localImage
     } else if (existing?.localImage && merged.imageUrl) {
@@ -213,6 +234,14 @@ export function enterChat(
     let needsRetry = false
     for (const item of await readOutbox()) {
       if (closed) break
+      // The one-hour rule outlives a reconnect: an unsent draft whose
+      // hour ran out while the tab was closed departs with the farewell
+      // animation instead of going out with a fresh server-side hour.
+      if (Date.now() - item.at >= MESSAGE_TTL_MS) {
+        beginExpire(item.id, false)
+        await removeFromOutbox(item.id)
+        continue
+      }
       if (item.attempts >= CHAT_OUTBOX_MAX_ATTEMPTS) {
         fail(item.id)
         continue
@@ -221,6 +250,8 @@ export function enterChat(
         id: item.id,
         content: item.content,
         displayName: item.displayName,
+        avatar: item.avatar,
+        avatarUrl: item.avatarUrl ?? null,
         imageBlob: item.imageBlob,
       })
       if (result.ok) {
@@ -253,6 +284,9 @@ export function enterChat(
         id: item.id,
         userId: currentIdentity.userId,
         displayName: item.displayName,
+        avatarStyle: item.avatar?.style ?? null,
+        avatarSeed: item.avatar?.seed ?? null,
+        avatarUrl: item.avatarUrl ?? null,
         content: item.content,
         at: item.at,
         state: 'pending',
@@ -267,6 +301,8 @@ export function enterChat(
     entries = [...live, ...pending].sort(compareEntries).slice(-MEMORY_CAP)
     if (entries.length > 0) callbacks.onSnapshot(entries)
     void saveChatCache(entries)
+    // Rows that expired while the tab was closed leave the store now.
+    void pruneChatCache()
   })()
 
   void fetchChatPage().then((page) => {
@@ -323,6 +359,19 @@ export function enterChat(
 
   sweepTimer = setInterval(sweep, SWEEP_INTERVAL_MS)
 
+  // Cloud purge fallback: any online player sweeps the room's expired
+  // rows, so the promise holds even where pg_cron is not scheduled.
+  firstPurgeTimer = setTimeout(
+    () => {
+      firstPurgeTimer = null
+      void purgeExpiredRemote()
+    },
+    8_000 + Math.floor(Math.random() * 15_000),
+  )
+  purgeTimer = setInterval(() => {
+    void purgeExpiredRemote()
+  }, PURGE_INTERVAL_MS)
+
   return {
     send(content, imageBlob) {
       const trimmed = content.trim()
@@ -331,6 +380,8 @@ export function enterChat(
         id: newId(),
         content: trimmed,
         displayName: currentIdentity.displayName,
+        avatar: currentIdentity.avatar ?? undefined,
+        avatarUrl: currentIdentity.avatarUrl,
         at: Date.now(),
         attempts: 0,
       }
@@ -339,6 +390,9 @@ export function enterChat(
         id: item.id,
         userId: currentIdentity.userId,
         displayName: currentIdentity.displayName,
+        avatarStyle: currentIdentity.avatar?.style ?? null,
+        avatarSeed: currentIdentity.avatar?.seed ?? null,
+        avatarUrl: currentIdentity.avatarUrl,
         content: trimmed,
         at: item.at,
         state: 'pending',
@@ -356,6 +410,14 @@ export function enterChat(
       // Reset nothing: failed attempts keep their budget; a manual retry
       // just runs the queue again immediately.
       void flush()
+    },
+    remove(id) {
+      const entry = entries.find((e) => e.id === id)
+      if (!entry || entry.expiring) return
+      if (entry.userId !== currentIdentity.userId) return
+      // Pending/failed rows never reached the cloud — the farewell alone is
+      // enough (dropEntry also clears their outbox slot).
+      beginExpire(id, !entry.state)
     },
     async loadOlder() {
       if (closed || loadingOlder || !hasMoreOlder) {
@@ -414,10 +476,21 @@ export function enterChat(
       closed = true
       if (retryTimer) clearTimeout(retryTimer)
       if (sweepTimer) clearInterval(sweepTimer)
+      if (purgeTimer) clearInterval(purgeTimer)
+      if (firstPurgeTimer) clearTimeout(firstPurgeTimer)
       handle?.leave()
       handle = null
     },
   }
+}
+
+/** Storage path of a chat photo URL (`…/object/public/chat-images/<path>`). */
+function imagePathOf(imageUrl: string | null | undefined): string | null {
+  if (!imageUrl) return null
+  const marker = 'chat-images/'
+  const idx = imageUrl.indexOf(marker)
+  if (idx === -1) return null
+  return imageUrl.slice(idx + marker.length)
 }
 
 function cursorFor(entry: ChatEntry): ChatCursor {

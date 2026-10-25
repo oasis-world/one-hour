@@ -248,6 +248,125 @@ export function TravelerGlyph({ size = 20 }: GlyphProps) {
   )
 }
 
+/** Copy glyph: front sheet over a back plate (menu "copy" action). */
+export function CopyIcon({ size = 20 }: GlyphProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect x="7.2" y="7.2" width="9.6" height="9.6" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path
+        d="M12.8 4.6v-.2A1.4 1.4 0 0011.4 3H4.4A1.4 1.4 0 003 4.4v7c0 .77.63 1.4 1.4 1.4h.2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+/** Trash glyph for the delete action. */
+export function TrashIcon({ size = 20 }: GlyphProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M3.5 5.5h13M8.2 5V3.8c0-.44.36-.8.8-.8h2c.44 0 .8.36.8.8V5M5.2 5.5l.6 9.8c.05.86.76 1.53 1.62 1.53h5.16c.86 0 1.57-.67 1.62-1.53l.6-9.8"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8.3 8.9v4.4M11.7 8.9v4.4"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+/** Add-reaction glyph: smiley with a fresh plus (menu "Add Reaction"). */
+export function ReactIcon({ size = 20 }: GlyphProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle cx="9.5" cy="10.5" r="7" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="7.3" cy="9.1" r="0.85" fill="currentColor" />
+      <circle cx="11.7" cy="9.1" r="0.85" fill="currentColor" />
+      <path
+        d="M6.6 12.7c.7.9 1.7 1.4 2.9 1.4s2.2-.5 2.9-1.4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M16.6 2.9v4M14.6 4.9h4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+export function ChevronRightIcon({ size = 16 }: GlyphProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M7.5 4l6 6-6 6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+/** Discord-style three-dot "more" glyph. */
+export function MoreIcon({ size = 20 }: GlyphProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle cx="5" cy="12" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="19" cy="12" r="1.8" />
+    </svg>
+  )
+}
+
 export function SunIcon({ size = 16 }: GlyphProps) {
   return (
     <svg

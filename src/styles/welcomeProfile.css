@@ -1,0 +1,201 @@
+/* ============================================================
+   一小时 / one-hour — welcome gate (first visit) and the profile
+   page modal. Shares the account-dialog glass language.
+   ============================================================ */
+
+/* ---------- Welcome: the first-visit gate ---------- */
+
+.welcome-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: var(--backdrop);
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  animation: viewer-in 0.2s ease both;
+}
+
+.welcome-card {
+  position: relative;
+  width: min(360px, 100%);
+  padding: 24px 24px 20px;
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: 0 24px 70px var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: popover-rise 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+  transform-origin: center;
+}
+
+.welcome-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 10px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  color: var(--accent);
+}
+
+.welcome-copy {
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--ink-soft);
+}
+
+.welcome-copy strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.welcome-avatar-wrap {
+  position: relative;
+  margin-bottom: 18px;
+}
+
+.welcome-avatar {
+  display: block;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  box-shadow: 0 12px 34px var(--shadow);
+}
+
+/* Shared avatar editing block (welcome gate + profile page). */
+.avatar-editor {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Tool cluster perched on the avatar's bottom-right corner. */
+.welcome-avatar-tools {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  display: flex;
+  gap: 6px;
+}
+
+.welcome-reroll,
+.welcome-custom,
+.welcome-upload {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 6px 16px var(--shadow);
+  transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.25), color 0.15s ease;
+}
+
+.welcome-reroll:hover {
+  transform: rotate(120deg) scale(1.08);
+}
+
+.welcome-custom:hover {
+  transform: scale(1.08);
+}
+
+.welcome-custom.is-open {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.welcome-upload:hover {
+  transform: scale(1.08);
+}
+
+.welcome-upload:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.welcome-field {
+  width: 100%;
+  margin-bottom: 4px;
+  text-align: left;
+}
+
+.welcome-field input {
+  text-align: center;
+  font-weight: 700;
+}
+
+.welcome-confirm {
+  width: 100%;
+  margin-top: 12px;
+}
+
+/* ---------- Profile page (modal, account-dialog chrome) ---------- */
+
+.profile-body {
+  display: flex;
+  flex-direction: column;
+  padding-top: 6px;
+}
+
+.profile-body .avatar-editor {
+  margin-bottom: 6px;
+}
+
+.profile-avatar {
+  display: block;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  box-shadow: 0 10px 28px var(--shadow);
+}
+
+.profile-meta {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 14px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--ink-mute);
+}
+
+.profile-meta svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.profile-bind {
+  border: none;
+  padding: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.profile-page .account-actions {
+  justify-content: stretch;
+}
+
+.profile-page .account-actions .btn-accent {
+  flex: 1;
+}

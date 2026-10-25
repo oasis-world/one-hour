@@ -1,24 +1,37 @@
 import type { AccountState } from './account'
 import { isSupabaseConfigured } from './supabaseConfig'
-import { loadChatNickname } from './nickname'
+import type { AvatarLook } from './avatar'
+import { loadUserProfile, randomNickname } from './userProfile'
 
 /** Room identity: every visitor gets one via anonymous sign-in. */
 export interface ChatIdentity {
   userId: string
   displayName: string
+  /** DiceBear look broadcast through presence; null until picked. */
+  avatar: AvatarLook | null
+  /** Custom photo avatar URL; wins over the generated look. */
   avatarUrl: string | null
 }
 
 const LOCAL_UID_KEY = 'one-hour-local-uid'
 
+/** Stable per-session name for the moments before the welcome confirm. */
+let preWelcomeName: string | null = null
+
 export function resolveChatIdentity(account: AccountState): ChatIdentity | null {
+  const profile = loadUserProfile()
+  const displayName = profile?.nickname ?? (preWelcomeName ??= randomNickname())
+  const avatar: AvatarLook | null = profile
+    ? { style: profile.style, seed: profile.seed }
+    : null
+  const avatarUrl = profile?.avatarUrl ?? null
   if (account.userId) {
-    return { userId: account.userId, displayName: loadChatNickname(), avatarUrl: null }
+    return { userId: account.userId, displayName, avatar, avatarUrl }
   }
   // Supabase unconfigured: run as a purely local player so the room (and
   // its one-hour rule) works end-to-end without any backend.
   if (!isSupabaseConfigured()) {
-    return { userId: localUserId(), displayName: loadChatNickname(), avatarUrl: null }
+    return { userId: localUserId(), displayName, avatar, avatarUrl }
   }
   return null
 }

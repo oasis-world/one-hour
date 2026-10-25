@@ -4,6 +4,11 @@ export interface ChatMessage {
   id: string
   userId: string
   displayName: string
+  /** DiceBear look captured at send time, so rows stay self-contained. */
+  avatarStyle?: string | null
+  avatarSeed?: string | null
+  /** Custom photo avatar URL captured at send time; wins over the look. */
+  avatarUrl?: string | null
   content: string
   /** epoch ms (client send time, or server created_at once confirmed). */
   at: number
@@ -26,6 +31,10 @@ export interface ChatEntry extends ChatMessage {
 export interface PresenceMember {
   userId: string
   displayName: string
+  /** DiceBear look, when the member has picked one (welcome / profile). */
+  avatarStyle: string | null
+  avatarSeed: string | null
+  /** Custom photo avatar URL; wins over the generated look. */
   avatarUrl: string | null
   /** epoch ms — when this member entered the room (last track). */
   enteredAt: number

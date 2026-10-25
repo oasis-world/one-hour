@@ -12,6 +12,10 @@ export interface ChatOutboxItem {
   id: string
   content: string
   displayName: string
+  /** DiceBear look captured at send time. */
+  avatar?: { style: string; seed: string }
+  /** Custom photo avatar URL captured at send time. */
+  avatarUrl?: string | null
   /** epoch ms */
   at: number
   /** Failed send attempts so far (the current try not included). */

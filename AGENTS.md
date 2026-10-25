@@ -22,6 +22,22 @@
 
 - **尽量每个代码文件不超过 200 行**（含 `.ts` / `.tsx` / `.css`）。新写代码优先拆分模块；修改已接近或超过 200 行的文件时，顺手做低风险拆分（提取子组件、工具函数、样式分段），不引入行为变化。
 
+## 输入框与输入法（IME）· 强制规则
+
+- **所有文本输入框的 Enter 处理必须防输入法误触**：中文/日文/韩文等有候选词的输入法在组词状态下，按 Enter 是"确认候选词上屏"，绝不能触发业务逻辑（发送/保存/确认/跳转下一字段）。
+- 统一使用 `src/lib/ime.ts` 的 `useImeEnter()`：
+  ```tsx
+  const ime = useImeEnter()
+  <input {...ime.imeProps} onKeyDown={(e) => {
+    if (ime.imeConsumesEnter(e)) return
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    // ...业务逻辑...
+  }} />
+  ```
+- 判定必须同时覆盖三种信号：`nativeEvent.isComposing`（标准）、`keyCode === 229`（旧内核组词中）、以及 Safari 时序（compositionend 先于提交 Enter 的 keydown，由 hook 内的 ref 延迟一拍兜住）——不能只查 `isComposing`。
+- 新增任何带 Enter 行为的输入框（单行/多行）都必须接这个 hook；review 时把"输入框 Enter 没接 ime 防护"当作 bug。
+
 ## 结构速览
 
 - `src/lib/` — 数据层（Supabase 客户端、聊天同步 facade、IndexedDB 缓存/outbox、i18n、设置），不依赖 React。

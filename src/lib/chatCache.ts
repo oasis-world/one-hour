@@ -1,4 +1,5 @@
 import { idbDelete, idbGetAll, idbPut, MESSAGES_STORE } from './idb'
+import { isExpired } from './expiry'
 import type { ChatEntry } from './chatTypes'
 
 /**
@@ -27,6 +28,24 @@ export async function saveChatCache(entries: ChatEntry[]): Promise<void> {
 
 export async function removeChatCacheEntry(id: string): Promise<void> {
   await idbDelete(MESSAGES_STORE, id)
+}
+
+/**
+ * The one-hour rule for the store itself: rows that expired while the
+ * app was closed (the runtime sweeper only sees live tabs) and rows
+ * pushed past the sliding window are deleted for good.
+ */
+export async function pruneChatCache(): Promise<void> {
+  const rows = await loadChatCache()
+  if (rows.length === 0) return
+  const now = Date.now()
+  const keep = new Set(
+    rows.filter((row) => !isExpired(row, now)).slice(-CACHE_LIMIT).map((row) => row.id),
+  )
+  const doomed = rows.filter((row) => !keep.has(row.id)).map((row) => row.id)
+  if (doomed.length > 0) {
+    await Promise.all(doomed.map((id) => idbDelete(MESSAGES_STORE, id)))
+  }
 }
 
 /** Cached entries strictly older than the cursor (for loadOlder's local path). */

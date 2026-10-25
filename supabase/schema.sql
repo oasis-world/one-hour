@@ -14,6 +14,9 @@ create table if not exists public.chat_messages (
   id uuid primary key,
   user_id uuid not null references auth.users (id) on delete cascade,
   display_name text not null check (char_length(display_name) between 1 and 40),
+  avatar_style text, -- dicebear style name captured at send time
+  avatar_seed text, -- dicebear seed captured at send time
+  avatar_url text, -- custom photo avatar URL captured at send time
   content text not null default '' check (char_length(content) <= 500),
   image_url text, -- public storage URL of the attached photo, null for text-only
   created_at timestamptz not null default now(),
@@ -21,6 +24,11 @@ create table if not exists public.chat_messages (
   constraint chat_messages_has_payload
     check (char_length(content) > 0 or image_url is not null)
 );
+
+-- Existing deployments: add the avatar columns in place.
+alter table public.chat_messages add column if not exists avatar_style text;
+alter table public.chat_messages add column if not exists avatar_seed text;
+alter table public.chat_messages add column if not exists avatar_url text;
 
 create index if not exists chat_messages_recent
   on public.chat_messages (created_at desc);
@@ -114,9 +122,19 @@ create policy "chat images are deletable by their owner folder"
 --
 -- SECURITY DEFINER so the cron job can sweep every author's rows (RLS
 -- would otherwise only let each player delete their own). Runs every
--- minute via pg_cron; every connected client then receives the DELETE
--- broadcast and plays the same farewell animation it would for its own
--- expiry. Storage objects are removed with the rows.
+-- minute via pg_cron; every connected client also calls it as a
+-- fallback (the function is granted to authenticated).
+--
+-- Photo objects are NOT swept here: Supabase blocks direct deletes on
+-- storage.objects ("use the Storage API"), and a raising statement
+-- would roll the whole function back — messages included. Photos are
+-- cleaned in two layers instead:
+--  1. the author's own client removes its object via the Storage API
+--     as the row expires or is deleted (chatRemote.deleteMessage);
+--  2. the scheduled Edge Function supabase/functions/purge-chat-images
+--     (service role) sweeps the bucket for orphaned photos, skipping
+--     avatar-* profile assets — schedule it every few minutes in the
+--     Dashboard (Edge Functions → Schedules).
 
 create or replace function public.purge_expired_chat_messages()
 returns void
@@ -126,11 +144,6 @@ set search_path = public
 as $$
 begin
   delete from public.chat_messages where expires_at <= now();
-  -- Images lag behind by 2h (past any message lifetime, and safely past
-  -- the upload→insert window) so fresh uploads never race the sweep.
-  delete from storage.objects
-  where bucket_id = 'chat-images'
-    and created_at < now() - interval '2 hours';
 end;
 $$;
 
@@ -162,4 +175,83 @@ begin
   );
 exception
   when others then null; -- pg_cron absent: skip, client-side expiry still holds
+end $$;
+
+-- ── Player profiles ─────────────────────────────────────────────────────────
+--
+-- Nickname + DiceBear look (style name + seed, rendered client-side).
+-- Written only for players who bind an email; the same row restores the
+-- face on every device after sign-in. Never expires.
+
+create table if not exists public.profiles (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  nickname text not null check (char_length(nickname) between 1 and 40),
+  avatar_style text not null check (char_length(avatar_style) between 1 and 40),
+  avatar_seed text not null check (char_length(avatar_seed) between 1 and 64),
+  avatar_url text, -- custom photo avatar (public storage URL)
+  updated_at timestamptz not null default now()
+);
+
+alter table public.profiles add column if not exists avatar_url text;
+
+alter table public.profiles enable row level security;
+
+-- Readable by every signed-in player so future surfaces can show faces.
+drop policy if exists "profiles are readable by signed-in players"
+  on public.profiles;
+
+create policy "profiles are readable by signed-in players"
+  on public.profiles for select
+  using (auth.uid() is not null);
+
+-- Writes bind to the caller's JWT (upsert needs both insert + update).
+drop policy if exists "players may insert their own profile"
+  on public.profiles;
+
+create policy "players may insert their own profile"
+  on public.profiles for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "players may update their own profile"
+  on public.profiles;
+
+create policy "players may update their own profile"
+  on public.profiles for update
+  using (auth.uid() = user_id);
+
+-- ── Scheduled bucket sweep (Edge Function) ─────────────────────────────────
+--
+-- Photos of vanished authors are swept by the Edge Function
+-- supabase/functions/purge-chat-images. One-time setup in the SQL editor
+-- (the service_role key lives only in Vault — never in this file):
+--   create extension if not exists pg_net;
+--   select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
+--   select vault.create_secret('<service_role_key>', 'purge_service_key');
+
+do $$
+begin
+  perform cron.unschedule('purge-chat-images');
+exception
+  when others then null; -- not scheduled yet
+end $$;
+
+do $$
+begin
+  perform cron.schedule(
+    'purge-chat-images',
+    '*/5 * * * *',
+    $sql$
+    select net.http_post(
+      url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url')
+             || '/functions/v1/purge-chat-images',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'purge_service_key')
+      ),
+      body := '{}'::jsonb
+    );
+    $sql$
+  );
+exception
+  when others then null; -- pg_net absent or vault secrets not set up yet
 end $$;

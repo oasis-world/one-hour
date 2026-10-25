@@ -8,7 +8,9 @@ import {
   type AuthErrorKind,
 } from '../lib/account'
 import { useLang } from '../lib/i18n'
+import { useImeEnter } from '../lib/ime'
 import { ThinXIcon } from './icons'
+import { UserIcon } from './userIcons'
 
 /**
  * Login / register modal, ported from the oasis-game AccountDialog: guests
@@ -36,18 +38,24 @@ const ERROR_TEXT: Record<FeedbackCode, [zh: string, en: string]> = {
 export default function AccountDialog({
   account,
   onClose,
+  onOpenProfile,
+  initialMode = 'bind',
 }: {
   account: AccountState
   onClose: () => void
+  onOpenProfile?: () => void
+  /** 'signin' opens straight on the sign-in form (popover entry). */
+  initialMode?: 'bind' | 'signin'
 }) {
   const lang = useLang()
   const zh = lang === 'zh'
   const configured = isSupabaseConfigured()
-  const [mode, setMode] = useState<'bind' | 'signin'>('bind')
+  const [mode, setMode] = useState<'bind' | 'signin'>(initialMode)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [busy, setBusy] = useState(false)
+  const ime = useImeEnter()
   const [feedback, setFeedback] = useState<Feedback>(null)
   const emailRef = useRef<HTMLInputElement>(null)
   const passwordRef = useRef<HTMLInputElement>(null)
@@ -106,9 +114,11 @@ export default function AccountDialog({
     onClose()
   }
 
-  /** Enter walks field → field → submit. */
+  /** Enter walks field → field → submit. IME composition Enter is the
+   *  candidates' commit — it must never walk or submit. */
   const onFieldEnter = (field: 'email' | 'password' | 'confirm') =>
     (e: ReactKeyboardEvent<HTMLInputElement>) => {
+      if (ime.imeConsumesEnter(e)) return
       if (e.key !== 'Enter') return
       e.preventDefault()
       if (field === 'email') {
@@ -171,6 +181,17 @@ export default function AccountDialog({
                 {zh ? '已登录' : 'Signed in'} · {account.email}
               </p>
               <div className="account-actions">
+                {onOpenProfile && (
+                  <button
+                    type="button"
+                    className="btn-ghost account-profile-btn"
+                    disabled={busy}
+                    onClick={onOpenProfile}
+                  >
+                    <UserIcon size={15} />
+                    {zh ? '个人资料' : 'Profile'}
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn-ghost danger-text"
@@ -194,6 +215,7 @@ export default function AccountDialog({
                     autoFocus
                     onChange={(e) => setEmail(e.target.value)}
                     onKeyDown={onFieldEnter('email')}
+                    {...ime.imeProps}
                   />
                 </label>
                 <label className="field">
@@ -205,6 +227,7 @@ export default function AccountDialog({
                     autoComplete={mode === 'bind' ? 'new-password' : 'current-password'}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={onFieldEnter('password')}
+                    {...ime.imeProps}
                   />
                 </label>
                 {mode === 'bind' && (
@@ -217,6 +240,7 @@ export default function AccountDialog({
                       autoComplete="new-password"
                       onChange={(e) => setConfirm(e.target.value)}
                       onKeyDown={onFieldEnter('confirm')}
+                      {...ime.imeProps}
                     />
                   </label>
                 )}
