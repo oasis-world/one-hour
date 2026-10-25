@@ -146,10 +146,11 @@ export default function Composer({ onSend, onImagePicked }: Props) {
           }}
           onKeyDown={(e) => {
             if (e.key !== 'Enter' || e.shiftKey) return
+            // Guard IME confirmation (Chinese candidates) — that Enter
+            // commits the composition, it must not send.
             if (composingRef.current || e.nativeEvent.isComposing || e.keyCode === 229) {
               return
             }
-            if (coarse) return
             e.preventDefault()
             submit()
           }}

@@ -25,8 +25,11 @@ create table if not exists public.chat_messages (
 create index if not exists chat_messages_recent
   on public.chat_messages (created_at desc);
 
-create index if not exists chat_messages_live
-  on public.chat_messages (expires_at) where expires_at > now();
+-- Plain expiry index for the purge delete. (No partial index here: a
+-- `where expires_at > now()` predicate is illegal — now() is STABLE and
+-- index predicates require IMMUTABLE functions.)
+create index if not exists chat_messages_expiry
+  on public.chat_messages (expires_at);
 
 alter table public.chat_messages enable row level security;
 
@@ -134,14 +137,20 @@ $$;
 revoke all on function public.purge_expired_chat_messages() from public, anon;
 grant execute on function public.purge_expired_chat_messages() to authenticated;
 
--- Schedule the sweep; extension unavailable on some plans → the try block
--- keeps this file runnable either way (clients expire rows on their own).
+-- Schedule the sweep; extension unavailable on some plans → each block
+-- fails soft and the file stays runnable (clients expire rows on their own).
 do $$
 begin
   create extension if not exists pg_cron;
-  perform cron.unschedule('purge-expired-chat-messages');
 exception
   when others then null;
+end $$;
+
+do $$
+begin
+  perform cron.unschedule('purge-expired-chat-messages');
+exception
+  when others then null; -- job not scheduled yet, or pg_cron absent
 end $$;
 
 do $$
