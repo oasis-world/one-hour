@@ -134,7 +134,7 @@ export default function Composer({ onSend, onImagePicked }: Props) {
           value={draft}
           rows={1}
           maxLength={500}
-          placeholder={zh ? '说点什么… 只留一小时' : 'Say something… gone in an hour'}
+          placeholder={zh ? '说点什么…' : 'Say something…'}
           onChange={(e) => setDraft(e.target.value)}
           onCompositionStart={() => {
             composingRef.current = true

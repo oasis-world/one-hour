@@ -183,6 +183,28 @@ export function ChatBubbleIcon({ size = 16 }: GlyphProps) {
   )
 }
 
+/** Chevron for the mobile toolbar toggle (rotates via CSS when open). */
+export function ChevronDownIcon({ size = 14 }: GlyphProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M4 6.2l4 4 4-4"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 /** Default anonymous avatar: the oasis traveler silhouette. */
 export function TravelerGlyph({ size = 20 }: GlyphProps) {
   return (
