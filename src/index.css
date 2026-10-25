@@ -49,6 +49,7 @@ button {
   --surface: rgba(16, 18, 23, var(--veil));
   --surface-strong: rgba(16, 18, 23, 0.72);
   --surface-raised: rgba(24, 26, 32, 0.82);
+  --surface-solid: #1d2026;
   --line: rgba(243, 239, 231, 0.14);
   --line-soft: rgba(243, 239, 231, 0.08);
   --accent: #e8b04b;
@@ -70,6 +71,7 @@ button {
   --surface: rgba(246, 231, 200, var(--veil));
   --surface-strong: rgba(246, 231, 200, 0.8);
   --surface-raised: rgba(252, 243, 220, 0.92);
+  --surface-solid: #fbf2da;
   --line: rgba(61, 36, 18, 0.18);
   --line-soft: rgba(61, 36, 18, 0.1);
   --accent: #c45c26;
@@ -441,7 +443,9 @@ button {
   }
 }
 
-/* Folded state leaves a quiet affordance at the corner it folded into. */
+/* Folded state leaves a quiet affordance at the corner it folded into.
+   Solid chip — it sits on the fully revealed photo, where translucent
+   glass would read as a smudge. */
 .chat-reopen-hint {
   position: absolute;
   left: max(16px, env(safe-area-inset-left));
@@ -454,13 +458,11 @@ button {
   padding: 0 16px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  background: var(--surface-raised);
+  background: var(--surface-solid);
   color: var(--ink-soft);
   font-size: 13px;
   font-weight: 600;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 6px 20px var(--shadow);
+  box-shadow: 0 8px 24px var(--shadow);
   cursor: pointer;
   animation: hint-rise 0.45s 0.25s ease both;
 }
@@ -856,7 +858,9 @@ button {
   transform: translateY(-2px);
 }
 
-/* ---------- Backdrop slot ring (bottom-right, chat folded) ---------- */
+/* ---------- Backdrop slot ring (bottom-right, chat folded) ----------
+   Solid chip like the reopen hint: it only ever sits on the revealed,
+   fully sharp photo. */
 
 .bg-slot-ring {
   position: absolute;
@@ -869,11 +873,9 @@ button {
   place-items: center;
   border-radius: 50%;
   border: 1px solid var(--line);
-  background: var(--surface-raised);
+  background: var(--surface-solid);
   color: var(--ink-soft);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 4px 14px var(--shadow);
+  box-shadow: 0 6px 18px var(--shadow);
   animation: hint-rise 0.45s 0.3s ease both;
   pointer-events: none;
 }
