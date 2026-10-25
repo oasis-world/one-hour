@@ -1,0 +1,443 @@
+import {
+  fetchChatPage,
+  joinChatRoom,
+  type ChatCursor,
+  type RoomHandle,
+} from './chatRemote'
+import {
+  compareEntries,
+  loadChatCache,
+  loadChatCacheBefore,
+  removeChatCacheEntry,
+  saveChatCache,
+} from './chatCache'
+import {
+  CHAT_OUTBOX_MAX_ATTEMPTS,
+  enqueueOutbox,
+  exhaustOutboxItem,
+  markOutboxFailed,
+  readOutbox,
+  removeFromOutbox,
+  type ChatOutboxItem,
+} from './chatOutbox'
+import { isExpired } from './expiry'
+import type { ChatEntry, ChatStatus, ChatMessage, PresenceMember } from './chatTypes'
+import type { ChatIdentity } from './identity'
+
+/**
+ * Chat sync facade (oasis-game architecture): writes land locally first —
+ * optimistic entry + durable IndexedDB outbox (images included) — and sync
+ * in the background; network failures degrade to 'offline' and retry with
+ * backoff, never blocking the UI nor dropping a word or photo.
+ *
+ * The one-hour rule lives here too: a sweeper flags entries whose hour ran
+ * out (the UI plays the dissolve animation), then removes them locally and
+ * cloud-deletes own rows so every client watches them go.
+ */
+
+export interface ChatCallbacks {
+  /** Full list replace (history load, cache merge). Oldest → newest. */
+  onSnapshot: (entries: ChatEntry[]) => void
+  /** One entry added or updated (optimistic, confirmed, failed, expiring). */
+  onEntry: (entry: ChatEntry) => void
+  /** A message finished dissolving and is gone for good. */
+  onRemoved: (id: string) => void
+  onPresence: (members: PresenceMember[]) => void
+  onStatus: (status: ChatStatus) => void
+}
+
+export interface ChatApi {
+  send(content: string, imageBlob?: Blob): void
+  /** Retry every failed/pending message right now. */
+  retry(): void
+  /** Load and prepend the page older than the current oldest message. */
+  loadOlder(): Promise<{ loaded: number; hasMore: boolean }>
+  updateIdentity(identity: ChatIdentity): void
+  leave(): void
+}
+
+const RETRY_DELAYS_MS = [1000, 4000, 15000, 30000]
+const MEMORY_CAP = 400
+const INITIAL_PAGE = 60
+/** Dissolve animation length — removal waits for it to finish. */
+const DISSOLVE_MS = 1050
+const SWEEP_INTERVAL_MS = 1000
+
+export function enterChat(
+  initialIdentity: ChatIdentity,
+  callbacks: ChatCallbacks,
+): ChatApi {
+  let entries: ChatEntry[] = []
+  let currentIdentity = initialIdentity
+  let handle: RoomHandle | null = null
+  let flushing = false
+  let retryTimer: ReturnType<typeof setTimeout> | null = null
+  let sweepTimer: ReturnType<typeof setInterval> | null = null
+  let closed = false
+  let loadingOlder = false
+  let hasMoreOlder = true
+  let serverCursor: ChatCursor | null = null
+  /** Object URLs for in-flight image previews, revoked on final removal. */
+  const localUrls = new Map<string, string>()
+  /** ids already flagged expiring (sweeper + DELETE broadcasts share this). */
+  const expiringIds = new Set<string>()
+
+  callbacks.onStatus('connecting')
+
+  const emit = (entry: ChatEntry) => callbacks.onEntry(entry)
+
+  // ---- local removal (after the dissolve animation has played) ----
+  const dropEntry = (id: string) => {
+    entries = entries.filter((e) => e.id !== id)
+    callbacks.onRemoved(id)
+    void removeFromOutbox(id)
+    void removeChatCacheEntry(id)
+    const url = localUrls.get(id)
+    if (url) {
+      localUrls.delete(id)
+      URL.revokeObjectURL(url)
+    }
+  }
+
+  /** Flag the entry for its farewell animation, then remove it everywhere. */
+  const beginExpire = (id: string, cloudDelete: boolean) => {
+    if (expiringIds.has(id)) return
+    const entry = entries.find((e) => e.id === id)
+    if (!entry) return
+    expiringIds.add(id)
+    const flagged: ChatEntry = { ...entry, expiring: true }
+    entries = replace(entries, flagged)
+    emit(flagged)
+    setTimeout(() => {
+      // Someone may have re-added a row with this id (server echo after a
+      // local delete race) — only drop what is still flagged.
+      const still = entries.find((e) => e.id === id)
+      if (!still?.expiring) {
+        expiringIds.delete(id)
+        return
+      }
+      dropEntry(id)
+      expiringIds.delete(id)
+    }, DISSOLVE_MS)
+    if (cloudDelete && handle) void handle.deleteMessage(id)
+  }
+
+  const sweep = () => {
+    if (closed) return
+    const now = Date.now()
+    for (const entry of entries) {
+      if (!entry.expiring && isExpired(entry, now)) {
+        beginExpire(entry.id, entry.userId === currentIdentity.userId && !entry.state)
+      }
+    }
+  }
+
+  const confirm = (id: string) => {
+    const found = entries.find((e) => e.id === id)
+    if (!found || (!found.state && found.serverCreatedAt)) return
+    const entry: ChatEntry = { ...found }
+    delete entry.state
+    entries = replace(entries, entry)
+    emit(entry)
+  }
+
+  /**
+   * Overlay a server-confirmed row onto its optimistic echo: the object-URL
+   * photo preview survives until the row carries its remote URL, at which
+   * point the preview is released.
+   */
+  const mergeIntoEntry = (message: ChatMessage, existing?: ChatEntry): ChatEntry => {
+    const merged: ChatEntry = { ...message }
+    if (existing?.localImage && !merged.imageUrl) {
+      merged.localImage = existing.localImage
+    } else if (existing?.localImage && merged.imageUrl) {
+      const url = localUrls.get(existing.id)
+      if (url) {
+        localUrls.delete(existing.id)
+        URL.revokeObjectURL(url)
+      }
+    }
+    return merged
+  }
+
+  const fail = (id: string) => {
+    const entry = entries.find((e) => e.id === id)
+    if (!entry || entry.expiring) return
+    const next = { ...entry, state: 'failed' as const }
+    entries = replace(entries, next)
+    emit(next)
+  }
+
+  const mergeServerMessage = (message: ChatMessage) => {
+    const existing = entries.find((e) => e.id === message.id)
+    if (existing && existing.expiring) return
+    if (existing && existing.serverCreatedAt) {
+      // Same confirmed row resent (refetch): keep as-is.
+      return
+    }
+    const merged = mergeIntoEntry(message, existing)
+    entries = existing ? replace(entries, merged) : [...entries, merged].slice(-MEMORY_CAP)
+    emit(merged)
+    void saveChatCache(entries)
+  }
+
+  const removeRemote = (id: string) => {
+    const entry = entries.find((e) => e.id === id)
+    if (!entry || entry.expiring) return
+    // Another client's row disappeared (author delete or the hourly purge):
+    // play the same farewell, no cloud write needed from us.
+    beginExpire(id, false)
+  }
+
+  const scheduleRetry = () => {
+    if (closed || retryTimer) return
+    void readOutbox().then((queue) => {
+      if (closed || retryTimer) return
+      const retrying = queue.find(
+        (item) => item.attempts > 0 && item.attempts < CHAT_OUTBOX_MAX_ATTEMPTS,
+      )
+      if (!retrying) return
+      const delay = RETRY_DELAYS_MS[
+        Math.min(retrying.attempts - 1, RETRY_DELAYS_MS.length - 1)
+      ]
+      retryTimer = setTimeout(() => {
+        retryTimer = null
+        void flush()
+      }, delay)
+    })
+  }
+
+  const flush = async (): Promise<void> => {
+    if (closed || !handle || flushing) return
+    flushing = true
+    let needsRetry = false
+    for (const item of await readOutbox()) {
+      if (closed) break
+      if (item.attempts >= CHAT_OUTBOX_MAX_ATTEMPTS) {
+        fail(item.id)
+        continue
+      }
+      const result = await handle.send({
+        id: item.id,
+        content: item.content,
+        displayName: item.displayName,
+        imageBlob: item.imageBlob,
+      })
+      if (result.ok) {
+        await removeFromOutbox(item.id)
+        confirm(item.id)
+      } else if (result.error === 'rejected') {
+        // Server refused for good (RLS / validation): stop retrying, keep
+        // the words on screen as failed.
+        await exhaustOutboxItem(item.id)
+        fail(item.id)
+      } else {
+        needsRetry = true
+        const exhausted = await markOutboxFailed(item.id)
+        if (exhausted) fail(item.id)
+      }
+    }
+    flushing = false
+    if (needsRetry && !closed) scheduleRetry()
+  }
+
+  // ---- startup: cache first, outbox previews, then the network ----
+  void (async () => {
+    const [cached, outbox] = await Promise.all([loadChatCache(), readOutbox()])
+    if (closed) return
+    const live = cached.filter((entry) => !isExpired(entry)).slice(-INITIAL_PAGE)
+    // Unsent drafts come back as pending entries with their photo preview.
+    const pending: ChatEntry[] = []
+    for (const item of outbox) {
+      const optimistic: ChatEntry = {
+        id: item.id,
+        userId: currentIdentity.userId,
+        displayName: item.displayName,
+        content: item.content,
+        at: item.at,
+        state: 'pending',
+      }
+      if (item.imageBlob) {
+        const url = URL.createObjectURL(item.imageBlob)
+        localUrls.set(item.id, url)
+        optimistic.localImage = url
+      }
+      pending.push(optimistic)
+    }
+    entries = [...live, ...pending].sort(compareEntries).slice(-MEMORY_CAP)
+    if (entries.length > 0) callbacks.onSnapshot(entries)
+    void saveChatCache(entries)
+  })()
+
+  void fetchChatPage().then((page) => {
+    if (closed || !page) return
+    hasMoreOlder = page.hasMore
+    serverCursor = page.messages[0]
+      ? { createdAt: page.messages[0].serverCreatedAt!, id: page.messages[0].id }
+      : null
+    // Merge the authoritative page over whatever cache/outbox restored:
+    // confirmed rows win, cached-but-older rows survive beneath the page.
+    const byId = new Map(entries.map((entry) => [entry.id, entry]))
+    for (const message of page.messages) {
+      byId.set(message.id, mergeIntoEntry(message, byId.get(message.id)))
+    }
+    entries = [...byId.values()]
+      .filter((entry) => entry.state || !isExpired(entry))
+      .sort(compareEntries)
+      .slice(-MEMORY_CAP)
+    callbacks.onSnapshot(entries)
+    void saveChatCache(entries)
+  })
+
+  void joinChatRoom({
+    presenceKey: currentIdentity.userId,
+    onMessage: mergeServerMessage,
+    onDeleted: removeRemote,
+    onPresence: callbacks.onPresence,
+    onStatus: (status) => {
+      if (closed) return
+      if (status === 'open') {
+        handle?.track(currentIdentity)
+        callbacks.onStatus('online')
+        void flush()
+      } else if (status === 'error' || status === 'closed') {
+        callbacks.onStatus('offline')
+        scheduleRetry()
+      }
+    },
+  }).then((joined) => {
+    if (closed) {
+      joined?.leave()
+      return
+    }
+    handle = joined
+    if (!joined) {
+      callbacks.onStatus('offline')
+      return
+    }
+    joined.track(currentIdentity)
+    void flush()
+  }).catch(() => {
+    if (!closed) callbacks.onStatus('offline')
+  })
+
+  sweepTimer = setInterval(sweep, SWEEP_INTERVAL_MS)
+
+  return {
+    send(content, imageBlob) {
+      const trimmed = content.trim()
+      if ((!trimmed && !imageBlob) || closed) return
+      const item: ChatOutboxItem = {
+        id: newId(),
+        content: trimmed,
+        displayName: currentIdentity.displayName,
+        at: Date.now(),
+        attempts: 0,
+      }
+      if (imageBlob) item.imageBlob = imageBlob
+      const entry: ChatEntry = {
+        id: item.id,
+        userId: currentIdentity.userId,
+        displayName: currentIdentity.displayName,
+        content: trimmed,
+        at: item.at,
+        state: 'pending',
+      }
+      if (imageBlob) {
+        const url = URL.createObjectURL(imageBlob)
+        localUrls.set(item.id, url)
+        entry.localImage = url
+      }
+      entries = [...entries, entry].slice(-MEMORY_CAP)
+      emit(entry)
+      void enqueueOutbox(item).then(() => flush())
+    },
+    retry() {
+      // Reset nothing: failed attempts keep their budget; a manual retry
+      // just runs the queue again immediately.
+      void flush()
+    },
+    async loadOlder() {
+      if (closed || loadingOlder || !hasMoreOlder) {
+        return { loaded: 0, hasMore: hasMoreOlder }
+      }
+      const oldest = entries.find((entry) => !entry.state)
+      if (!oldest) return { loaded: 0, hasMore: false }
+      loadingOlder = true
+      try {
+        const displayBefore = cursorFor(oldest)
+        // Local cache first — only hit the server when it runs dry.
+        const cachedPage = (
+          await loadChatCacheBefore(
+            { createdAt: new Date(displayBefore.createdAt).getTime(), id: displayBefore.id },
+            60,
+          )
+        ).filter((entry) => !isExpired(entry))
+        if (cachedPage.length > 0 && !entries.some((e) => e.id === cachedPage[0].id)) {
+          const byId = new Map(entries.map((entry) => [entry.id, entry]))
+          for (const entry of cachedPage) byId.set(entry.id, entry)
+          entries = [...byId.values()].sort(compareEntries).slice(-MEMORY_CAP)
+          callbacks.onSnapshot(entries)
+          return { loaded: cachedPage.length, hasMore: true }
+        }
+        const page = await fetchChatPage(serverCursor ?? displayBefore)
+        if (!page || closed) {
+          hasMoreOlder = cachedPage.length >= 60 || hasMoreOlder
+          return { loaded: cachedPage.length, hasMore: hasMoreOlder }
+        }
+        hasMoreOlder = page.hasMore
+        if (page.messages.length > 0) {
+          serverCursor = {
+            createdAt: page.messages[0].serverCreatedAt!,
+            id: page.messages[0].id,
+          }
+        } else {
+          serverCursor = null
+        }
+        const byId = new Map(entries.map((entry) => [entry.id, entry]))
+        for (const message of page.messages) {
+          byId.set(message.id, mergeIntoEntry(message, byId.get(message.id)))
+        }
+        entries = [...byId.values()].sort(compareEntries).slice(-MEMORY_CAP)
+        callbacks.onSnapshot(entries)
+        void saveChatCache(entries)
+        return { loaded: page.messages.length, hasMore: hasMoreOlder }
+      } finally {
+        loadingOlder = false
+      }
+    },
+    updateIdentity(next) {
+      currentIdentity = next
+      handle?.track(next)
+    },
+    leave() {
+      closed = true
+      if (retryTimer) clearTimeout(retryTimer)
+      if (sweepTimer) clearInterval(sweepTimer)
+      handle?.leave()
+      handle = null
+    },
+  }
+}
+
+function cursorFor(entry: ChatEntry): ChatCursor {
+  return {
+    createdAt: entry.serverCreatedAt ?? new Date(entry.at).toISOString(),
+    id: entry.id,
+  }
+}
+
+function replace(list: ChatEntry[], entry: ChatEntry): ChatEntry[] {
+  const index = list.findIndex((e) => e.id === entry.id)
+  if (index === -1) return [...list, entry].slice(-MEMORY_CAP)
+  const next = list.slice()
+  next[index] = entry
+  return next
+}
+
+function newId(): string {
+  return (
+    globalThis.crypto?.randomUUID?.() ??
+    `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  )
+}
