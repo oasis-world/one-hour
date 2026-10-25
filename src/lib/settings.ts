@@ -12,6 +12,8 @@ export type ThemeName = 'warm' | 'dark'
 
 export const VEIL_MIN = 0
 export const VEIL_MAX = 0.92
+/** Default chat-list opacity — high enough that messages read over any photo. */
+export const VEIL_DEFAULT = 0.62
 
 /** A backdrop photo holds the screen for at most this long. */
 export const BG_TTL_DEFAULT_MS = 10 * 60 * 1000
@@ -21,10 +23,10 @@ export function loadVeil(): number {
   try {
     const raw = globalThis.localStorage?.getItem(VEIL_KEY)
     const parsed = raw == null ? NaN : Number(raw)
-    if (!Number.isFinite(parsed)) return 0.42
+    if (!Number.isFinite(parsed)) return VEIL_DEFAULT
     return Math.min(VEIL_MAX, Math.max(VEIL_MIN, parsed))
   } catch {
-    return 0.42
+    return VEIL_DEFAULT
   }
 }
 

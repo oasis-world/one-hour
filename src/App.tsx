@@ -124,7 +124,8 @@ export default function App() {
 
       <TopBar
         account={account}
-        onlineCount={room.presence.length}
+        members={room.presence}
+        selfId={room.identity?.userId ?? null}
         theme={theme}
         onAvatarClick={() => setAccountOpen(true)}
         onToggleTheme={() => window.setOneHourTheme?.(theme === 'dark' ? 'warm' : 'dark')}

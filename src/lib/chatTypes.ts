@@ -27,6 +27,8 @@ export interface PresenceMember {
   userId: string
   displayName: string
   avatarUrl: string | null
+  /** epoch ms — when this member entered the room (last track). */
+  enteredAt: number
 }
 
 export type ChatStatus = 'connecting' | 'online' | 'offline'

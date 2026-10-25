@@ -1,28 +1,33 @@
 import { useState } from 'react'
 import type { AccountState } from '../lib/account'
 import type { ThemeName } from '../lib/settings'
+import type { PresenceMember } from '../lib/chatTypes'
 import { useLang } from '../lib/i18n'
 import { useViewportNarrow } from '../lib/media'
 import { isAutoTravelerName, loadChatNickname } from '../lib/nickname'
 import { userAvatarTint } from '../lib/identity'
 import { ChevronDownIcon, MoonIcon, PeopleIcon, SunIcon, TravelerGlyph } from './icons'
+import OnlineList from './OnlineList'
 
 /**
  * Top-left corner. Desktop: a vertical column of four matching glass
- * controls — avatar (login/register), online count (badge), theme toggle,
- * language toggle. Phones: the column collapses into one chevron chip;
- * tapping it unfolds the four icons with a staggered pop-in.
+ * controls — avatar (login/register), online count (opens the member
+ * list), theme toggle, language toggle. Phones: the column collapses
+ * into one chevron chip; tapping it unfolds the icons with a staggered
+ * pop-in.
  */
 export default function TopBar({
   account,
-  onlineCount,
+  members,
+  selfId,
   theme,
   onAvatarClick,
   onToggleTheme,
   onToggleLang,
 }: {
   account: AccountState
-  onlineCount: number
+  members: PresenceMember[]
+  selfId: string | null
   theme: ThemeName
   onAvatarClick: () => void
   onToggleTheme: () => void
@@ -32,7 +37,9 @@ export default function TopBar({
   const zh = lang === 'zh'
   const narrow = useViewportNarrow()
   const [expanded, setExpanded] = useState(false)
+  const [listOpen, setListOpen] = useState(false)
   const showIcons = !narrow || expanded
+  const onlineCount = members.length
 
   const displayName = loadChatNickname(lang)
   const accountLabel =
@@ -100,7 +107,15 @@ export default function TopBar({
             style={{ ['--chip-i' as string]: 1 }}
             title={zh ? `当前在线 ${onlineCount} 人` : `${onlineCount} online now`}
           >
-            <PeopleIcon size={15} />
+            <button
+              type="button"
+              className="top-chip-btn top-chip-hit"
+              onClick={() => setListOpen((v) => !v)}
+              aria-label={zh ? `在线 ${onlineCount} 人，点击查看` : `${onlineCount} online, tap to view`}
+              aria-expanded={listOpen}
+            >
+              <PeopleIcon size={15} />
+            </button>
             <span className="top-badge">{onlineCount}</span>
           </span>
 
@@ -126,6 +141,10 @@ export default function TopBar({
             {zh ? 'EN' : '中'}
           </button>
         </div>
+      )}
+
+      {listOpen && (
+        <OnlineList members={members} selfId={selfId} onClose={() => setListOpen(false)} />
       )}
     </div>
   )

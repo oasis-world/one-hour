@@ -150,6 +150,7 @@ export async function joinChatRoom(options: {
             userId: entry.userId,
             displayName: entry.displayName,
             avatarUrl: entry.avatarUrl ?? null,
+            enteredAt: entry.enteredAt,
           }))
         options.onPresence(members)
       })
