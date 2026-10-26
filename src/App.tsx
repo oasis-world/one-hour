@@ -16,6 +16,7 @@ import { watchAccountForProfileSync } from './lib/profileCloud'
 import { useMobileKeyboard } from './lib/useMobileKeyboard'
 import './lib/settingsRuntime'
 import { fileToChatImage } from './lib/imageBlob'
+import { chromePopoverJustClosed } from './lib/chromePopover'
 import { useLang, t } from './lib/i18n'
 import { loadTheme, loadVeil, type ThemeName } from './lib/settings'
 
@@ -42,6 +43,12 @@ const MUSIC_TRACKS: Record<string, string[]> = {
     'https://upload.wikimedia.org/wikipedia/commons/transcoded/6/60/Guqin-Yangguan_Sandie.ogg/Guqin-Yangguan_Sandie.ogg.mp3',
     'https://upload.wikimedia.org/wikipedia/commons/transcoded/1/16/Qiu_Feng_Ci.ogg/Qiu_Feng_Ci.ogg.mp3',
     'https://upload.wikimedia.org/wikipedia/commons/transcoded/e/ed/Kuai_le_de_qia_qia_gu_niang_-_Teresa_Teng_-_Deng_Lijun_%28%E5%BF%AB%E4%B9%90%E7%9A%84%E6%81%B0%E6%81%B0%E5%A7%91%E5%A8%98%29.opus/Kuai_le_de_qia_qia_gu_niang_-_Teresa_Teng_-_Deng_Lijun_%28%E5%BF%AB%E4%B9%90%E7%9A%84%E6%81%B0%E6%81%B0%E5%A7%91%E5%A8%98%29.opus.mp3',
+    // Guqin classics (public domain performances on Wikimedia Commons)
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/5/52/Guqin-Zuiyu_Changwan.ogg/Guqin-Zuiyu_Changwan.ogg.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/8/8f/Jiu_Kuang.ogg/Jiu_Kuang.ogg.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/e/e0/Liu_Shui.ogg/Liu_Shui.ogg.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/5/5a/Pingsha_Luoyan.ogg/Pingsha_Luoyan.ogg.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/1/1e/Shenren_Chang.ogg/Shenren_Chang.ogg.mp3',
   ],
   en: [
     // Ambient / background
@@ -49,6 +56,18 @@ const MUSIC_TRACKS: Record<string, string[]> = {
     'https://upload.wikimedia.org/wikipedia/commons/8/8e/Scott_Buckley_-_Aurora.mp3',
     'https://upload.wikimedia.org/wikipedia/commons/transcoded/3/31/SoundAudio_-_Forest_%28relaxing_music%29.opus/SoundAudio_-_Forest_%28relaxing_music%29.opus.mp3',
     'https://upload.wikimedia.org/wikipedia/commons/transcoded/3/3e/Alex-Productions_-_Deep_%28Dark_Ambient_Background_music%29.oga/Alex-Productions_-_Deep_%28Dark_Ambient_Background_music%29.oga.mp3',
+    // Kevin MacLeod (CC-BY 3.0, incompetech.com) — calm / soundtrack picks
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/6/67/Kevin_MacLeod_-_01_-_Meditation_Impromptu_01.ogg/Kevin_MacLeod_-_01_-_Meditation_Impromptu_01.ogg.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/5/59/Kevin_MacLeod_-_Autumn_Day.ogg/Kevin_MacLeod_-_Autumn_Day.ogg.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/5/58/Kevin_MacLeod_-_Carefree.ogg/Kevin_MacLeod_-_Carefree.ogg.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/4/4c/Kevin_MacLeod_-_Cattails.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/8/80/MacLeod%2C_Kevin_-_Snowdrop.ogg/MacLeod%2C_Kevin_-_Snowdrop.ogg.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/9/9c/Heart_of_Nowhere_%28MacLeod%2C_Kevin%29_%28ISRC_USUAN1400045%29.oga/Heart_of_Nowhere_%28MacLeod%2C_Kevin%29_%28ISRC_USUAN1400045%29.oga.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/48/Peaceful_Desolation_%28Kevin_MacLeod%29_%28ISRC_USUAN1200017%29.oga/Peaceful_Desolation_%28Kevin_MacLeod%29_%28ISRC_USUAN1200017%29.oga.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/45/Kevin_MacLeod_-_The_Endless.ogg/Kevin_MacLeod_-_The_Endless.ogg.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/5/5a/Blue_Feather_%28ISRC_USUAN1100524%29.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/f/f1/Himalayan_Atmosphere_%28MacLeod%2C_Kevin%29_%28ISRC_USUAN1100204%29.oga/Himalayan_Atmosphere_%28MacLeod%2C_Kevin%29_%28ISRC_USUAN1100204%29.oga.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/2/21/Relaxing_Piano_Music_%28ISRC_USUAN1500075%29.mp3',
     // Country / English songs (public domain)
     'https://upload.wikimedia.org/wikipedia/commons/transcoded/3/3b/Media.io_1-01_Walkin%27_After_Midnight.ogg/Media.io_1-01_Walkin%27_After_Midnight.ogg.mp3',
     "https://upload.wikimedia.org/wikipedia/commons/transcoded/9/92/George_Jones_sings_%27I%27m_Ragged_But_I%27m_Right%27.oga/George_Jones_sings_%27I%27m_Ragged_But_I%27m_Right%27.oga.mp3",
@@ -252,19 +271,22 @@ export default function App() {
     return () => window.clearTimeout(timer)
   }, [profile, startTrack])
 
+  /**
+   * Switching on always plays a brand-new random track right away (never
+   * resumes the old song). Switching off silences the room at once and
+   * stops streaming; the next switch-on draws another fresh track.
+   */
   const toggleMusic = () => {
     const audio = audioRef.current
     if (!audio) return
-    if (musicMuted) {
-      audio.muted = false
-      musicMutedRef.current = false
-      setMusicMuted(false)
-      if (audio.paused) void audio.play().catch(() => {})
-    } else {
+    if (!musicMuted) {
       audio.muted = true
       musicMutedRef.current = true
       setMusicMuted(true)
+      audio.pause()
+      return
     }
+    startTrack(false)
   }
 
   // Browsers may block the delayed autoplay; retry once the user interacts.
@@ -454,6 +476,9 @@ export default function App() {
             // composer popover shouldn't fold the room as well.
             if (e.target !== e.currentTarget) return
             if (composerMenuOpen || Date.now() - menuClosedAt.current < 400) return
+            // A blank click that just dismissed the avatar / gear popover
+            // only closes the popover — the clear photo stays, chat stays.
+            if (chromePopoverJustClosed()) return
             closeChat()
           }}
         >

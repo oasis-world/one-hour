@@ -221,17 +221,9 @@ export function HourglassIcon({ size = 13 }: GlyphProps) {
       focusable="false"
     >
       <rect width="14" height="14" rx="3" fill="#e85d3a" />
-      <text
-        x="7"
-        y="11"
-        text-anchor="middle"
-        font-family="serif"
-        font-size="11"
-        font-weight="700"
-        fill="#ffffff"
-      >
-        I
-      </text>
+      <rect x="4" y="3" width="6" height="2" rx="0.5" fill="#ffffff" />
+      <rect x="6" y="3" width="2" height="8" fill="#ffffff" />
+      <rect x="4" y="9" width="6" height="2" rx="0.5" fill="#ffffff" />
     </svg>
   )
 }

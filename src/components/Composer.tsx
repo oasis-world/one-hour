@@ -1,7 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { useLang, COMPOSER_PLACEHOLDER, t } from '../lib/i18n'
-import { useHoverCapable } from '../lib/media'
-import { useHoverReveal } from '../lib/useHoverReveal'
 import { useImeEnter } from '../lib/ime'
 import { CameraIcon, EmojiIcon, PlusIcon, SendIcon, UploadIcon } from './icons'
 import { PhotoIcon } from './userIcons'
@@ -42,9 +40,9 @@ function useMobileFormFactor(): boolean {
 
 /**
  * The composer pill: the plus (camera / photo library) on the left, the
- * field, emoji and the round send arrow on the right. Desktop hovers on
- * the plus / emoji buttons reveal their popovers directly; touch devices
- * tap to toggle.
+ * field, emoji and the round send arrow on the right. Clicking the plus
+ * or emoji button toggles its popover (a click outside closes it); there
+ * is no hover-to-open.
  */
 export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Props) {
   const lang = useLang()
@@ -59,26 +57,6 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
-
-  // Desktop: hovering a side button opens its popover (grace-closable so
-  // the pointer can travel from the button into the panel).
-  const hover = useHoverCapable()
-  const plusHover = useHoverReveal(
-    hover,
-    () => {
-      setPlusOpen(true)
-      setEmojiOpen(false)
-    },
-    () => setPlusOpen(false),
-  )
-  const emojiHover = useHoverReveal(
-    hover,
-    () => {
-      setEmojiOpen(true)
-      setPlusOpen(false)
-    },
-    () => setEmojiOpen(false),
-  )
 
   // Auto-grow: mirror the content height, capped by CSS max-height.
   useLayoutEffect(() => {
@@ -139,11 +117,7 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
   return (
     <div className="composer-dock" ref={rootRef}>
       <div className={`composer${multiline ? ' is-multiline' : ''}`}>
-        <div
-          className="composer-zone"
-          onMouseEnter={plusHover.onEnter}
-          onMouseLeave={plusHover.onLeave}
-        >
+        <div className="composer-zone">
           <button
             type="button"
             className={`composer-side-btn${plusOpen ? ' is-active' : ''}`}
@@ -218,11 +192,7 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
           }}
         />
 
-        <div
-          className="composer-zone"
-          onMouseEnter={emojiHover.onEnter}
-          onMouseLeave={emojiHover.onLeave}
-        >
+        <div className="composer-zone">
           <button
             type="button"
             className={`composer-side-btn${emojiOpen ? ' is-active' : ''}`}

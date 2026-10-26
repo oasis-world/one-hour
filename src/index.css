@@ -1168,8 +1168,8 @@ button {
 
 /* ---------- Popovers (plus menu / emoji panel) ---------- */
 
-/* Hover zone: a side button plus the popover it reveals, so the pointer
-   can travel between them without the popover closing. */
+/* Trigger + the popover it opens share this box, so the panel can be
+   anchored above the side button. */
 .composer-zone {
   position: relative;
   display: flex;
@@ -1601,13 +1601,24 @@ button {
 
 /* Touch devices: no sticky hover backgrounds while scrolling. */
 @media (hover: none), (pointer: coarse) {
-  .msg-row:hover {
+  .msg-row:hover,
+  .settings-row:hover,
+  .online-pop-row:hover,
+  .plus-menu-item:hover,
+  .emoji-cell:hover,
+  .style-row:hover,
+  .style-row-main:hover,
+  .style-row-reroll:hover {
     background: transparent;
   }
 
-  .chat-log {
+  .chat-log,
+  .online-pop-list,
+  .emoji-grid,
+  .style-picker-list {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    touch-action: pan-y;
   }
 }
 
@@ -1632,13 +1643,32 @@ button {
   }
 
   .chat-close {
-    width: 28px;
-    height: 28px;
+    width: 36px;
+    height: 36px;
   }
 
   .music-toggle {
-    width: 28px;
-    height: 28px;
-    top: calc(max(14px, env(safe-area-inset-top)) + 36px);
+    width: 36px;
+    height: 36px;
+    top: calc(max(14px, env(safe-area-inset-top)) + 44px);
+  }
+
+  /* Mobile only: swap the countdown ring's solid progress arc and the
+     faint full-hour track — the remaining-time arc goes faint, the track
+     solid. CSS opacity overrides the circles' presentation attributes. */
+  .msg-countdown-ring circle:first-child {
+    opacity: 1;
+  }
+
+  .msg-countdown-ring circle:last-child {
+    opacity: 0.22;
+  }
+
+  .bg-slot-ring svg circle:first-child {
+    opacity: 1;
+  }
+
+  .bg-slot-ring svg circle:last-child {
+    opacity: 0.25;
   }
 }

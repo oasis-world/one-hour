@@ -45,6 +45,11 @@
 - 实现时：外层 `position: relative` 容器包裹 `input` 与按钮；`input` 宽度 `100%`，并设置右侧 `padding-right` 为按钮留出空间；按钮 `position: absolute; right; top: 50%; transform: translateY(-50%)`。
 - 新增任何带清空功能的输入框都应遵循此布局，review 时把"清空按钮在输入框外部/遮挡文字/点击失焦"当作 bug。
 
+## 移动端列表交互 · 强制规则
+
+- **移动端（触屏）下，手指在列表上滑动时，不得触发列表项的点击态/背景色变化**：`:hover` 在触屏上会粘滞，滑动时会出现"先被点击"的背景色。所有列表项（消息行、设置菜单、在线成员、表情、样式等）在 `@media (hover: none), (pointer: coarse)` 下必须将 `:hover` 背景设为透明，并为滚动容器添加 `touch-action: pan-y` 与 `-webkit-overflow-scrolling: touch`。
+- review 时把"移动端滑动列表项出现背景色变化"当作 bug。
+
 ## 结构速览
 
 - `src/lib/` — 数据层（Supabase 客户端、聊天同步 facade、IndexedDB 缓存/outbox、i18n、设置），不依赖 React。

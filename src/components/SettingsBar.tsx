@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from 'react'
 import type { PresenceMember } from '../lib/chatTypes'
 import type { ThemeName } from '../lib/settings'
 import { useLang, setLang, LANGS, LANG_LABELS, t } from '../lib/i18n'
-import { useHoverCapable } from '../lib/media'
-import { useHoverReveal } from '../lib/useHoverReveal'
+import { setChromePopoverOpen } from '../lib/chromePopover'
 import { ChevronRightIcon, MoonIcon, PeopleIcon, SunIcon } from './icons'
 import { GearIcon, GlobeIcon, RefreshIcon } from './userIcons'
+import LangFlag from './LangFlag'
 import OnlineList from './OnlineList'
 
 /**
- * Bottom-left corner: the settings gear. Hover (desktop) or click opens
- * the room switches — online count (opens the member list), theme,
- * language.
+ * Bottom-left corner: the settings gear. Click to toggle the room
+ * switches — online count (opens the member list), theme, language.
+ * A click outside (or Escape) folds them back down; there is no
+ * hover-to-open.
  */
 export default function SettingsBar({
   members,
@@ -40,18 +41,15 @@ export default function SettingsBar({
   const [listOpen, setListOpen] = useState(false)
   const [langOpen, setLangOpen] = useState(false)
   const barRef = useRef<HTMLDivElement>(null)
-  const hover = useHoverCapable()
-  const { onEnter, onLeave } = useHoverReveal(
-    hover,
-    () => {
-      // Hovering back in while the member list is up keeps it as-is.
-      setOpen((v) => (v || listOpen ? v : true))
-    },
-    () => {
-      setOpen(false)
-      setListOpen(false)
-    },
-  )
+  const anyOpen = open || listOpen || langOpen
+
+  // Report to the chat-stage fold guard so a blank click that dismisses
+  // these popovers doesn't also fold the chat (see chromePopover.ts).
+  useEffect(() => {
+    if (!anyOpen) return
+    setChromePopoverOpen(true)
+    return () => setChromePopoverOpen(false)
+  }, [anyOpen])
 
   // Clicks anywhere outside the corner (popovers included via the ref)
   // fold both layers back down.
@@ -86,8 +84,6 @@ export default function SettingsBar({
     <div
       className={`settings-bar${suppressed ? ' is-suppressed' : ''}`}
       ref={barRef}
-      onMouseEnter={onEnter}
-      onMouseLeave={onLeave}
     >
       <button
         type="button"
@@ -95,6 +91,7 @@ export default function SettingsBar({
         onClick={() => {
           setOpen((v) => !v)
           setListOpen(false)
+          setLangOpen(false)
         }}
         aria-label={t('设置', 'Settings')}
         title={t('设置', 'Settings')}
@@ -134,18 +131,6 @@ export default function SettingsBar({
             <ChevronRightIcon size={14} />
           </button>
 
-          {mobile && (
-            <button
-              type="button"
-              className="settings-row"
-              role="menuitem"
-              onClick={() => window.location.reload()}
-            >
-              <span className="settings-row-icon"><RefreshIcon size={15} /></span>
-              <span className="settings-row-label">{t('刷新页面', 'Reload page')}</span>
-            </button>
-          )}
-
           <button
             type="button"
             className="settings-row"
@@ -161,6 +146,18 @@ export default function SettingsBar({
               {theme === 'dark' ? (t('深色', 'Dark')) : t('暖色', 'Warm')}
             </span>
           </button>
+
+          {mobile && (
+            <button
+              type="button"
+              className="settings-row"
+              role="menuitem"
+              onClick={() => window.location.reload()}
+            >
+              <span className="settings-row-icon"><RefreshIcon size={15} /></span>
+              <span className="settings-row-label">{t('刷新页面', 'Reload page')}</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -177,7 +174,7 @@ export default function SettingsBar({
                 setLangOpen(false)
               }}
             >
-              <span className="settings-row-icon"><GlobeIcon size={15} /></span>
+              <LangFlag code={code} />
               <span className="settings-row-label">{LANG_LABELS[code]}</span>
               {code === lang && <span className="settings-row-value">✓</span>}
             </button>

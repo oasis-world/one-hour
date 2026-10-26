@@ -1,16 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { AccountState } from '../lib/account'
 import { preWelcomeProfile, type UserProfile } from '../lib/userProfile'
 import { useLang } from '../lib/i18n'
-import { useHoverCapable } from '../lib/media'
-import { useHoverReveal } from '../lib/useHoverReveal'
+import { setChromePopoverOpen } from '../lib/chromePopover'
 import AvatarBadge from './AvatarBadge'
 import AccountPopover from './AccountPopover'
 
 /**
- * Top-left corner: the player's DiceBear face (large). Hover (desktop)
- * or click opens the account popover — nickname at a glance, sign-in
- * for travelers, profile + sign-out once an email identity is bound.
+ * Top-left corner: the player's DiceBear face (large). Click it to
+ * toggle the account popover — nickname at a glance, sign-in for
+ * travelers, profile + sign-out once an email identity is bound. A
+ * click outside (or Escape) closes it; there is no hover-to-open.
  * Before the welcome confirm the shared random draft plays the part,
  * matching what the welcome gate offers.
  */
@@ -30,17 +30,19 @@ export default function TopBar({
   const lang = useLang()
   const zh = lang === 'zh'
   const [open, setOpen] = useState(false)
-  const hover = useHoverCapable()
-  const { onEnter, onLeave } = useHoverReveal(
-    hover,
-    () => setOpen(true),
-    () => setOpen(false),
-  )
   const shown = profile ?? preWelcomeProfile()
   const label = shown.nickname
 
+  // Report to the chat-stage fold guard so a blank click that dismisses
+  // this popover doesn't also fold the chat (see chromePopover.ts).
+  useEffect(() => {
+    if (!open) return
+    setChromePopoverOpen(true)
+    return () => setChromePopoverOpen(false)
+  }, [open])
+
   return (
-    <div className="top-bar" onMouseEnter={onEnter} onMouseLeave={onLeave}>
+    <div className="top-bar">
       <button
         type="button"
         className="top-avatar-btn"

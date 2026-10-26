@@ -80,39 +80,26 @@ export function RefreshIcon({ size = 16 }: GlyphProps) {
 }
 
 /**
- * Settings gear: teeth rooted INSIDE the ring band so the strokes fuse
- * into one cog silhouette — a gap between ring and teeth reads as a sun.
+ * Settings gear — Feather's `settings` icon (MIT, by Cole Bemis),
+ * copied verbatim: 24-grid, classic cog with a center hole. It stays
+ * legible at 15px where hand-rolled 16-grid cogs turn blobby.
  */
 export function GearIcon({ size = 16 }: GlyphProps) {
-  const teeth: Array<{ key: number; x1: number; y1: number; x2: number; y2: number }> = []
-  for (let i = 0; i < 8; i += 1) {
-    const a = (i * Math.PI) / 4
-    const inner = 4.1 // starts within the ring band → connected
-    const outer = 6.4
-    teeth.push({
-      key: i,
-      x1: 8 + inner * Math.cos(a),
-      y1: 8 + inner * Math.sin(a),
-      x2: 8 + outer * Math.cos(a),
-      y2: 8 + outer * Math.sin(a),
-    })
-  }
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 16 16"
+      viewBox="0 0 24 24"
       fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden="true"
       focusable="false"
-      stroke="currentColor"
-      strokeLinecap="round"
     >
-      <circle cx="8" cy="8" r="1.8" strokeWidth="1.4" />
-      <circle cx="8" cy="8" r="4" strokeWidth="2.2" />
-      {teeth.map((t) => (
-        <line key={t.key} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} strokeWidth="2.2" />
-      ))}
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83a2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33a1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2a2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0a2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2a2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83a2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2a2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0a2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2a2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   )
 }
