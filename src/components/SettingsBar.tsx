@@ -5,7 +5,7 @@ import { useLang } from '../lib/i18n'
 import { useHoverCapable } from '../lib/media'
 import { useHoverReveal } from '../lib/useHoverReveal'
 import { ChevronRightIcon, MoonIcon, PeopleIcon, SunIcon } from './icons'
-import { GearIcon, GlobeIcon } from './userIcons'
+import { GearIcon, GlobeIcon, RefreshIcon } from './userIcons'
 import OnlineList from './OnlineList'
 
 /**
@@ -31,6 +31,13 @@ export default function SettingsBar({
 }) {
   const lang = useLang()
   const zh = lang === 'zh'
+  const mobile = (() => {
+    try {
+      return window.matchMedia('(pointer: coarse)').matches
+    } catch {
+      return false
+    }
+  })()
   const [open, setOpen] = useState(false)
   const [listOpen, setListOpen] = useState(false)
   const barRef = useRef<HTMLDivElement>(null)
@@ -140,6 +147,18 @@ export default function SettingsBar({
             <span className="settings-row-label">{zh ? '语言' : 'Language'}</span>
             <span className="settings-row-value">{zh ? '中文' : 'English'}</span>
           </button>
+
+          {mobile && (
+            <button
+              type="button"
+              className="settings-row"
+              role="menuitem"
+              onClick={() => window.location.reload()}
+            >
+              <span className="settings-row-icon"><RefreshIcon size={15} /></span>
+              <span className="settings-row-label">{zh ? '刷新页面' : 'Reload page'}</span>
+            </button>
+          )}
         </div>
       )}
 

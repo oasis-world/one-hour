@@ -35,10 +35,19 @@ export function useMobileKeyboard(shellRef: RefObject<HTMLElement | null>): void
 
     const apply = () => {
       const keyboard = window.innerHeight - vv.height - vv.offsetTop
-      if (keyboard > KEYBOARD_MIN_PX) {
+      const active = document.activeElement
+      const fieldFocused =
+        active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement
+      const keyboardOpen = keyboard > KEYBOARD_MIN_PX
+      if (keyboardOpen || fieldFocused) {
         shell.classList.add('is-keyboard-open')
-        shell.style.height = `${vv.height}px`
-        shell.style.transform = `translateY(${vv.offsetTop}px)`
+        if (keyboardOpen) {
+          shell.style.height = `${vv.height}px`
+          shell.style.transform = `translateY(${vv.offsetTop}px)`
+        } else {
+          shell.style.height = ''
+          shell.style.transform = ''
+        }
       } else {
         shell.classList.remove('is-keyboard-open')
         shell.style.height = ''
@@ -63,6 +72,8 @@ export function useMobileKeyboard(shellRef: RefObject<HTMLElement | null>): void
 
     vv.addEventListener('resize', apply)
     vv.addEventListener('scroll', apply)
+    document.addEventListener('focusin', apply)
+    document.addEventListener('focusout', apply)
     document.addEventListener('pointerdown', onDown)
     document.addEventListener('touchmove', onMove)
     document.addEventListener('gesturestart', onGesture)
@@ -71,6 +82,8 @@ export function useMobileKeyboard(shellRef: RefObject<HTMLElement | null>): void
     return () => {
       vv.removeEventListener('resize', apply)
       vv.removeEventListener('scroll', apply)
+      document.removeEventListener('focusin', apply)
+      document.removeEventListener('focusout', apply)
       document.removeEventListener('pointerdown', onDown)
       document.removeEventListener('touchmove', onMove)
       document.removeEventListener('gesturestart', onGesture)

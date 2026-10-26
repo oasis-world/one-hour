@@ -35,6 +35,13 @@ type FoldState = 'open' | 'folding' | 'folded' | 'unfolding'
 const FOLD_MS = 500
 const UNFOLD_MS = 540
 
+const MUSIC_TRACKS = [
+  'https://upload.wikimedia.org/wikipedia/commons/transcoded/5/52/Uniq_-_Art_Of_Silence_V2.ogg/Uniq_-_Art_Of_Silence_V2.ogg.mp3',
+  'https://upload.wikimedia.org/wikipedia/commons/8/8e/Scott_Buckley_-_Aurora.mp3',
+  'https://upload.wikimedia.org/wikipedia/commons/transcoded/3/31/SoundAudio_-_Forest_%28relaxing_music%29.opus/SoundAudio_-_Forest_%28relaxing_music%29.opus.mp3',
+  'https://upload.wikimedia.org/wikipedia/commons/transcoded/3/3e/Alex-Productions_-_Deep_%28Dark_Ambient_Background_music%29.oga/Alex-Productions_-_Deep_%28Dark_Ambient_Background_music%29.oga.mp3',
+]
+
 export default function App() {
   const account = useAccount()
   const profile = useUserProfile()
@@ -49,6 +56,41 @@ export default function App() {
   const [musicMuted, setMusicMuted] = useState(true)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const musicScheduledRef = useRef(false)
+  const musicMutedRef = useRef(true)
+  const lastTrackRef = useRef(-1)
+
+  const pickTrack = useCallback(() => {
+    if (MUSIC_TRACKS.length === 0) return ''
+    let idx = Math.floor(Math.random() * MUSIC_TRACKS.length)
+    if (MUSIC_TRACKS.length > 1 && idx === lastTrackRef.current) {
+      idx = (idx + 1) % MUSIC_TRACKS.length
+    }
+    lastTrackRef.current = idx
+    return MUSIC_TRACKS[idx]
+  }, [])
+
+  const startTrack = useCallback((muted: boolean) => {
+    const audio = audioRef.current
+    if (!audio) return
+    audio.src = pickTrack()
+    audio.loop = false
+    audio.muted = muted
+    audio.setAttribute('playsinline', '')
+    musicMutedRef.current = muted
+    setMusicMuted(muted)
+    audio.load()
+    const tryPlay = () => void audio.play().catch(() => {})
+    audio.addEventListener('canplay', tryPlay, { once: true })
+    tryPlay()
+  }, [pickTrack])
+
+  const handleTrackEnded = useCallback(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    audio.src = pickTrack()
+    audio.muted = musicMutedRef.current
+    void audio.play().catch(() => {})
+  }, [pickTrack])
   /** Which account dialog view is open, if any. */
   const [accountView, setAccountView] = useState<'closed' | 'signin' | 'bind'>('closed')
   const [profileOpen, setProfileOpen] = useState(false)
@@ -149,6 +191,10 @@ export default function App() {
   // Keep the document language in sync for a11y / IME hints.
   useEffect(() => {
     document.documentElement.lang = zh ? 'zh-CN' : 'en'
+    // Localized home-screen name for iOS "Add to Home Screen".
+    document.title = zh ? '一小时' : 'One Hour'
+    const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]')
+    if (appleTitle) appleTitle.setAttribute('content', zh ? '一小时' : 'One Hour')
   }, [zh])
 
   // First background ready → wait 1.5s, then unfold the chat from the
@@ -173,27 +219,44 @@ export default function App() {
     if (!profile || musicScheduledRef.current) return
     musicScheduledRef.current = true
     const timer = window.setTimeout(() => {
-      const audio = audioRef.current
-      if (!audio) return
-      audio.loop = true
-      audio.muted = true
-      void audio.play().catch(() => {})
+      startTrack(true)
     }, 3000)
     return () => window.clearTimeout(timer)
-  }, [profile])
+  }, [profile, startTrack])
 
   const toggleMusic = () => {
     const audio = audioRef.current
     if (!audio) return
     if (musicMuted) {
       audio.muted = false
+      musicMutedRef.current = false
       setMusicMuted(false)
-      void audio.play().catch(() => {})
+      if (audio.paused) void audio.play().catch(() => {})
     } else {
       audio.muted = true
+      musicMutedRef.current = true
       setMusicMuted(true)
     }
   }
+
+  // Browsers may block the delayed autoplay; retry once the user interacts.
+  useEffect(() => {
+    const retry = () => {
+      if (!musicScheduledRef.current) return
+      const audio = audioRef.current
+      if (audio && audio.paused) {
+        audio.muted = musicMutedRef.current
+        if (!audio.src) audio.src = pickTrack()
+        void audio.play().catch(() => {})
+      }
+    }
+    window.addEventListener('pointerdown', retry)
+    window.addEventListener('touchstart', retry)
+    return () => {
+      window.removeEventListener('pointerdown', retry)
+      window.removeEventListener('touchstart', retry)
+    }
+  }, [pickTrack])
 
   // Re-run the choreography when the tab/app returns to the foreground
   // after being away for a while.
@@ -290,9 +353,9 @@ export default function App() {
       <BackgroundStage imageUrl={latestImage} revealed={fold === 'folded'} onReady={markBgReady} />
       <audio
         ref={audioRef}
-        src="https://upload.wikimedia.org/wikipedia/commons/transcoded/5/52/Uniq_-_Art_Of_Silence_V2.ogg/Uniq_-_Art_Of_Silence_V2.ogg.mp3"
-        loop
         preload="auto"
+        playsInline
+        onEnded={handleTrackEnded}
       />
 
       <TopBar
