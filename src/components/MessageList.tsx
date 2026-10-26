@@ -2,9 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ChatEntry, ChatStatus } from '../lib/chatTypes'
 import { setPopoverOpen } from '../lib/popoverGuard'
 import {
-  loadRoomReactions,
   recordEmojiUse,
-  toggleRoomReaction,
   type RoomReactionState,
 } from '../lib/chatReactions'
 import { t, useLang } from '../lib/i18n'
@@ -18,11 +16,13 @@ interface Props {
   selfId: string | null
   status: ChatStatus
   layoutKey: boolean
+  reactions: RoomReactionState
   onImageClick: (src: string) => void
   onRetry: () => void
   onRemove: (id: string) => void
   onToast: (text: string) => void
   onLoadOlder: () => Promise<{ loaded: number; hasMore: boolean }>
+  onReact: (entryId: string, emoji: string) => void
 }
 
 interface OpenMenu {
@@ -45,18 +45,19 @@ export default function MessageList({
   selfId,
   status,
   layoutKey,
+  reactions,
   onImageClick,
   onRetry,
   onRemove,
   onToast,
   onLoadOlder,
+  onReact,
 }: Props) {
   useLang() // re-render on language flips
   const logRef = useRef<HTMLDivElement>(null)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [hasOlder, setHasOlder] = useState(true)
   const [menu, setMenu] = useState<OpenMenu | null>(null)
-  const [reactions, setReactions] = useState<RoomReactionState>(() => loadRoomReactions())
   const menuOpen = menu !== null
 
   // Report to the chat-stage guard: a blank click dismisses this menu on
@@ -126,7 +127,7 @@ export default function MessageList({
   }
 
   const reactEntry = (id: string, emoji: string) => {
-    setReactions((prev) => toggleRoomReaction(prev, id, emoji))
+    onReact(id, emoji)
     recordEmojiUse(emoji)
   }
 

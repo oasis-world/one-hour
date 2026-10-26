@@ -25,6 +25,7 @@ import {
 import { isExpired, MESSAGE_TTL_MS } from './expiry'
 import type { ChatEntry, ChatStatus, ChatMessage, PresenceMember } from './chatTypes'
 import type { ChatIdentity } from './identity'
+import type { RoomReactionChange, RoomReactionRecord } from './chatReactions'
 
 /**
  * Chat sync facade (oasis-game architecture): writes land locally first —
@@ -46,6 +47,8 @@ export interface ChatCallbacks {
   onRemoved: (id: string) => void
   onPresence: (members: PresenceMember[]) => void
   onStatus: (status: ChatStatus) => void
+  onReactionSnapshot: (reactions: RoomReactionRecord[]) => void
+  onReaction: (change: RoomReactionChange) => void
 }
 
 export interface ChatApi {
@@ -56,6 +59,7 @@ export interface ChatApi {
   loadOlder(): Promise<{ loaded: number; hasMore: boolean }>
   /** Author deletes one own message: dissolve here, purge the cloud row. */
   remove(id: string): void
+  toggleReaction(messageId: string, emoji: string, active: boolean): Promise<boolean>
   updateIdentity(identity: ChatIdentity): void
   leave(): void
 }
@@ -370,6 +374,8 @@ export function enterChat(
     presenceKey: currentIdentity.userId,
     onMessage: mergeServerMessage,
     onDeleted: removeRemote,
+    onReactionSnapshot: callbacks.onReactionSnapshot,
+    onReaction: callbacks.onReaction,
     onPresence: callbacks.onPresence,
     onStatus: (status) => {
       if (closed) return
@@ -459,6 +465,10 @@ export function enterChat(
       // Pending/failed rows never reached the cloud — the farewell alone is
       // enough (dropEntry also clears their outbox slot).
       beginExpire(id, !entry.state)
+    },
+    toggleReaction(messageId, emoji, active) {
+      if (closed || !handle) return Promise.resolve(false)
+      return handle.toggleReaction(messageId, emoji, active)
     },
     async loadOlder() {
       if (closed || loadingOlder || !hasMoreOlder) {

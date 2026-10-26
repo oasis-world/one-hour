@@ -1,16 +1,21 @@
 /**
- * Local emoji reactions for the chat room — ported from the oasis room
- * chat. Reactions live in localStorage (no cloud table: sharing them
- * across clients would need a `chat_reactions` table + Realtime fan-out,
- * deliberately left as the follow-up, same as oasis). The shape mirrors
- * what such a table would serve so the UI can swap sources unchanged.
+ * Emoji reactions for the global room. Reaction rows are synchronized by
+ * Supabase Realtime; only the player's quick-emoji preference stays local.
  */
 
 export type RoomReactionMap = Record<string, { count: number; own: boolean }>
 
 export type RoomReactionState = Record<string, RoomReactionMap>
 
-const STORE_KEY = 'one-hour-chat-reactions:global'
+export interface RoomReactionRecord {
+  messageId: string
+  userId: string
+  emoji: string
+}
+
+export interface RoomReactionChange extends RoomReactionRecord {
+  active: boolean
+}
 
 /** Player-global quick-emoji habits (input habit, not per room). */
 const QUICK_KEY = 'one-hour-chat-quick-emoji'
@@ -98,40 +103,31 @@ export function getQuickEmojis(count: number): string[] {
   return out.slice(0, Math.max(0, count))
 }
 
-export function loadRoomReactions(): RoomReactionState {
-  const storage = readStorage()
-  if (!storage) return {}
-  try {
-    const raw = storage.getItem(STORE_KEY)
-    const parsed = raw ? (JSON.parse(raw) as unknown) : {}
-    return (parsed ?? {}) as RoomReactionState
-  } catch {
-    return {}
+export function applyRoomReactionChange(
+  records: RoomReactionRecord[],
+  change: RoomReactionChange,
+): RoomReactionRecord[] {
+  const index = records.findIndex((row) => sameReaction(row, change))
+  if (change.active) {
+    return index >= 0 ? records : [...records, change]
   }
+  return index < 0 ? records : records.filter((_, i) => i !== index)
 }
 
-/** Toggle my reaction; returns the next full state (persisted inside). */
-export function toggleRoomReaction(
-  prev: RoomReactionState,
-  messageId: string,
-  emoji: string,
+export function summarizeRoomReactions(
+  records: RoomReactionRecord[],
+  selfId: string | null,
 ): RoomReactionState {
-  const current: RoomReactionMap = { ...(prev[messageId] ?? {}) }
-  const slot = current[emoji]
-  if (slot?.own) {
-    const count = slot.count - 1
-    if (count <= 0) delete current[emoji]
-    else current[emoji] = { count, own: false }
-  } else {
-    current[emoji] = { count: (slot?.count ?? 0) + 1, own: true }
+  const state: RoomReactionState = {}
+  for (const row of records) {
+    const message = (state[row.messageId] ??= {})
+    const summary = (message[row.emoji] ??= { count: 0, own: false })
+    summary.count += 1
+    if (row.userId === selfId) summary.own = true
   }
-  const next: RoomReactionState = { ...prev }
-  if (Object.keys(current).length === 0) delete next[messageId]
-  else next[messageId] = current
-  try {
-    readStorage()?.setItem(STORE_KEY, JSON.stringify(next))
-  } catch {
-    // Quota / private mode: reactions stay in memory for this session.
-  }
-  return next
+  return state
+}
+
+function sameReaction(a: RoomReactionRecord, b: RoomReactionRecord): boolean {
+  return a.messageId === b.messageId && a.userId === b.userId && a.emoji === b.emoji
 }

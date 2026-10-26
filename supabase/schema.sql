@@ -79,6 +79,49 @@ exception
   when duplicate_object then null; -- already in the publication
 end $$;
 
+-- ── Shared message reactions ────────────────────────────────────────────────
+
+create table if not exists public.chat_reactions (
+  message_id uuid not null references public.chat_messages (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  emoji text not null check (char_length(emoji) between 1 and 16),
+  created_at timestamptz not null default now(),
+  primary key (message_id, user_id, emoji)
+);
+
+create index if not exists chat_reactions_message
+  on public.chat_reactions (message_id);
+
+alter table public.chat_reactions enable row level security;
+
+drop policy if exists "reactions are readable by signed-in players"
+  on public.chat_reactions;
+create policy "reactions are readable by signed-in players"
+  on public.chat_reactions for select
+  using (auth.uid() is not null);
+
+drop policy if exists "players may add their own reactions"
+  on public.chat_reactions;
+create policy "players may add their own reactions"
+  on public.chat_reactions for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "players may remove their own reactions"
+  on public.chat_reactions;
+create policy "players may remove their own reactions"
+  on public.chat_reactions for delete
+  using (auth.uid() = user_id);
+
+grant select, insert, delete on public.chat_reactions to authenticated;
+revoke all on public.chat_reactions from anon;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.chat_reactions;
+exception
+  when duplicate_object then null;
+end $$;
+
 -- ── Chat image bucket ───────────────────────────────────────────────────────
 
 insert into storage.buckets (id, name, public)

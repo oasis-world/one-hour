@@ -1,8 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { enterChat, type ChatApi } from '../lib/chatSync'
 import type { ChatEntry, ChatStatus, PresenceMember } from '../lib/chatTypes'
 import { resolveChatIdentity, type ChatIdentity } from '../lib/identity'
 import { useAccount } from '../lib/useAccount'
+import {
+  applyRoomReactionChange,
+  summarizeRoomReactions,
+  type RoomReactionChange,
+  type RoomReactionRecord,
+} from '../lib/chatReactions'
 
 /**
  * React binding for the global chat room (oasis-game pattern). Joins on
@@ -19,6 +25,7 @@ export function useChatRoom(enabled: boolean) {
 
   const [entries, setEntries] = useState<ChatEntry[]>([])
   const [presence, setPresence] = useState<PresenceMember[]>([])
+  const [reactionRows, setReactionRows] = useState<RoomReactionRecord[]>([])
   const [status, setStatus] = useState<ChatStatus>('connecting')
   const apiRef = useRef<ChatApi | null>(null)
 
@@ -37,9 +44,15 @@ export function useChatRoom(enabled: boolean) {
           next[index] = entry
           return next
         }),
-      onRemoved: (id) => setEntries((list) => list.filter((e) => e.id !== id)),
+      onRemoved: (id) => {
+        setEntries((list) => list.filter((e) => e.id !== id))
+        setReactionRows((rows) => rows.filter((reaction) => reaction.messageId !== id))
+      },
       onPresence: setPresence,
       onStatus: setStatus,
+      onReactionSnapshot: setReactionRows,
+      onReaction: (change: RoomReactionChange) =>
+        setReactionRows((rows) => applyRoomReactionChange(rows, change)),
     })
     apiRef.current = api
     return () => {
@@ -64,6 +77,32 @@ export function useChatRoom(enabled: boolean) {
   }, [])
   const retry = useCallback(() => apiRef.current?.retry(), [])
   const remove = useCallback((id: string) => apiRef.current?.remove(id), [])
+  const toggleReaction = useCallback((messageId: string, emoji: string) => {
+    const reactionUserId = identity?.userId
+    if (!reactionUserId) return
+    const active = !reactionRows.some(
+      (reaction) =>
+        reaction.messageId === messageId &&
+        reaction.userId === reactionUserId &&
+        reaction.emoji === emoji,
+    )
+    const change: RoomReactionChange = {
+      messageId,
+      userId: reactionUserId,
+      emoji,
+      active,
+    }
+    setReactionRows((rows) => applyRoomReactionChange(rows, change))
+    void (apiRef.current?.toggleReaction(messageId, emoji, active) ?? Promise.resolve(false))
+      .then((ok) => {
+        if (!ok) {
+          setReactionRows((rows) => applyRoomReactionChange(rows, { ...change, active: !active }))
+        }
+      })
+      .catch(() => {
+        setReactionRows((rows) => applyRoomReactionChange(rows, { ...change, active: !active }))
+      })
+  }, [identity?.userId, reactionRows])
   const loadOlder = useCallback(() => {
     return (
       apiRef.current?.loadOlder() ?? Promise.resolve({ loaded: 0, hasMore: false })
@@ -71,6 +110,10 @@ export function useChatRoom(enabled: boolean) {
   }, [])
 
   const active = enabled && identity !== null
+  const reactions = useMemo(
+    () => summarizeRoomReactions(reactionRows, identity?.userId ?? null),
+    [identity?.userId, reactionRows],
+  )
   return {
     entries: active ? entries : [],
     presence: active ? presence : [],
@@ -78,6 +121,8 @@ export function useChatRoom(enabled: boolean) {
     send,
     retry,
     remove,
+    reactions,
+    toggleReaction,
     loadOlder,
     identity,
   }

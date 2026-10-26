@@ -3,16 +3,19 @@ import { getSupabaseClient } from './supabaseClient'
 import { isSupabaseConfigured } from './supabaseConfig'
 import { withTimeout } from './withTimeout'
 import type { ChatMessage, PresenceMember } from './chatTypes'
+import type { RoomReactionChange, RoomReactionRecord } from './chatReactions'
+import { fetchRoomReactionSnapshot, persistRoomReaction } from './chatReactionRemote'
 
 /**
  * Supabase remote layer for the global chat room, ported from oasis-game's
- * sceneChat remote: history in the `chat_messages` table, realtime INSERT /
- * DELETE via postgres_changes, who-is-here via channel presence, images in
- * the public `chat-images` storage bucket. The vendor SDK stays behind this
- * module — UI code only sees the sync facade.
+ * sceneChat remote: history in `chat_messages`, realtime message/reaction
+ * changes via postgres_changes, who-is-here via presence, and images in the
+ * public `chat-images` bucket. The vendor SDK stays behind this module — UI
+ * code only sees the sync facade.
  */
 
 const MESSAGES_TABLE = 'chat_messages'
+const REACTIONS_TABLE = 'chat_reactions'
 const IMAGES_BUCKET = 'chat-images'
 export const CHAT_PAGE_SIZE = 40
 
@@ -53,6 +56,8 @@ export interface RoomCallbacks {
   onMessage: (message: ChatMessage) => void
   /** A row was deleted on any client (expiry purge or author delete). */
   onDeleted: (id: string) => void
+  onReactionSnapshot: (reactions: RoomReactionRecord[]) => void
+  onReaction: (change: RoomReactionChange) => void
   onPresence: (members: PresenceMember[]) => void
   onStatus: (status: RoomStatus) => void
 }
@@ -76,6 +81,7 @@ export interface RoomHandle {
    *  and, through the storage API (SQL deletes on storage.objects are
    *  platform-blocked), the photo object under the author's folder. */
   deleteMessage(id: string, imagePath?: string | null): Promise<{ ok: true } | { ok: false; error: 'network' | 'rejected' }>
+  toggleReaction(messageId: string, emoji: string, active: boolean): Promise<boolean>
   leave(): void
 }
 
@@ -89,6 +95,12 @@ interface MessageRow {
   content: string
   image_url: string | null
   created_at: string
+}
+
+interface ReactionRow {
+  message_id: string
+  user_id: string
+  emoji: string
 }
 
 export const ROOM_TOPIC = 'chat:global'
@@ -171,6 +183,8 @@ export async function joinChatRoom(options: {
   presenceKey: string
   onMessage: RoomCallbacks['onMessage']
   onDeleted: RoomCallbacks['onDeleted']
+  onReactionSnapshot: RoomCallbacks['onReactionSnapshot']
+  onReaction: RoomCallbacks['onReaction']
   onPresence: RoomCallbacks['onPresence']
   onStatus: RoomCallbacks['onStatus']
 }): Promise<RoomHandle | null> {
@@ -190,6 +204,17 @@ export async function joinChatRoom(options: {
   }
 
   let channel: ReturnType<typeof ctx.channel>
+  let roomClosed = false
+  let reactionSnapshotGeneration = 0
+  let reactionSnapshotReady = false
+  let bufferedReactionChanges: RoomReactionChange[] = []
+
+  const receiveReaction = (change: RoomReactionChange) => {
+    if (roomClosed) return
+    if (reactionSnapshotReady) options.onReaction(change)
+    else bufferedReactionChanges.push(change)
+  }
+
   try {
     channel = ctx.channel(ROOM_TOPIC, {
       // Per-user key: reconnects overwrite this player's presence entry
@@ -244,8 +269,50 @@ export async function joinChatRoom(options: {
           if (old?.id) options.onDeleted(old.id)
         },
       )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: REACTIONS_TABLE },
+        (payload) => {
+          const row = payload.new as ReactionRow
+          if (row?.message_id && row.user_id && row.emoji) {
+            receiveReaction({
+              messageId: row.message_id,
+              userId: row.user_id,
+              emoji: row.emoji,
+              active: true,
+            })
+          }
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: REACTIONS_TABLE },
+        (payload) => {
+          const row = payload.old as Partial<ReactionRow> | null
+          if (row?.message_id && row.user_id && row.emoji) {
+            receiveReaction({
+              messageId: row.message_id,
+              userId: row.user_id,
+              emoji: row.emoji,
+              active: false,
+            })
+          }
+        },
+      )
       .subscribe((status) => {
-        if (status === 'SUBSCRIBED') options.onStatus('open')
+        if (status === 'SUBSCRIBED') {
+          options.onStatus('open')
+          const generation = ++reactionSnapshotGeneration
+          reactionSnapshotReady = false
+          bufferedReactionChanges = []
+          void fetchRoomReactionSnapshot(ctx).then((snapshot) => {
+            if (roomClosed || generation !== reactionSnapshotGeneration) return
+            if (snapshot) options.onReactionSnapshot(snapshot)
+            for (const change of bufferedReactionChanges) options.onReaction(change)
+            bufferedReactionChanges = []
+            reactionSnapshotReady = true
+          })
+        }
         else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') options.onStatus('error')
         else if (status === 'CLOSED') options.onStatus('closed')
       })
@@ -361,7 +428,12 @@ export async function joinChatRoom(options: {
         return { ok: false, error: 'network' }
       }
     },
+    async toggleReaction(messageId, emoji, active) {
+      return persistRoomReaction(ctx, messageId, emoji, active)
+    },
     leave() {
+      roomClosed = true
+      reactionSnapshotGeneration += 1
       // Untrack first so the server drops this presence immediately.
       if (heartbeat) {
         clearInterval(heartbeat)

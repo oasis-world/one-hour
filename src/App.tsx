@@ -611,11 +611,13 @@ export default function App() {
               selfId={room.identity?.userId ?? null}
               status={room.status}
               layoutKey={fold === 'unfolding'}
+              reactions={room.reactions}
               onImageClick={openImage}
               onRetry={room.retry}
               onRemove={room.remove}
               onToast={showToast}
               onLoadOlder={room.loadOlder}
+              onReact={room.toggleReaction}
             />
 
             {room.identity ? (
