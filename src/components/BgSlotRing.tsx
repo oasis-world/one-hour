@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { t } from '../lib/i18n'
 import { loadBgTtlMs } from '../lib/settings'
 import { subscribeTick } from '../lib/tick'
-import CountdownProgressRing from './CountdownProgressRing'
+import CountdownVisual from './CountdownVisual'
 import { GlobeIcon } from './userIcons'
 
 /**
@@ -76,13 +76,13 @@ export default function BgSlotRing({
         aria-label={tipText}
         onClick={toggleTip}
       >
-        <CountdownProgressRing
+        <CountdownVisual
           remaining={fraction}
           size={17}
           radius={7}
           strokeWidth={1.8}
           trackOpacity={0.25}
-          className="bg-slot-countdown-ring"
+          className="bg-slot-countdown-visual"
         />
         <span className="bg-tip" aria-hidden="true">
           {tipText}

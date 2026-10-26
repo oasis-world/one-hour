@@ -1,47 +1,41 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PresenceMember } from '../lib/chatTypes'
 import type { ThemeName } from '../lib/settings'
-import { useLang, setLang, LANGS, LANG_LABELS, t } from '../lib/i18n'
+import { COUNTDOWN_ANIMATIONS, type CountdownAnimation } from '../lib/countdownAnimations'
+import { useLang, LANG_LABELS, t } from '../lib/i18n'
 import { setPopoverOpen } from '../lib/popoverGuard'
 import { ChevronRightIcon, MoonIcon, PeopleIcon, SunIcon } from './icons'
 import { GearIcon, GlobeIcon, RefreshIcon } from './userIcons'
-import LangFlag from './LangFlag'
+import CountdownAnimationPicker from './CountdownAnimationPicker'
+import LanguagePicker from './LanguagePicker'
 import OnlineList from './OnlineList'
 
-/**
- * Bottom-left corner: the settings gear. Click to toggle the room
- * switches — online count (opens the member list), theme, language.
- * A click outside (or Escape) folds them back down; there is no
- * hover-to-open.
- */
 export default function SettingsBar({
   members,
   selfId,
   theme,
+  countdownAnimation,
   suppressed = false,
   onToggleTheme,
+  onChangeCountdownAnimation,
 }: {
   members: PresenceMember[]
   selfId: string | null
   theme: ThemeName
+  countdownAnimation: CountdownAnimation
   /** Composer popover is up — mobile hides the gear meanwhile. */
   suppressed?: boolean
   onToggleTheme: () => void
+  onChangeCountdownAnimation: (animation: CountdownAnimation) => void
 }) {
   const lang = useLang()
-  const zh = lang === 'zh'
-  const mobile = (() => {
-    try {
-      return window.matchMedia('(pointer: coarse)').matches
-    } catch {
-      return false
-    }
-  })()
+  const mobile = window.matchMedia?.('(pointer: coarse)').matches ?? false
   const [open, setOpen] = useState(false)
   const [listOpen, setListOpen] = useState(false)
-  const [langOpen, setLangOpen] = useState(false)
+  const [subview, setSubview] = useState<'language' | 'animation' | null>(null)
   const barRef = useRef<HTMLDivElement>(null)
-  const anyOpen = open || listOpen || langOpen
+  const anyOpen = open || listOpen || subview !== null
+  const currentAnimation = COUNTDOWN_ANIMATIONS.find((option) => option.id === countdownAnimation)
 
   // Report to the chat-stage fold guard so a blank click that dismisses
   // these popovers doesn't also fold the chat (see popoverGuard.ts).
@@ -54,20 +48,20 @@ export default function SettingsBar({
   // Clicks anywhere outside the corner (popovers included via the ref)
   // fold both layers back down.
   useEffect(() => {
-    if (!open && !listOpen && !langOpen) return
+    if (!anyOpen) return
     const onDown = (e: PointerEvent) => {
       const target = e.target as HTMLElement | null
       if (barRef.current?.contains(target)) return
       if (target?.closest?.('.online-pop')) return
       setOpen(false)
       setListOpen(false)
-      setLangOpen(false)
+      setSubview(null)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setOpen(false)
         setListOpen(false)
-        setLangOpen(false)
+        setSubview(null)
       }
     }
     document.addEventListener('pointerdown', onDown)
@@ -76,9 +70,9 @@ export default function SettingsBar({
       document.removeEventListener('pointerdown', onDown)
       window.removeEventListener('keydown', onKey)
     }
-  }, [open, listOpen, langOpen])
+  }, [anyOpen])
 
-  const onlineLabel = zh ? `在线 · ${members.length} 人` : `Online · ${members.length}`
+  const onlineLabel = `${t('在线', 'Online')} · ${members.length}`
 
   return (
     <div
@@ -91,7 +85,7 @@ export default function SettingsBar({
         onClick={() => {
           setOpen((v) => !v)
           setListOpen(false)
-          setLangOpen(false)
+          setSubview(null)
         }}
         aria-label={t('设置', 'Settings')}
         title={t('设置', 'Settings')}
@@ -101,13 +95,13 @@ export default function SettingsBar({
         <GearIcon size={15} />
       </button>
 
-      {open && !listOpen && !langOpen && (
+      {open && !listOpen && !subview && (
         <div className="settings-pop" role="menu" aria-label={t('设置', 'Settings')}>
           <button
             type="button"
             className="settings-row"
             role="menuitem"
-            onClick={() => setLangOpen(true)}
+            onClick={() => setSubview('language')}
             title={t('切换语言', 'Switch language')}
           >
             <span className="settings-row-icon"><GlobeIcon size={15} /></span>
@@ -120,10 +114,26 @@ export default function SettingsBar({
             type="button"
             className="settings-row"
             role="menuitem"
+            onClick={() => setSubview('animation')}
+            title={t('选择倒计时动画', 'Choose countdown animation')}
+          >
+            <span className="settings-row-icon" aria-hidden="true">✧</span>
+            <span className="settings-row-label">{t('动画', 'Animation')}</span>
+            <span className="settings-row-value settings-current-animation">
+              {currentAnimation ? t(currentAnimation.zh, currentAnimation.en) : ''}
+            </span>
+            <ChevronRightIcon size={14} />
+          </button>
+
+          <button
+            type="button"
+            className="settings-row"
+            role="menuitem"
             aria-expanded={listOpen}
             onClick={() => {
               setListOpen(true)
               setOpen(false)
+              setSubview(null)
             }}
           >
             <span className="settings-row-icon is-ok"><PeopleIcon size={15} /></span>
@@ -161,33 +171,28 @@ export default function SettingsBar({
         </div>
       )}
 
-      {open && langOpen && (
-        <div className="settings-pop" role="menu" aria-label={t('语言', 'Language')}>
-          {LANGS.map((code) => (
-            <button
-              key={code}
-              type="button"
-              className={`settings-row${code === lang ? ' is-current' : ''}`}
-              role="menuitem"
-              onClick={() => {
-                setLang(code)
-                setLangOpen(false)
-              }}
-            >
-              <LangFlag code={code} />
-              <span className="settings-row-label">{LANG_LABELS[code]}</span>
-              {code === lang && <span className="settings-row-value">✓</span>}
-            </button>
-          ))}
-        </div>
+      {open && subview === 'language' && (
+        <LanguagePicker
+          selected={lang}
+          onSelect={() => setSubview(null)}
+          onBack={() => setSubview(null)}
+        />
       )}
 
+      {open && subview === 'animation' && (
+        <CountdownAnimationPicker
+          selected={countdownAnimation}
+          onSelect={onChangeCountdownAnimation}
+          onBack={() => setSubview(null)}
+        />
+      )}
       {listOpen && (
         <OnlineList
           members={members}
           selfId={selfId}
           placement="bottom"
           onClose={() => setListOpen(false)}
+          onBack={() => { setListOpen(false); setOpen(true) }}
         />
       )}
     </div>

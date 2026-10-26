@@ -20,7 +20,8 @@ import { withTimeout } from './lib/withTimeout'
 import { consumeFilePickerFlag } from './lib/filePickerGuard'
 import { popoverJustClosed } from './lib/popoverGuard'
 import { useLang, t } from './lib/i18n'
-import { loadTheme, loadVeil, type ThemeName } from './lib/settings'
+import { loadCountdownAnimation, loadTheme, loadVeil, saveCountdownAnimation, type ThemeName } from './lib/settings'
+import type { CountdownAnimation } from './lib/countdownAnimations'
 
 /**
  * 一小时 / one-hour — the ephemeral chat room. Every message, text or
@@ -263,6 +264,12 @@ export default function App() {
   }
   const [theme, setTheme] = useState<ThemeName>(() => loadTheme() ?? systemTheme())
   const [veil, setVeil] = useState<number>(() => loadVeil())
+  const [countdownAnimation, setCountdownAnimation] = useState<CountdownAnimation>(loadCountdownAnimation)
+
+  const changeCountdownAnimation = (animation: CountdownAnimation) => {
+    setCountdownAnimation(animation)
+    saveCountdownAnimation(animation)
+  }
 
   // The settings surfaces adjust these via the window helpers; the
   // events hot-swap the running shell.
@@ -504,7 +511,12 @@ export default function App() {
   ].join(' ')
 
   return (
-    <div ref={shellRef} className={shellClass} style={{ ['--veil' as string]: String(veil) }}>
+    <div
+      ref={shellRef}
+      className={shellClass}
+      data-countdown-animation={countdownAnimation}
+      style={{ ['--veil' as string]: String(veil) }}
+    >
       <BackgroundStage imageUrl={latestImage} revealed={fold === 'folded'} onReady={markBgReady} />
       <audio
         ref={audioRef}
@@ -525,8 +537,10 @@ export default function App() {
         members={room.presence}
         selfId={room.identity?.userId ?? null}
         theme={theme}
+        countdownAnimation={countdownAnimation}
         suppressed={composerMenuOpen}
         onToggleTheme={() => window.setOneHourTheme?.(theme === 'dark' ? 'warm' : 'dark')}
+        onChangeCountdownAnimation={changeCountdownAnimation}
       />
 
       {/* Page-corner close: small, top-right of the screen. */}

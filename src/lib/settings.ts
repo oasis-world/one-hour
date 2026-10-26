@@ -1,3 +1,9 @@
+import {
+  DEFAULT_COUNTDOWN_ANIMATION,
+  isCountdownAnimation,
+  type CountdownAnimation,
+} from './countdownAnimations'
+
 /**
  * Local settings (persisted): chat veil opacity — the background alpha of
  * the message list, adjustable from the future settings dialog — plus the
@@ -7,8 +13,26 @@
 const VEIL_KEY = 'one-hour-veil'
 const THEME_KEY = 'one-hour-theme'
 const BG_TTL_KEY = 'one-hour-bg-ttl'
+const COUNTDOWN_ANIMATION_KEY = 'one-hour-countdown-animation'
 
 export type ThemeName = 'warm' | 'dark'
+
+export function loadCountdownAnimation(): CountdownAnimation {
+  try {
+    const value = globalThis.localStorage?.getItem(COUNTDOWN_ANIMATION_KEY)
+    return value && isCountdownAnimation(value) ? value : DEFAULT_COUNTDOWN_ANIMATION
+  } catch {
+    return DEFAULT_COUNTDOWN_ANIMATION
+  }
+}
+
+export function saveCountdownAnimation(animation: CountdownAnimation): void {
+  try {
+    globalThis.localStorage?.setItem(COUNTDOWN_ANIMATION_KEY, animation)
+  } catch {
+    // Private mode: the choice remains active for this session.
+  }
+}
 
 export const VEIL_MIN = 0
 export const VEIL_MAX = 0.92

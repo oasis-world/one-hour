@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { PresenceMember } from '../lib/chatTypes'
-import { useLang, t } from '../lib/i18n'
+import { t } from '../lib/i18n'
 import { userAvatarTint, userNameColor } from '../lib/identity'
 import AvatarBadge from './AvatarBadge'
 
@@ -14,15 +14,15 @@ export default function OnlineList({
   members,
   selfId,
   onClose,
+  onBack,
   placement = 'top',
 }: {
   members: PresenceMember[]
   selfId: string | null
   onClose: () => void
+  onBack: () => void
   placement?: 'top' | 'bottom'
 }) {
-  const lang = useLang()
-  const zh = lang === 'zh'
   const popRef = useRef<HTMLDivElement>(null)
 
   // Click outside closes — clicks on the corner controls that own this
@@ -46,7 +46,11 @@ export default function OnlineList({
       aria-label={t('在线列表', 'Online members')}
     >
       <header className="online-pop-head">
-        {zh ? `在线 · ${members.length}` : `Online · ${members.length}`}
+        <button type="button" className="settings-subview-back" onClick={onBack}>
+          <span aria-hidden="true">‹</span>
+          {t('设置', 'Settings')}
+        </button>
+        <span>{`${t('在线', 'Online')} · ${members.length}`}</span>
       </header>
       <ul className="online-pop-list">
         {members.map((member) => (

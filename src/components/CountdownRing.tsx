@@ -3,7 +3,7 @@ import { MESSAGE_TTL_MS, expiresAtOf } from '../lib/expiry'
 import { t } from '../lib/i18n'
 import { subscribeTick } from '../lib/tick'
 import type { ChatEntry } from '../lib/chatTypes'
-import CountdownProgressRing from './CountdownProgressRing'
+import CountdownVisual from './CountdownVisual'
 
 /**
  * The one-hour countdown: a depleting ring with a mm:ss readout, next to
@@ -31,13 +31,13 @@ export default function CountdownRing({ entry }: { entry: ChatEntry }) {
       className={`msg-countdown${phase === 'late' ? ' is-late' : ''}${phase === 'final' ? ' is-final' : ''}`}
       title={t(`这条消息还剩 ${readout} 消失`, `Vanishes in ${readout}`)}
     >
-      <CountdownProgressRing
+      <CountdownVisual
         remaining={fraction}
         size={17}
         radius={6.5}
         strokeWidth={1.6}
         trackOpacity={0.22}
-        className="msg-countdown-ring"
+        className="msg-countdown-visual"
       />
       <span className="msg-countdown-text">{readout}</span>
     </span>

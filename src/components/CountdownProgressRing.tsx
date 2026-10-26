@@ -1,4 +1,12 @@
-/** Shared single-colour countdown ring used in message rows and the backdrop. */
+/**
+ * Preserved classic ring scheme.
+ *
+ * Keep this renderer isolated as the fallback/reference implementation:
+ * a full muted track plus a current-colour remaining arc, beginning at the
+ * elapsed endpoint and sweeping clockwise back to twelve. Size, stroke,
+ * color inheritance, and the late/final wrapper effects are intentionally
+ * supplied by its caller/CSS so this exact scheme can be restored later.
+ */
 export default function CountdownProgressRing({
   remaining,
   size = 17,

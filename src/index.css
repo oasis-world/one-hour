@@ -779,11 +779,11 @@ button {
   color: var(--danger);
 }
 
-.msg-countdown-ring {
+.countdown-visual {
   display: block;
 }
 
-.msg-countdown.is-final .msg-countdown-ring {
+.msg-countdown.is-final .countdown-visual {
   animation: countdown-pulse 1.6s ease-in-out infinite;
 }
 
