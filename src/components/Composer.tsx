@@ -7,8 +7,10 @@ import EmojiPanel from './EmojiPanel'
 
 interface Props {
   onSend: (text: string) => void
-  /** Photo picked from camera or the photo library. */
+  /** Photo from the camera (single shot). */
   onImagePicked: (file: File) => void
+  /** Photos from the library — up to 5, sent as independent messages. */
+  onImagesPicked: (files: File[]) => void
   /** Notifies the shell while a popover is up (mobile hides the gear). */
   onMenuOpenChange?: (open: boolean) => void
 }
@@ -44,7 +46,7 @@ function useMobileFormFactor(): boolean {
  * or emoji button toggles its popover (a click outside closes it); there
  * is no hover-to-open.
  */
-export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Props) {
+export default function Composer({ onSend, onImagePicked, onImagesPicked, onMenuOpenChange }: Props) {
   const lang = useLang()
   const [draft, setDraft] = useState('')
   const [plusOpen, setPlusOpen] = useState(false)
@@ -58,13 +60,16 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
 
-  // Auto-grow: mirror the content height, capped by CSS max-height.
+  // Auto-grow: the single-line height stays on the CSS 38px so every
+  // webview (including WeChat's, whose font metrics differ) renders the
+  // same pill — only true multiline content sets an explicit height.
   useLayoutEffect(() => {
     const el = inputRef.current
     if (!el) return
     el.style.height = 'auto'
     const grown = el.scrollHeight > 44
-    el.style.height = `${Math.min(el.scrollHeight, 108)}px`
+    el.style.height = grown ? `${Math.min(el.scrollHeight, 108)}px` : ''
+    el.style.overflowY = grown ? '' : 'hidden'
     setMultiline(grown)
   }, [draft])
 
@@ -129,7 +134,9 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
             onClick={() => {
               setPlusOpen((v) => !v)
               setEmojiOpen(false)
-              if (coarse) inputRef.current?.focus()
+              // Leave the keyboard exactly as it is: no focus() call here.
+              // The pointerdown preventDefault above already keeps an open
+              // keyboard up, and a closed one stays down.
             }}
           >
             <PlusIcon />
@@ -178,7 +185,7 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
           className="composer-input"
           value={draft}
           rows={1}
-          maxLength={500}
+          maxLength={1000}
           placeholder={COMPOSER_PLACEHOLDER[lang]}
           onChange={(e) => setDraft(e.target.value)}
           {...ime.imeProps}
@@ -204,7 +211,8 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
             onClick={() => {
               setEmojiOpen((v) => !v)
               setPlusOpen(false)
-              if (coarse) inputRef.current?.focus()
+              // Same as the plus button: never force focus, so the
+              // keyboard neither pops up nor drops on these taps.
             }}
           >
             <EmojiIcon />
@@ -240,16 +248,17 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
           if (file) onImagePicked(file)
         }}
       />
-      {/* Photo library / disk upload. */}
+      {/* Photo library / disk upload — up to 5 at once. */}
       <input
         ref={uploadInputRef}
         type="file"
         accept="image/*"
+        multiple
         hidden
         onChange={(e) => {
-          const file = e.target.files?.[0]
+          const files = Array.from(e.target.files ?? []).slice(0, 5)
           e.target.value = ''
-          if (file) onImagePicked(file)
+          if (files.length > 0) onImagesPicked(files)
         }}
       />
     </div>

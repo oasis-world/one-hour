@@ -1074,6 +1074,7 @@ button {
   font: inherit;
   font-size: 14.5px;
   line-height: 38px;
+  height: 38px; /* single-line pill height — JS only overrides when grown */
   padding: 0 4px;
   max-height: 108px; /* ~3 lines */
   user-select: text;
@@ -1204,6 +1205,9 @@ button {
 .plus-menu {
   left: 0;
   min-width: 168px;
+  /* Long labels (some locales) widen the card instead of wrapping. */
+  width: max-content;
+  max-width: min(78vw, 360px);
   padding: 6px;
 }
 
@@ -1220,6 +1224,7 @@ button {
   font-size: 13.5px;
   font-weight: 600;
   text-align: left;
+  white-space: nowrap;
   cursor: pointer;
   transition: background 0.13s ease;
 }
@@ -1622,6 +1627,19 @@ button {
   }
 }
 
+/* Same no-sticky-hover list, driven by JS touch detection instead of
+   media queries — covers webviews that misreport hover/pointer. */
+.is-touch .msg-row:hover,
+.is-touch .settings-row:hover,
+.is-touch .online-pop-row:hover,
+.is-touch .plus-menu-item:hover,
+.is-touch .emoji-cell:hover,
+.is-touch .style-row:hover,
+.is-touch .style-row-main:hover,
+.is-touch .style-row-reroll:hover {
+  background: transparent;
+}
+
 /* Mobile refinements */
 @media (max-width: 820px) {
   .chat-log-wrap {
@@ -1653,22 +1671,15 @@ button {
     top: calc(max(14px, env(safe-area-inset-top)) + 44px);
   }
 
-  /* Mobile only: swap the countdown ring's solid progress arc and the
-     faint full-hour track — the remaining-time arc goes faint, the track
-     solid. CSS opacity overrides the circles' presentation attributes. */
+  /* Mobile only: hide the faint full-hour track — the solid remaining
+     arc starts full and is eaten clockwise from 12 o'clock until the
+     ring zeroes out. CSS opacity overrides the circles' presentation
+     attributes. */
   .msg-countdown-ring circle:first-child {
-    opacity: 1;
-  }
-
-  .msg-countdown-ring circle:last-child {
-    opacity: 0.22;
+    opacity: 0;
   }
 
   .bg-slot-ring svg circle:first-child {
-    opacity: 1;
-  }
-
-  .bg-slot-ring svg circle:last-child {
-    opacity: 0.25;
+    opacity: 0;
   }
 }

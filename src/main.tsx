@@ -8,6 +8,17 @@ import './styles/welcomeProfile.css'
 import './styles/stylePicker.css'
 import App from './App.tsx'
 
+// Touch fallback: some embedded webviews (notably WeChat's) misreport the
+// hover/pointer media features, leaving sticky :hover backgrounds on list
+// rows while scrolling. The .is-touch hook drives the same
+// no-hover-background overrides in CSS.
+if (
+  typeof window !== 'undefined' &&
+  (navigator.maxTouchPoints > 0 || 'ontouchstart' in window)
+) {
+  document.documentElement.classList.add('is-touch')
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

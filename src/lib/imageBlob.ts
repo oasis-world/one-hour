@@ -6,8 +6,53 @@
 
 const MAX_EDGE = 1440
 
+/** iPhone 高效格式 — 系统相册常以此交付，浏览器解码器大都不支持。 */
+export function looksLikeHeic(file: File | Blob): boolean {
+  const type = 'type' in file ? file.type : ''
+  if (type === 'image/heic' || type === 'image/heif') return true
+  const name = 'name' in file ? file.name : ''
+  return /\.hei[cf]$/i.test(name)
+}
+
+/**
+ * Decode with createImageBitmap, falling back to an <img> element: some
+ * phone-gallery outputs are rejected by the bitmap API but still load in
+ * an image element (and vice versa), so try both before giving up.
+ */
+async function decodeToBitmap(file: File | Blob): Promise<ImageBitmap> {
+  // HEIC/HEIF from phone galleries: no browser decodes it natively, so
+  // convert to JPEG first. Dynamic import — only HEIC picks pay for the
+  // decoder chunk; everyone else stays on the lean path below.
+  if (looksLikeHeic(file)) {
+    const { default: heic2any } = await import('heic2any')
+    const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 })
+    const jpeg = Array.isArray(converted) ? converted[0] : converted
+    return decodeNative(jpeg)
+  }
+  return decodeNative(file)
+}
+
+async function decodeNative(file: File | Blob): Promise<ImageBitmap> {
+  try {
+    return await createImageBitmap(file)
+  } catch {
+    const url = URL.createObjectURL(file)
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const el = new Image()
+        el.onload = () => resolve(el)
+        el.onerror = () => reject(new Error('img decode failed'))
+        el.src = url
+      })
+      return await createImageBitmap(img)
+    } finally {
+      URL.revokeObjectURL(url)
+    }
+  }
+}
+
 export async function fileToChatImage(file: File | Blob): Promise<Blob> {
-  const bitmap = await createImageBitmap(file)
+  const bitmap = await decodeToBitmap(file)
   try {
     const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height))
     const width = Math.max(1, Math.round(bitmap.width * scale))

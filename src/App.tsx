@@ -15,7 +15,7 @@ import { useUserProfile } from './lib/userProfile'
 import { watchAccountForProfileSync } from './lib/profileCloud'
 import { useMobileKeyboard } from './lib/useMobileKeyboard'
 import './lib/settingsRuntime'
-import { fileToChatImage } from './lib/imageBlob'
+import { fileToChatImage, looksLikeHeic } from './lib/imageBlob'
 import { chromePopoverJustClosed } from './lib/chromePopover'
 import { useLang, t } from './lib/i18n'
 import { loadTheme, loadVeil, type ThemeName } from './lib/settings'
@@ -49,6 +49,12 @@ const MUSIC_TRACKS: Record<string, string[]> = {
     'https://upload.wikimedia.org/wikipedia/commons/transcoded/e/e0/Liu_Shui.ogg/Liu_Shui.ogg.mp3',
     'https://upload.wikimedia.org/wikipedia/commons/transcoded/5/5a/Pingsha_Luoyan.ogg/Pingsha_Luoyan.ogg.mp3',
     'https://upload.wikimedia.org/wikipedia/commons/transcoded/1/1e/Shenren_Chang.ogg/Shenren_Chang.ogg.mp3',
+    // Erhu & Cantonese classics + Kevin MacLeod's Chinese-flavored pieces
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/3/30/%E6%B1%9F%E6%B2%B3%E6%B0%B4.ogg/%E6%B1%9F%E6%B2%B3%E6%B0%B4.ogg.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/1/1d/%E8%BF%9E%E7%8E%AF%E6%89%A3.ogg/%E8%BF%9E%E7%8E%AF%E6%89%A3.ogg.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/f/f3/%E9%9B%A8%E6%89%93%E8%8A%AD%E8%95%89.ogg/%E9%9B%A8%E6%89%93%E8%8A%AD%E8%95%89.ogg.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/6/6d/Tea_Roots_%28MacLeod%2C_Kevin%29_%28ISRC_USUAN1100472%29.oga/Tea_Roots_%28MacLeod%2C_Kevin%29_%28ISRC_USUAN1100472%29.oga.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/5/5c/Shenyang_%28ISRC_USUAN1600066%29.mp3',
   ],
   en: [
     // Ambient / background
@@ -68,6 +74,13 @@ const MUSIC_TRACKS: Record<string, string[]> = {
     'https://upload.wikimedia.org/wikipedia/commons/5/5a/Blue_Feather_%28ISRC_USUAN1100524%29.mp3',
     'https://upload.wikimedia.org/wikipedia/commons/transcoded/f/f1/Himalayan_Atmosphere_%28MacLeod%2C_Kevin%29_%28ISRC_USUAN1100204%29.oga/Himalayan_Atmosphere_%28MacLeod%2C_Kevin%29_%28ISRC_USUAN1100204%29.oga.mp3',
     'https://upload.wikimedia.org/wikipedia/commons/2/21/Relaxing_Piano_Music_%28ISRC_USUAN1500075%29.mp3',
+    // Scott Buckley (CC-BY 4.0, scottbuckley.com.au) — calm cinematic picks
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/f/f8/Scott_Buckley_-_Sleep.oga/Scott_Buckley_-_Sleep.oga.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/3/35/Scott_Buckley_-_In_Dreams.oga/Scott_Buckley_-_In_Dreams.oga.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/b/b7/Scott_Buckley_-_Affirmations.oga/Scott_Buckley_-_Affirmations.oga.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/e/e5/Scott_Buckley_-_Chasing_Daylight.oga/Scott_Buckley_-_Chasing_Daylight.oga.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/1/16/Scott_Buckley_-_This_Too_Shall_Pass.oga/Scott_Buckley_-_This_Too_Shall_Pass.oga.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/c/c2/Scott_Buckley_-_Hymn.mp3',
     // Country / English songs (public domain)
     'https://upload.wikimedia.org/wikipedia/commons/transcoded/3/3b/Media.io_1-01_Walkin%27_After_Midnight.ogg/Media.io_1-01_Walkin%27_After_Midnight.ogg.mp3',
     "https://upload.wikimedia.org/wikipedia/commons/transcoded/9/92/George_Jones_sings_%27I%27m_Ragged_But_I%27m_Right%27.oga/George_Jones_sings_%27I%27m_Ragged_But_I%27m_Right%27.oga.mp3",
@@ -366,7 +379,39 @@ export default function App() {
       const blob = await fileToChatImage(file)
       room.send('', blob)
     } catch {
-      showToast(t('这张图片读取失败，换一张试试', 'Could not read that image — try another one'))
+      showToast(
+        looksLikeHeic(file)
+          ? t('iPhone 高效格式（HEIC）暂不支持，请改用 JPEG 或截图发送', 'HEIC photos are not supported — send a JPEG or screenshot instead')
+          : t('这张图片读取失败，换一张试试', 'Could not read that image — try another one'),
+      )
+    }
+  }
+
+  /**
+   * Photo-library batch: at most 5, each converted then sent as its own
+   * message so every photo gets an independent countdown and retry.
+   * Sequential conversion keeps mobile memory flat.
+   */
+  const handleImagesPicked = async (files: File[]) => {
+    let sent = 0
+    let heicFailed = 0
+    let otherFailed = 0
+    for (const file of files.slice(0, 5)) {
+      try {
+        const blob = await fileToChatImage(file)
+        room.send('', blob)
+        sent += 1
+      } catch {
+        if (looksLikeHeic(file)) heicFailed += 1
+        else otherFailed += 1
+      }
+    }
+    const failed = heicFailed + otherFailed
+    if (failed === 0) return
+    if (sent === 0 && otherFailed === 0) {
+      showToast(t('iPhone 高效格式（HEIC）暂不支持，请改用 JPEG 或截图发送', 'HEIC photos are not supported — send a JPEG or screenshot instead'))
+    } else {
+      showToast(t(`${sent} 张已发出，${failed} 张读取失败`, `${sent} sent, ${failed} failed to read`))
     }
   }
 
@@ -503,6 +548,7 @@ export default function App() {
               <Composer
                 onSend={handleSend}
                 onImagePicked={handleImagePicked}
+                onImagesPicked={handleImagesPicked}
                 onMenuOpenChange={handleMenuOpenChange}
               />
             ) : (
