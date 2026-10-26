@@ -52,6 +52,9 @@ export default function CountdownRing({ entry }: { entry: ChatEntry }) {
           strokeWidth="1.6"
           opacity="0.22"
         />
+        {/* Remaining time: full at 12 o'clock, then the gap grows
+            clockwise from 12 as the arc's tail retreats — the ring wanes
+            toward zero, never fills up. */}
         <circle
           cx={RING_SIZE / 2}
           cy={RING_SIZE / 2}
@@ -61,8 +64,6 @@ export default function CountdownRing({ entry }: { entry: ChatEntry }) {
           strokeWidth="1.6"
           strokeLinecap="round"
           strokeDasharray={CIRCUMFERENCE}
-          /* Negative offset keeps the arc's tail at 12 o'clock so the
-             leading edge retreats clockwise — a clockwise depletion. */
           strokeDashoffset={-CIRCUMFERENCE * (1 - fraction)}
           transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
           style={{ transition: 'stroke-dashoffset 1s linear' }}

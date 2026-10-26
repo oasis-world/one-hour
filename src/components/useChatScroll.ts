@@ -90,5 +90,16 @@ export function useChatScroll(opts: {
     scrollTo(el.scrollTop)
   }, [layoutKey, scrollRef, scrollTo])
 
-  return { showJumpEnd, scrollToEnd, jumpToEnd, handleScroll }
+  /**
+   * Content grew without new entries (chat photos decoding in after the
+   * send-time scroll already ran): stay pinned only if the reader was
+   * already at the bottom — never yank someone browsing history.
+   */
+  const stickToBottom = useCallback(() => {
+    const el = scrollRef.current
+    if (!el || !atBottomRef.current) return
+    scrollTo(el.scrollHeight)
+  }, [scrollRef, scrollTo])
+
+  return { showJumpEnd, scrollToEnd, jumpToEnd, handleScroll, stickToBottom }
 }

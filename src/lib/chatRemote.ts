@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getSupabaseClient } from './supabaseClient'
 import { isSupabaseConfigured } from './supabaseConfig'
+import { withTimeout } from './withTimeout'
 import type { ChatMessage, PresenceMember } from './chatTypes'
 
 /**
@@ -14,6 +15,15 @@ import type { ChatMessage, PresenceMember } from './chatTypes'
 const MESSAGES_TABLE = 'chat_messages'
 const IMAGES_BUCKET = 'chat-images'
 export const CHAT_PAGE_SIZE = 40
+
+/**
+ * A hung request (weak mobile network: sent, no response, no error) must
+ * not hold the outbox flush lock forever — one stuck photo would pin its
+ * entry as pending and block every later send. Timeouts feed the normal
+ * network-error retry path instead.
+ */
+const UPLOAD_TIMEOUT_MS = 60_000
+const INSERT_TIMEOUT_MS = 30_000
 
 /** Clients refresh their presence stamp on this cadence. */
 const PRESENCE_HEARTBEAT_MS = 60_000
@@ -284,12 +294,15 @@ export async function joinChatRoom(options: {
         let imageUrl: string | null = null
         if (draft.imageBlob) {
           const path = `${uid}/${draft.id}.jpg`
-          const { error: uploadError } = await ctx.storage
-            .from(IMAGES_BUCKET)
-            .upload(path, draft.imageBlob, {
-              contentType: 'image/jpeg',
-              upsert: true,
-            })
+          const { error: uploadError } = await withTimeout(
+            ctx.storage
+              .from(IMAGES_BUCKET)
+              .upload(path, draft.imageBlob, {
+                contentType: 'image/jpeg',
+                upsert: true,
+              }),
+            UPLOAD_TIMEOUT_MS,
+          )
           if (uploadError) {
             return { ok: false, error: isNetworkError(uploadError) ? 'network' : 'rejected' }
           }
@@ -302,18 +315,30 @@ export async function joinChatRoom(options: {
           content: draft.content || '',
           image_url: imageUrl,
         }
-        let { error } = await ctx.from(MESSAGES_TABLE).insert({
-          ...base,
-          avatar_style: draft.avatar?.style ?? null,
-          avatar_seed: draft.avatar?.seed ?? null,
-          avatar_url: draft.avatarUrl ?? null,
-        })
+        let { error } = await withTimeout(
+          ctx.from(MESSAGES_TABLE).insert({
+            ...base,
+            avatar_style: draft.avatar?.style ?? null,
+            avatar_seed: draft.avatar?.seed ?? null,
+            avatar_url: draft.avatarUrl ?? null,
+          }),
+          INSERT_TIMEOUT_MS,
+        )
         if (error && isMissingColumnError(error)) {
           // Schema not migrated yet: the avatar is cosmetic, the words are
           // not — retry once without the unknown columns.
-          ({ error } = await ctx.from(MESSAGES_TABLE).insert(base))
+          ({ error } = await withTimeout(
+            ctx.from(MESSAGES_TABLE).insert(base),
+            INSERT_TIMEOUT_MS,
+          ))
         }
-        if (error) return { ok: false, error: 'rejected' }
+        if (error) {
+          // Our own id already on the server (first try landed, its
+          // response didn't): at-least-once delivery with client-made ids
+          // must count the duplicate as sent, never as failed.
+          if ((error as { code?: string }).code === '23505') return { ok: true }
+          return { ok: false, error: 'rejected' }
+        }
         return { ok: true }
       } catch {
         return { ok: false, error: 'network' }

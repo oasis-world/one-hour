@@ -53,6 +53,9 @@ export default function ImageViewer({
     moved: boolean
     onImg: boolean
     zoom: Zoom
+    /** Seeded when a pinch drops to one finger — the final lift must do
+        nothing (no tap, no pager glide), only hand control back. */
+    fromPinch?: boolean
   } | null>(null)
   const pinch = useRef<{ dist: number; zoom: Zoom; mx: number; my: number } | null>(null)
   const lastTap = useRef(0)
@@ -75,6 +78,29 @@ export default function ImageViewer({
     setDim(0)
     onIndexChange(next)
   }
+
+  /**
+   * iOS Safari ignores `touch-action: none` (and user-scalable=no) for
+   * pinch gestures and takes the gesture over for page zoom — the viewer
+   * then only sees pointercancel and the photo never zooms. A native
+   * non-passive touchmove preventDefault (React's synthetic touch
+   * listeners are passive and cannot stop the takeover) keeps both
+   * fingers' pointer events flowing to the custom pinch handler below.
+   * There is no native scrolling inside the viewer to preserve.
+   */
+  const viewerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = viewerRef.current
+    if (!el) return
+    const stopDefault = (e: Event) => e.preventDefault()
+    el.addEventListener('touchmove', stopDefault, { passive: false })
+    // Legacy iOS pinch event — belt and suspenders next to touchmove.
+    el.addEventListener('gesturestart', stopDefault as EventListener)
+    return () => {
+      el.removeEventListener('touchmove', stopDefault)
+      el.removeEventListener('gesturestart', stopDefault as EventListener)
+    }
+  }, [])
 
   /** Keyboard: Esc leaves, arrows jump a photo. */
   useEffect(() => {
@@ -188,13 +214,32 @@ export default function ImageViewer({
 
   const onPointerUp = (e: ReactPointerEvent) => {
     pointers.current.delete(e.pointerId)
-    if (pointers.current.size === 1) pinch.current = null
+    if (pointers.current.size === 1) {
+      // Pinch ended with one finger still down: hand that finger a fresh
+      // pan drag (at the settled zoom) so it keeps moving the photo
+      // without a lift-and-retouch.
+      pinch.current = null
+      const rest = [...pointers.current.values()][0]
+      drag.current = {
+        px: rest.x,
+        py: rest.y,
+        t: Date.now(),
+        moved: true,
+        onImg: true,
+        zoom: { ...zoom },
+        fromPinch: true,
+      }
+      return
+    }
     if (pointers.current.size > 0) return
     const st = drag.current
     drag.current = null
     pinch.current = null
     setDragging(false)
     if (!st || glideTimer.current) return
+
+    // The tail of a pinch: release only, never a tap or a page turn.
+    if (st.fromPinch) return
 
     if (!st.moved) {
       if (!st.onImg) {
@@ -243,6 +288,7 @@ export default function ImageViewer({
   return (
     <div
       className="image-viewer"
+      ref={viewerRef}
       role="dialog"
       aria-modal="true"
       aria-label={t('查看图片', 'View photo')}

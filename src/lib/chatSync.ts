@@ -231,45 +231,86 @@ export function enterChat(
   const flush = async (): Promise<void> => {
     if (closed || !handle || flushing) return
     flushing = true
-    let needsRetry = false
-    for (const item of await readOutbox()) {
-      if (closed) break
-      // The one-hour rule outlives a reconnect: an unsent draft whose
-      // hour ran out while the tab was closed departs with the farewell
-      // animation instead of going out with a fresh server-side hour.
-      if (Date.now() - item.at >= MESSAGE_TTL_MS) {
-        beginExpire(item.id, false)
-        await removeFromOutbox(item.id)
-        continue
+    try {
+      let needsRetry = false
+      // Drain: items enqueued while this pass was uploading arrived after
+      // its snapshot — loop until a full pass finds nothing new. Without
+      // this, multi-photo sends strand: slow conversions land mid-upload,
+      // the running pass never sees them, and with no failure there is no
+      // scheduled retry to pick them up either.
+      const seen = new Set<string>()
+      for (;;) {
+        let attempted = false
+        for (const item of await readOutbox()) {
+          if (closed) break
+          if (seen.has(item.id)) continue
+          seen.add(item.id)
+          attempted = true
+          // The one-hour rule outlives a reconnect: an unsent draft whose
+          // hour ran out while the tab was closed departs with the farewell
+          // animation instead of going out with a fresh server-side hour.
+          if (Date.now() - item.at >= MESSAGE_TTL_MS) {
+            beginExpire(item.id, false)
+            try {
+              await removeFromOutbox(item.id)
+            } catch {
+              // Cache cleanup is best-effort; the row is already gone.
+            }
+            continue
+          }
+          if (item.attempts >= CHAT_OUTBOX_MAX_ATTEMPTS) {
+            fail(item.id)
+            continue
+          }
+          let result: { ok: boolean; error?: string }
+          try {
+            result = await handle.send({
+              id: item.id,
+              content: item.content,
+              displayName: item.displayName,
+              avatar: item.avatar,
+              avatarUrl: item.avatarUrl ?? null,
+              imageBlob: item.imageBlob,
+            })
+          } catch {
+            // One bad item must never wedge the queue (and the flush lock):
+            // treat it like a network error and move on to the next item.
+            result = { ok: false, error: 'network' }
+          }
+          if (result.ok) {
+            try {
+              await removeFromOutbox(item.id)
+            } catch {
+              // The server already has it — confirm locally anyway so the
+              // row doesn't sit in "sending" forever on an IDB hiccup. The
+              // leftover outbox copy re-sends idempotently (upsert path +
+              // duplicate-id insert counts as sent — see chatRemote.send).
+            }
+            confirm(item.id)
+          } else if (result.error === 'rejected') {
+            try {
+              await exhaustOutboxItem(item.id)
+            } catch {
+              // Counter unwritable — fail the row anyway; reload replays it.
+            }
+            fail(item.id)
+          } else {
+            needsRetry = true
+            try {
+              const exhausted = await markOutboxFailed(item.id)
+              if (exhausted) fail(item.id)
+            } catch {
+              // Attempt counter unwritable — leave pending; the next flush
+              // (or a reload replay) will try again.
+            }
+          }
+        }
+        if (!attempted || closed) break
       }
-      if (item.attempts >= CHAT_OUTBOX_MAX_ATTEMPTS) {
-        fail(item.id)
-        continue
-      }
-      const result = await handle.send({
-        id: item.id,
-        content: item.content,
-        displayName: item.displayName,
-        avatar: item.avatar,
-        avatarUrl: item.avatarUrl ?? null,
-        imageBlob: item.imageBlob,
-      })
-      if (result.ok) {
-        await removeFromOutbox(item.id)
-        confirm(item.id)
-      } else if (result.error === 'rejected') {
-        // Server refused for good (RLS / validation): stop retrying, keep
-        // the words on screen as failed.
-        await exhaustOutboxItem(item.id)
-        fail(item.id)
-      } else {
-        needsRetry = true
-        const exhausted = await markOutboxFailed(item.id)
-        if (exhausted) fail(item.id)
-      }
+      if (needsRetry && !closed) scheduleRetry()
+    } finally {
+      flushing = false
     }
-    flushing = false
-    if (needsRetry && !closed) scheduleRetry()
   }
 
   // ---- startup: cache first, outbox previews, then the network ----

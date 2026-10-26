@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { useLang, COMPOSER_PLACEHOLDER, t } from '../lib/i18n'
 import { useImeEnter } from '../lib/ime'
+import { markFilePickerOpened } from '../lib/filePickerGuard'
 import { CameraIcon, EmojiIcon, PlusIcon, SendIcon, UploadIcon } from './icons'
 import { PhotoIcon } from './userIcons'
 import EmojiPanel from './EmojiPanel'
@@ -90,6 +91,12 @@ export default function Composer({ onSend, onImagePicked, onImagesPicked, onMenu
     onMenuOpenChange?.(plusOpen || emojiOpen)
   }, [plusOpen, emojiOpen, onMenuOpenChange])
 
+  // Warm the HEIC decoder while the user browses the plus menu, so a
+  // first HEIC pick doesn't pay the chunk-download latency mid-send.
+  useEffect(() => {
+    if (plusOpen) void import('heic2any').catch(() => {})
+  }, [plusOpen])
+
   /**
    * Insert without touching focus: mousedown on the panel is prevented,
    * so the field keeps (or keeps losing) the keyboard exactly as it was.
@@ -100,14 +107,17 @@ export default function Composer({ onSend, onImagePicked, onImagesPicked, onMenu
 
   const submit = () => {
     const text = draft.trim()
-    if (text) {
-      onSend(text)
-      setDraft('')
-      setEmojiOpen(false)
-    }
-    // Keep the keyboard up on mobile — the player is mid-conversation,
-    // even when the tap landed on the gray (empty) send button.
-    if (coarse) inputRef.current?.focus()
+    // Idle (gray) send: ignore the tap entirely — no keyboard pop, and the
+    // field doesn't take focus either.
+    if (!text) return
+    // Hold the keyboard up only if it was already up (field focused). A
+    // send tapped with the keyboard down — e.g. after picking an emoji
+    // from a closed keyboard — must not pop it back up.
+    const holdKeyboard = document.activeElement === inputRef.current
+    onSend(text)
+    setDraft('')
+    setEmojiOpen(false)
+    if (coarse && holdKeyboard) inputRef.current?.focus()
   }
 
   /** Side-button taps must not steal the field's focus (the keyboard
@@ -116,6 +126,10 @@ export default function Composer({ onSend, onImagePicked, onImagesPicked, onMenu
 
   const pickFile = (input: RefObject<HTMLInputElement | null>) => {
     setPlusOpen(false)
+    // The native dialog blurs the window — flag it so the shell doesn't
+    // mistake the return focus for "away" and fold the chat (which would
+    // unmount this input before `change` fires).
+    markFilePickerOpened()
     input.current?.click()
   }
 
@@ -150,6 +164,8 @@ export default function Composer({ onSend, onImagePicked, onImagesPicked, onMenu
                     type="button"
                     className="plus-menu-item"
                     role="menuitem"
+                    onMouseDown={keepFocus}
+                    onPointerDown={keepFocus}
                     onClick={() => pickFile(cameraInputRef)}
                   >
                     <CameraIcon size={17} />
@@ -159,6 +175,8 @@ export default function Composer({ onSend, onImagePicked, onImagesPicked, onMenu
                     type="button"
                     className="plus-menu-item"
                     role="menuitem"
+                    onMouseDown={keepFocus}
+                    onPointerDown={keepFocus}
                     onClick={() => pickFile(uploadInputRef)}
                   >
                     <PhotoIcon size={17} />
@@ -170,6 +188,8 @@ export default function Composer({ onSend, onImagePicked, onImagesPicked, onMenu
                   type="button"
                   className="plus-menu-item"
                   role="menuitem"
+                  onMouseDown={keepFocus}
+                  onPointerDown={keepFocus}
                   onClick={() => pickFile(uploadInputRef)}
                 >
                   <UploadIcon size={17} />
@@ -248,7 +268,8 @@ export default function Composer({ onSend, onImagePicked, onImagesPicked, onMenu
           if (file) onImagePicked(file)
         }}
       />
-      {/* Photo library / disk upload — up to 5 at once. */}
+      {/* Photo library / disk upload — multi-select; the shell caps
+          the batch at 5 and tells the player about the cut. */}
       <input
         ref={uploadInputRef}
         type="file"
@@ -256,7 +277,7 @@ export default function Composer({ onSend, onImagePicked, onImagesPicked, onMenu
         multiple
         hidden
         onChange={(e) => {
-          const files = Array.from(e.target.files ?? []).slice(0, 5)
+          const files = Array.from(e.target.files ?? [])
           e.target.value = ''
           if (files.length > 0) onImagesPicked(files)
         }}

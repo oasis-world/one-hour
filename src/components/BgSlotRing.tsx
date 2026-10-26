@@ -103,8 +103,6 @@ export default function BgSlotRing({
             strokeWidth="1.8"
             strokeLinecap="round"
             strokeDasharray={CIRCUMFERENCE}
-            /* Negative offset keeps the tail at 12 o'clock — clockwise
-               depletion, same language as the message rings. */
             strokeDashoffset={-CIRCUMFERENCE * (1 - fraction)}
             transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
             style={{ transition: 'stroke-dashoffset 1s linear' }}

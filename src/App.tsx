@@ -16,6 +16,8 @@ import { watchAccountForProfileSync } from './lib/profileCloud'
 import { useMobileKeyboard } from './lib/useMobileKeyboard'
 import './lib/settingsRuntime'
 import { fileToChatImage, looksLikeHeic } from './lib/imageBlob'
+import { withTimeout } from './lib/withTimeout'
+import { consumeFilePickerFlag } from './lib/filePickerGuard'
 import { chromePopoverJustClosed } from './lib/chromePopover'
 import { useLang, t } from './lib/i18n'
 import { loadTheme, loadVeil, type ThemeName } from './lib/settings'
@@ -169,21 +171,59 @@ export default function App() {
   const toastTimer = useRef<number | null>(null)
   const bgReadyRef = useRef(false)
   const revealTimer = useRef<number | null>(null)
+  const revealStageTimer = useRef<number | null>(null)
+  /** True from the moment a reveal is scheduled until it reaches 'open'.
+      Return-to-app fires both visibilitychange and focus — without this
+      the second call would clobber the first mid-flight (its inner timer
+      escapes cancellation) and the unfold animation plays twice. */
+  const revealActive = useRef(false)
   const pendingReveal = useRef(false)
   const hiddenAt = useRef<number>(0)
   const blurAt = useRef<number>(0)
+  // Live mirror of the fold state for the focus/visibility handlers (their
+  // closure would otherwise see a stale value).
+  const foldRef = useRef(fold)
+  useEffect(() => {
+    foldRef.current = fold
+  }, [fold])
+
+  const cancelRevealTimers = useCallback(() => {
+    if (revealTimer.current) {
+      window.clearTimeout(revealTimer.current)
+      revealTimer.current = null
+    }
+    if (revealStageTimer.current) {
+      window.clearTimeout(revealStageTimer.current)
+      revealStageTimer.current = null
+    }
+  }, [])
 
   const scheduleReveal = useCallback(() => {
-    if (revealTimer.current) window.clearTimeout(revealTimer.current)
+    cancelRevealTimers()
+    revealActive.current = true
     setFold('folded')
     revealTimer.current = window.setTimeout(() => {
+      revealTimer.current = null
       setFold('unfolding')
-      window.setTimeout(() => {
+      revealStageTimer.current = window.setTimeout(() => {
+        revealStageTimer.current = null
+        revealActive.current = false
         setFold('open')
         setHasRevealed(true)
       }, UNFOLD_MS)
     }, 1500)
-  }, [])
+  }, [cancelRevealTimers])
+
+  /** Away-return entry: coalesces the duplicate visibility+focus events
+      into a single choreography — but only when the chat is folded. An
+      open chat must stay put: replaying would unmount the composer and
+      wipe an unsent draft, then replay the unfold for no reason. */
+  const requestReveal = useCallback(() => {
+    if (revealActive.current) return
+    if (foldRef.current !== 'folded') return
+    if (bgReadyRef.current) scheduleReveal()
+    else pendingReveal.current = true
+  }, [scheduleReveal])
 
   const markBgReady = useCallback(() => {
     if (bgReadyRef.current) {
@@ -321,16 +361,18 @@ export default function App() {
     }
   }, [pickTrack])
 
-  // Re-run the choreography when the tab/app returns to the foreground
-  // after being away for a while.
+  // If the tab/app returns while folded, replay the choreography after
+  // being away for a while. An open chat is deliberately left alone.
   useEffect(() => {
     if (!hiddenAt.current) hiddenAt.current = Date.now()
     const onVisibility = () => {
       if (document.hidden) {
         hiddenAt.current = Date.now()
       } else if (Date.now() - hiddenAt.current > 1000) {
-        if (bgReadyRef.current) scheduleReveal()
-        else pendingReveal.current = true
+        // Returning from the native picker/camera is not "away" — and
+        // replaying here would unmount the composer before `change` fires.
+        if (consumeFilePickerFlag()) return
+        requestReveal()
       }
     }
     const onBlur = () => {
@@ -338,8 +380,9 @@ export default function App() {
     }
     const onFocus = () => {
       if (blurAt.current && Date.now() - blurAt.current > 1000) {
-        if (bgReadyRef.current) scheduleReveal()
-        else pendingReveal.current = true
+        // Same picker guard as above (desktop file dialog path).
+        if (consumeFilePickerFlag()) return
+        requestReveal()
       }
     }
     document.addEventListener('visibilitychange', onVisibility)
@@ -350,7 +393,7 @@ export default function App() {
       window.removeEventListener('blur', onBlur)
       window.removeEventListener('focus', onFocus)
     }
-  }, [scheduleReveal])
+  }, [requestReveal])
 
   const showToast = (text: string) => {
     setToast(text)
@@ -366,8 +409,17 @@ export default function App() {
 
   const openChat = () => {
     if (fold !== 'folded') return
+    // Take over any scheduled replay: the player is opening the chat NOW.
+    // Otherwise the replay's late unfold lands after this one (or refolds
+    // mid-unfold) and the bottom-left popup plays twice.
+    cancelRevealTimers()
+    revealActive.current = true
     setFold('unfolding')
-    window.setTimeout(() => setFold('open'), UNFOLD_MS)
+    revealStageTimer.current = window.setTimeout(() => {
+      revealStageTimer.current = null
+      revealActive.current = false
+      setFold('open')
+    }, UNFOLD_MS)
   }
 
   const handleSend = (text: string) => {
@@ -376,7 +428,7 @@ export default function App() {
 
   const handleImagePicked = async (file: File) => {
     try {
-      const blob = await fileToChatImage(file)
+      const blob = await withTimeout(fileToChatImage(file), 60_000)
       room.send('', blob)
     } catch {
       showToast(
@@ -390,15 +442,19 @@ export default function App() {
   /**
    * Photo-library batch: at most 5, each converted then sent as its own
    * message so every photo gets an independent countdown and retry.
-   * Sequential conversion keeps mobile memory flat.
+   * Sequential conversion keeps mobile memory flat; a per-file timeout
+   * keeps one hung decode from stalling the rest of the batch.
    */
   const handleImagesPicked = async (files: File[]) => {
+    if (files.length > 5) {
+      showToast(t('一次最多发送 5 张照片，多余的已略过', 'You can send up to 5 photos at a time — extras skipped'))
+    }
     let sent = 0
     let heicFailed = 0
     let otherFailed = 0
     for (const file of files.slice(0, 5)) {
       try {
-        const blob = await fileToChatImage(file)
+        const blob = await withTimeout(fileToChatImage(file), 60_000)
         room.send('', blob)
         sent += 1
       } catch {

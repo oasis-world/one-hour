@@ -122,7 +122,15 @@ export default function MessageList({
   return (
     <div className="chat-log-wrap">
       <div className="chat-list-backdrop" aria-hidden="true" />
-      <div className="chat-log" ref={logRef} onScroll={handleScroll}>
+      <div
+        className="chat-log"
+        ref={logRef}
+        onScroll={handleScroll}
+        // Chat photos decode in after the send-time scroll ran and push
+        // the bottom down — re-pin (capture: load/error don't bubble).
+        onLoadCapture={scroll.stickToBottom}
+        onErrorCapture={scroll.stickToBottom}
+      >
         {loadingOlder && (
           <div className="chat-loading-older" role="status">
             {t('正在加载更早的消息…', 'Loading earlier messages…')}
