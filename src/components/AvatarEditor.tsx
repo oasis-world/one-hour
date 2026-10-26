@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useRef, useState, type ChangeEvent, type SyntheticEvent } from 'react'
 import { useLang } from '../lib/i18n'
 import { uploadAvatarImage } from '../lib/avatarUpload'
 import type { AvatarLook } from '../lib/avatar'
@@ -39,6 +39,8 @@ export default function AvatarEditor({
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  const keepFocus = (e: SyntheticEvent) => e.preventDefault()
+
   const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -60,6 +62,8 @@ export default function AvatarEditor({
           <button
             type="button"
             className="welcome-reroll"
+            onMouseDown={keepFocus}
+            onPointerDown={keepFocus}
             onClick={onReroll}
             aria-label={rerollLabel ?? (zh ? '换一个头像' : 'Reroll avatar')}
             title={rerollLabel ?? (zh ? '换一个' : 'Reroll')}
@@ -69,6 +73,8 @@ export default function AvatarEditor({
           <button
             type="button"
             className={`welcome-custom${pickerOpen ? ' is-open' : ''}`}
+            onMouseDown={keepFocus}
+            onPointerDown={keepFocus}
             onClick={() => setPickerOpen((v) => !v)}
             aria-label={zh ? '选择风格' : 'Choose a style'}
             title={zh ? '选择风格' : 'Styles'}
@@ -80,6 +86,8 @@ export default function AvatarEditor({
             <button
               type="button"
               className="welcome-upload"
+              onMouseDown={keepFocus}
+              onPointerDown={keepFocus}
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
               aria-label={zh ? '上传自己的头像' : 'Upload your photo'}

@@ -123,16 +123,33 @@ export default function ProfilePage({
 
           <label className="field">
             <span>{zh ? '昵称' : 'Nickname'}</span>
+            <span className="field-input-wrap">
             <input
             ref={nicknameRef}
             type="text"
             value={draft.nickname}
               maxLength={NICKNAME_MAX}
               spellCheck={false}
-              onChange={(e) => setDraft({ ...draft, nickname: e.target.value })}
+              autoFocus={typeof window !== 'undefined' && !window.matchMedia('(pointer: coarse)').matches}
+              onChange={(e) => setDraft((prev) => (prev ? { ...prev, nickname: e.target.value } : prev))}
               onKeyDown={onNickEnter}
               {...ime.imeProps}
             />
+            {draft.nickname && (
+              <button
+                type="button"
+                className="field-clear"
+                aria-label={zh ? '清空' : 'Clear'}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setDraft((prev) => (prev ? { ...prev, nickname: '' } : prev))
+                  nicknameRef.current?.focus()
+                }}
+              >
+                ×
+              </button>
+            )}
+            </span>
           </label>
 
           <div className="profile-meta">

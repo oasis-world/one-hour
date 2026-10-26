@@ -1,4 +1,5 @@
 import { useLang } from '../lib/i18n'
+import type { SyntheticEvent } from 'react'
 import { STYLE_IDS, styleTitle } from '../lib/avatar'
 import AvatarBadge from './AvatarBadge'
 import { RefreshIcon } from './userIcons'
@@ -20,6 +21,7 @@ export default function StylePicker({
 }) {
   const lang = useLang()
   const zh = lang === 'zh'
+  const keepFocus = (e: SyntheticEvent) => e.preventDefault()
 
   return (
     <div className="style-picker" role="listbox" aria-label={zh ? '选择风格' : 'Choose a style'}>
@@ -38,6 +40,8 @@ export default function StylePicker({
                 type="button"
                 className="style-row-main"
                 title={title}
+                onMouseDown={keepFocus}
+                onPointerDown={keepFocus}
                 onClick={() => onPick(id, false)}
               >
                 <AvatarBadge look={{ style: id, seed }} size={34} className="style-row-face" />
@@ -48,6 +52,8 @@ export default function StylePicker({
                 className="style-row-reroll"
                 title={rerollHint}
                 aria-label={rerollHint}
+                onMouseDown={keepFocus}
+                onPointerDown={keepFocus}
                 onClick={() => onPick(id, true)}
               >
                 <RefreshIcon size={12} />

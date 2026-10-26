@@ -145,17 +145,34 @@ export default function WelcomeModal({
 
         <label className="field welcome-field">
           <span>{zh ? '我的昵称' : 'My nickname'}</span>
-          <input
-            ref={nicknameRef}
-            type="text"
-            value={draft.nickname}
-            maxLength={NICKNAME_MAX}
-            spellCheck={false}
-            autoComplete="off"
-            onChange={(e) => setDraft({ ...draft, nickname: e.target.value })}
-            onKeyDown={onNickEnter}
-            {...ime.imeProps}
-          />
+          <span className="field-input-wrap">
+            <input
+              ref={nicknameRef}
+              type="text"
+              value={draft.nickname}
+              maxLength={NICKNAME_MAX}
+              spellCheck={false}
+              autoComplete="off"
+              autoFocus={typeof window !== 'undefined' && !window.matchMedia('(pointer: coarse)').matches}
+              onChange={(e) => setDraft({ ...draft, nickname: e.target.value })}
+              onKeyDown={onNickEnter}
+              {...ime.imeProps}
+            />
+            {draft.nickname && (
+              <button
+                type="button"
+                className="field-clear"
+                aria-label={zh ? '清空' : 'Clear'}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setDraft((prev) => ({ ...prev, nickname: '' }))
+                  nicknameRef.current?.focus()
+                }}
+              >
+                ×
+              </button>
+            )}
+          </span>
         </label>
 
         <button type="button" className="btn-accent welcome-confirm" onClick={confirm}>

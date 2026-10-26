@@ -38,6 +38,13 @@
 - 判定必须同时覆盖三种信号：`nativeEvent.isComposing`（标准）、`keyCode === 229`（旧内核组词中）、以及 Safari 时序（compositionend 先于提交 Enter 的 keydown，由 hook 内的 ref 延迟一拍兜住）——不能只查 `isComposing`。
 - 新增任何带 Enter 行为的输入框（单行/多行）都必须接这个 hook；review 时把"输入框 Enter 没接 ime 防护"当作 bug。
 
+## 输入框清空按钮（Clear button）· 设计原则
+
+- 文本输入框（昵称等）在**有内容时**，在输入框内部右侧显示一个 `×` 清空按钮，作为输入框的一部分（绝对定位覆盖在输入框内，不放在输入框外部）。
+- 清空按钮点击后清空内容并重新聚焦输入框；点击时必须 `preventDefault`，避免抢走输入框焦点（移动端键盘不收起）。
+- 实现时：外层 `position: relative` 容器包裹 `input` 与按钮；`input` 宽度 `100%`，并设置右侧 `padding-right` 为按钮留出空间；按钮 `position: absolute; right; top: 50%; transform: translateY(-50%)`。
+- 新增任何带清空功能的输入框都应遵循此布局，review 时把"清空按钮在输入框外部/遮挡文字/点击失焦"当作 bug。
+
 ## 结构速览
 
 - `src/lib/` — 数据层（Supabase 客户端、聊天同步 facade、IndexedDB 缓存/outbox、i18n、设置），不依赖 React。

@@ -1095,6 +1095,41 @@ button {
   border-radius: 999px;
 }
 
+/* Nickname field clear button */
+.field-input-wrap {
+  position: relative;
+  display: block;
+}
+
+.field-input-wrap input {
+  width: 100%;
+  padding-right: 34px;
+}
+
+.field-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--line);
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+}
+
+.field-clear:hover {
+  background: var(--line-soft);
+  color: var(--ink);
+}
+
 .composer-input::placeholder {
   color: var(--ink-mute);
 }
