@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ChatEntry, ChatStatus } from '../lib/chatTypes'
+import { setPopoverOpen } from '../lib/popoverGuard'
 import {
   loadRoomReactions,
   recordEmojiUse,
@@ -56,6 +57,16 @@ export default function MessageList({
   const [hasOlder, setHasOlder] = useState(true)
   const [menu, setMenu] = useState<OpenMenu | null>(null)
   const [reactions, setReactions] = useState<RoomReactionState>(() => loadRoomReactions())
+  const menuOpen = menu !== null
+
+  // Report to the chat-stage guard: a blank click dismisses this menu on
+  // pointerdown, and the click that follows must not fold the chat (or
+  // trigger anything else under the cursor) — see popoverGuard.ts.
+  useEffect(() => {
+    if (!menuOpen) return
+    setPopoverOpen(true)
+    return () => setPopoverOpen(false)
+  }, [menuOpen])
   const loadingRef = useRef(false)
   const anchorRef = useRef<{ height: number; firstId: string | undefined } | null>(null)
 

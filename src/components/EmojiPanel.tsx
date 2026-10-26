@@ -12,9 +12,9 @@ export default function EmojiPanel({ onInsert }: { onInsert: (emoji: string) => 
   return (
     <div className="popover emoji-panel" role="dialog" aria-label="表情选择">
       <div className="emoji-grid" onMouseDown={(e) => e.preventDefault()}>
-        {EMOJI_LIST.map((emoji) => (
+        {EMOJI_LIST.map((emoji, i) => (
           <button
-            key={emoji}
+            key={`${emoji}-${i}`}
             type="button"
             className="emoji-cell"
             onMouseDown={(e) => e.preventDefault()}

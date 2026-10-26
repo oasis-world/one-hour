@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { t } from '../lib/i18n'
 import { loadBgTtlMs } from '../lib/settings'
 import { subscribeTick } from '../lib/tick'
+import CountdownProgressRing from './CountdownProgressRing'
 import { GlobeIcon } from './userIcons'
 
 /**
@@ -13,9 +14,6 @@ import { GlobeIcon } from './userIcons'
  * hovering it (desktop) or tapping it (touch) floats the mm:ss readout.
  */
 
-const RING_RADIUS = 7
-const RING_SIZE = 17
-const CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 const TIP_AUTO_CLOSE_MS = 2500
 
 export default function BgSlotRing({
@@ -78,36 +76,14 @@ export default function BgSlotRing({
         aria-label={tipText}
         onClick={toggleTip}
       >
-        <svg
-          width={RING_SIZE}
-          height={RING_SIZE}
-          viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
-          focusable="false"
-          aria-hidden="true"
-        >
-          <circle
-            cx={RING_SIZE / 2}
-            cy={RING_SIZE / 2}
-            r={RING_RADIUS}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            opacity="0.25"
-          />
-          <circle
-            cx={RING_SIZE / 2}
-            cy={RING_SIZE / 2}
-            r={RING_RADIUS}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeDasharray={CIRCUMFERENCE}
-            strokeDashoffset={-CIRCUMFERENCE * (1 - fraction)}
-            transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
-            style={{ transition: 'stroke-dashoffset 1s linear' }}
-          />
-        </svg>
+        <CountdownProgressRing
+          remaining={fraction}
+          size={17}
+          radius={7}
+          strokeWidth={1.8}
+          trackOpacity={0.25}
+          className="bg-slot-countdown-ring"
+        />
         <span className="bg-tip" aria-hidden="true">
           {tipText}
         </span>

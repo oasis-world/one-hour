@@ -1350,11 +1350,9 @@ button {
 
 @keyframes viewer-img {
   from {
-    transform: scale(0.92);
     opacity: 0;
   }
   to {
-    transform: scale(1);
     opacity: 1;
   }
 }
@@ -1682,15 +1680,4 @@ button {
     top: calc(max(14px, env(safe-area-inset-top)) + 44px);
   }
 
-  /* Mobile only: hide the faint full-hour track — the solid remaining
-     arc starts full and is eaten clockwise from 12 o'clock until the
-     ring zeroes out. CSS opacity overrides the circles' presentation
-     attributes. */
-  .msg-countdown-ring circle:first-child {
-    opacity: 0;
-  }
-
-  .bg-slot-ring svg circle:first-child {
-    opacity: 0;
-  }
 }

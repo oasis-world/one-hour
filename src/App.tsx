@@ -18,7 +18,7 @@ import './lib/settingsRuntime'
 import { fileToChatImage, looksLikeHeic } from './lib/imageBlob'
 import { withTimeout } from './lib/withTimeout'
 import { consumeFilePickerFlag } from './lib/filePickerGuard'
-import { chromePopoverJustClosed } from './lib/chromePopover'
+import { popoverJustClosed } from './lib/popoverGuard'
 import { useLang, t } from './lib/i18n'
 import { loadTheme, loadVeil, type ThemeName } from './lib/settings'
 
@@ -486,6 +486,10 @@ export default function App() {
   const latestImage = chatImages.length > 0 ? chatImages[chatImages.length - 1] : null
 
   const openImage = (src: string) => {
+    // A click that just dismissed a popover (+ / emoji / message menu /
+    // avatar / gear) only closes the popover — it must not open the
+    // viewer. Same guard as the blank-area fold (see popoverGuard.ts).
+    if (popoverJustClosed()) return
     const idx = chatImages.indexOf(src)
     if (idx >= 0) setViewerIndex(idx)
   }
@@ -577,9 +581,9 @@ export default function App() {
             // composer popover shouldn't fold the room as well.
             if (e.target !== e.currentTarget) return
             if (composerMenuOpen || Date.now() - menuClosedAt.current < 400) return
-            // A blank click that just dismissed the avatar / gear popover
-            // only closes the popover — the clear photo stays, chat stays.
-            if (chromePopoverJustClosed()) return
+            // A blank click that just dismissed a popover (avatar / gear /
+            // message menu) only closes the popover — never anything under it.
+            if (popoverJustClosed()) return
             closeChat()
           }}
         >

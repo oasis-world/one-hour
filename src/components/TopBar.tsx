@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { AccountState } from '../lib/account'
 import { preWelcomeProfile, type UserProfile } from '../lib/userProfile'
 import { useLang } from '../lib/i18n'
-import { setChromePopoverOpen } from '../lib/chromePopover'
+import { setPopoverOpen } from '../lib/popoverGuard'
 import AvatarBadge from './AvatarBadge'
 import AccountPopover from './AccountPopover'
 
@@ -34,11 +34,11 @@ export default function TopBar({
   const label = shown.nickname
 
   // Report to the chat-stage fold guard so a blank click that dismisses
-  // this popover doesn't also fold the chat (see chromePopover.ts).
+  // this popover doesn't also fold the chat (see popoverGuard.ts).
   useEffect(() => {
     if (!open) return
-    setChromePopoverOpen(true)
-    return () => setChromePopoverOpen(false)
+    setPopoverOpen(true)
+    return () => setPopoverOpen(false)
   }, [open])
 
   return (

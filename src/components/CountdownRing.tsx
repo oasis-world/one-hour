@@ -3,16 +3,13 @@ import { MESSAGE_TTL_MS, expiresAtOf } from '../lib/expiry'
 import { t } from '../lib/i18n'
 import { subscribeTick } from '../lib/tick'
 import type { ChatEntry } from '../lib/chatTypes'
+import CountdownProgressRing from './CountdownProgressRing'
 
 /**
  * The one-hour countdown: a depleting ring with a mm:ss readout, next to
  * the message's send time. Amber in the final ten minutes, pulsing red in
  * the last two.
  */
-
-const RING_RADIUS = 6.5
-const RING_SIZE = 17
-const CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 
 type Phase = 'fresh' | 'late' | 'final'
 
@@ -34,41 +31,14 @@ export default function CountdownRing({ entry }: { entry: ChatEntry }) {
       className={`msg-countdown${phase === 'late' ? ' is-late' : ''}${phase === 'final' ? ' is-final' : ''}`}
       title={t(`这条消息还剩 ${readout} 消失`, `Vanishes in ${readout}`)}
     >
-      <svg
+      <CountdownProgressRing
+        remaining={fraction}
+        size={17}
+        radius={6.5}
+        strokeWidth={1.6}
+        trackOpacity={0.22}
         className="msg-countdown-ring"
-        width={RING_SIZE}
-        height={RING_SIZE}
-        viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
-        aria-hidden="true"
-        focusable="false"
-      >
-        {/* full-hour track */}
-        <circle
-          cx={RING_SIZE / 2}
-          cy={RING_SIZE / 2}
-          r={RING_RADIUS}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          opacity="0.22"
-        />
-        {/* Remaining time: full at 12 o'clock, then the gap grows
-            clockwise from 12 as the arc's tail retreats — the ring wanes
-            toward zero, never fills up. */}
-        <circle
-          cx={RING_SIZE / 2}
-          cy={RING_SIZE / 2}
-          r={RING_RADIUS}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeDasharray={CIRCUMFERENCE}
-          strokeDashoffset={-CIRCUMFERENCE * (1 - fraction)}
-          transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
-          style={{ transition: 'stroke-dashoffset 1s linear' }}
-        />
-      </svg>
+      />
       <span className="msg-countdown-text">{readout}</span>
     </span>
   )

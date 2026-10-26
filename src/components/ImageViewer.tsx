@@ -9,13 +9,17 @@ import { ThinXIcon } from './icons'
  * ends); releasing past the threshold glides into the neighbor, anything
  * less springs back — browsing feels like sliding real photos. Vertical
  * fling dismisses, double-tap toggles zoom, pinch zooms 1×..4× (floor at
- * the fitted size), and a zoomed photo pans under one finger.
+ * the fitted size), desktop wheel zooms toward the cursor, and a zoomed
+ * photo pans under one finger or the held mouse button.
  */
 
 const MAX_SCALE = 4
 const DOUBLE_TAP_SCALE = 2.5
 const TAP_SLOP_PX = 8
 const DOUBLE_TAP_MS = 300
+/** Mouse double-clicks land slower than touch double-taps (the OS
+    convention is ~500ms) — give the mouse a wider second-tap window. */
+const MOUSE_DOUBLE_TAP_MS = 450
 const GLIDE_MS = 240
 
 interface Zoom {
@@ -89,6 +93,20 @@ export default function ImageViewer({
    * There is no native scrolling inside the viewer to preserve.
    */
   const viewerRef = useRef<HTMLDivElement>(null)
+
+  /** Keep the zoomed photo from being panned fully off the screen. */
+  const clampPan = (z: Zoom): Zoom => {
+    const el = imgRef.current
+    if (!el) return z
+    const maxX = Math.max(0, (z.s * el.offsetWidth - window.innerWidth) / 2)
+    const maxY = Math.max(0, (z.s * el.offsetHeight - window.innerHeight) / 2)
+    return {
+      s: z.s,
+      x: Math.min(maxX, Math.max(-maxX, z.x)),
+      y: Math.min(maxY, Math.max(-maxY, z.y)),
+    }
+  }
+
   useEffect(() => {
     const el = viewerRef.current
     if (!el) return
@@ -96,9 +114,32 @@ export default function ImageViewer({
     el.addEventListener('touchmove', stopDefault, { passive: false })
     // Legacy iOS pinch event — belt and suspenders next to touchmove.
     el.addEventListener('gesturestart', stopDefault as EventListener)
+    // Desktop: wheel zooms toward the cursor (React's synthetic wheel is
+    // passive, so this native listener does the preventDefault). Panning
+    // a zoomed photo is the existing pointer-drag path below.
+    const onWheelNative = (e: WheelEvent) => {
+      e.preventDefault()
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1
+      const delta = e.deltaY * unit
+      const mx = e.clientX
+      const my = e.clientY
+      setZoom((z) => {
+        const s = Math.min(MAX_SCALE, Math.max(1, z.s * Math.exp(-delta * 0.0018)))
+        if (s === z.s) return z
+        const cx = window.innerWidth / 2
+        const cy = window.innerHeight / 2
+        return clampPan({
+          s,
+          x: mx - cx - (s * (mx - cx - z.x)) / z.s,
+          y: my - cy - (s * (my - cy - z.y)) / z.s,
+        })
+      })
+    }
+    el.addEventListener('wheel', onWheelNative, { passive: false })
     return () => {
       el.removeEventListener('touchmove', stopDefault)
       el.removeEventListener('gesturestart', stopDefault as EventListener)
+      el.removeEventListener('wheel', onWheelNative)
     }
   }, [])
 
@@ -113,19 +154,6 @@ export default function ImageViewer({
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, canPrev, canNext])
-
-  /** Keep the zoomed photo from being panned fully off the screen. */
-  const clampPan = (z: Zoom): Zoom => {
-    const el = imgRef.current
-    if (!el) return z
-    const maxX = Math.max(0, (z.s * el.offsetWidth - window.innerWidth) / 2)
-    const maxY = Math.max(0, (z.s * el.offsetHeight - window.innerHeight) / 2)
-    return {
-      s: z.s,
-      x: Math.min(maxX, Math.max(-maxX, z.x)),
-      y: Math.min(maxY, Math.max(-maxY, z.y)),
-    }
-  }
 
   /** Glide out toward the neighbor, then swap indices in place. */
   const glide = (dir: 1 | -1) => {
@@ -247,7 +275,8 @@ export default function ImageViewer({
         return
       }
       const now = Date.now()
-      if (now - lastTap.current < DOUBLE_TAP_MS) {
+      const tapWindow = e.pointerType === 'mouse' ? MOUSE_DOUBLE_TAP_MS : DOUBLE_TAP_MS
+      if (now - lastTap.current < tapWindow) {
         lastTap.current = 0
         if (zoom.s > 1) {
           setZoom(ZOOM_NONE)

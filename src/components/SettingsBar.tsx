@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { PresenceMember } from '../lib/chatTypes'
 import type { ThemeName } from '../lib/settings'
 import { useLang, setLang, LANGS, LANG_LABELS, t } from '../lib/i18n'
-import { setChromePopoverOpen } from '../lib/chromePopover'
+import { setPopoverOpen } from '../lib/popoverGuard'
 import { ChevronRightIcon, MoonIcon, PeopleIcon, SunIcon } from './icons'
 import { GearIcon, GlobeIcon, RefreshIcon } from './userIcons'
 import LangFlag from './LangFlag'
@@ -44,11 +44,11 @@ export default function SettingsBar({
   const anyOpen = open || listOpen || langOpen
 
   // Report to the chat-stage fold guard so a blank click that dismisses
-  // these popovers doesn't also fold the chat (see chromePopover.ts).
+  // these popovers doesn't also fold the chat (see popoverGuard.ts).
   useEffect(() => {
     if (!anyOpen) return
-    setChromePopoverOpen(true)
-    return () => setChromePopoverOpen(false)
+    setPopoverOpen(true)
+    return () => setPopoverOpen(false)
   }, [anyOpen])
 
   // Clicks anywhere outside the corner (popovers included via the ref)
