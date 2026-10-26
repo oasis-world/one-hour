@@ -1,0 +1,12 @@
+{
+  "name": "一小时 · one hour",
+  "short_name": "one-hour",
+  "description": "每条消息只存在一小时的公共聊天室",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e1014",
+  "theme_color": "#0e1014",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

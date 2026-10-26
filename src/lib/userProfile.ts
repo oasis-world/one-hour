@@ -99,6 +99,19 @@ export function randomProfile(
   }
 }
 
+let preWelcome: UserProfile | null = null
+
+/**
+ * The random identity the room shows before the welcome confirm — rolled
+ * once per session and shared by the identity layer, the top bar and the
+ * welcome gate, so the face and name behind the modal are exactly the ones
+ * the modal first offers. Confirming the gate saves it for real.
+ */
+export function preWelcomeProfile(): UserProfile {
+  preWelcome ??= randomProfile(null)
+  return preWelcome
+}
+
 /* ---- random nicknames: a mood word + a wanderer noun ---- */
 
 const NICK_ZH_A = [

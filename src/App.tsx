@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AccountDialog from './components/AccountDialog'
 import BackgroundStage from './components/BackgroundStage'
 import Composer from './components/Composer'
@@ -41,7 +41,14 @@ export default function App() {
   const room = useChatRoom(true)
   const lang = useLang()
   const zh = lang === 'zh'
-  const [fold, setFold] = useState<FoldState>('open')
+  const [fold, setFold] = useState<FoldState>('folded')
+  /** First remote (or fallback) background is ready — drives the 1.5s chat reveal. */
+  const [bgReady, setBgReady] = useState(false)
+  /** Whether the initial choreography has completed (gates the reopen hint). */
+  const [hasRevealed, setHasRevealed] = useState(false)
+  const [musicMuted, setMusicMuted] = useState(true)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const musicScheduledRef = useRef(false)
   /** Which account dialog view is open, if any. */
   const [accountView, setAccountView] = useState<'closed' | 'signin' | 'bind'>('closed')
   const [profileOpen, setProfileOpen] = useState(false)
@@ -69,6 +76,47 @@ export default function App() {
   }
   const [toast, setToast] = useState<string | null>(null)
   const toastTimer = useRef<number | null>(null)
+  const bgReadyRef = useRef(false)
+  const revealTimer = useRef<number | null>(null)
+  const pendingReveal = useRef(false)
+  const hiddenAt = useRef<number>(0)
+  const blurAt = useRef<number>(0)
+
+  const scheduleReveal = useCallback(() => {
+    if (revealTimer.current) window.clearTimeout(revealTimer.current)
+    setFold('folded')
+    revealTimer.current = window.setTimeout(() => {
+      setFold('unfolding')
+      window.setTimeout(() => {
+        setFold('open')
+        setHasRevealed(true)
+      }, UNFOLD_MS)
+    }, 1500)
+  }, [])
+
+  const markBgReady = useCallback(() => {
+    if (bgReadyRef.current) {
+      if (pendingReveal.current) {
+        pendingReveal.current = false
+        scheduleReveal()
+      }
+      return
+    }
+    bgReadyRef.current = true
+    setBgReady(true)
+    const splash = document.getElementById('splash')
+    if (splash) {
+      const delay = Math.max(0, 350 - performance.now())
+      window.setTimeout(() => {
+        splash.classList.add('is-done')
+        window.setTimeout(() => splash.remove(), 450)
+      }, delay)
+    }
+    if (pendingReveal.current) {
+      pendingReveal.current = false
+      scheduleReveal()
+    }
+  }, [scheduleReveal])
 
   // Signed-in players carry their profile in the cloud; guests stay local.
   useEffect(() => watchAccountForProfileSync(), [])
@@ -102,6 +150,81 @@ export default function App() {
   useEffect(() => {
     document.documentElement.lang = zh ? 'zh-CN' : 'en'
   }, [zh])
+
+  // First background ready → wait 1.5s, then unfold the chat from the
+  // bottom-left corner.
+  useEffect(() => {
+    if (!bgReady) return
+    const timer = window.setTimeout(scheduleReveal, 0)
+    return () => window.clearTimeout(timer)
+  }, [bgReady, scheduleReveal])
+
+  // Fallback: if no background arrives (offline / blocked), promote the
+  // CSS blur backdrop after 4s so the app is never stuck on the splash.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (!bgReadyRef.current) markBgReady()
+    }, 4000)
+    return () => window.clearTimeout(timer)
+  }, [markBgReady])
+
+  // Start the looping background music 3s after the player has an identity.
+  useEffect(() => {
+    if (!profile || musicScheduledRef.current) return
+    musicScheduledRef.current = true
+    const timer = window.setTimeout(() => {
+      const audio = audioRef.current
+      if (!audio) return
+      audio.loop = true
+      audio.muted = true
+      void audio.play().catch(() => {})
+    }, 3000)
+    return () => window.clearTimeout(timer)
+  }, [profile])
+
+  const toggleMusic = () => {
+    const audio = audioRef.current
+    if (!audio) return
+    if (musicMuted) {
+      audio.muted = false
+      setMusicMuted(false)
+      void audio.play().catch(() => {})
+    } else {
+      audio.muted = true
+      setMusicMuted(true)
+    }
+  }
+
+  // Re-run the choreography when the tab/app returns to the foreground
+  // after being away for a while.
+  useEffect(() => {
+    if (!hiddenAt.current) hiddenAt.current = Date.now()
+    const onVisibility = () => {
+      if (document.hidden) {
+        hiddenAt.current = Date.now()
+      } else if (Date.now() - hiddenAt.current > 1000) {
+        if (bgReadyRef.current) scheduleReveal()
+        else pendingReveal.current = true
+      }
+    }
+    const onBlur = () => {
+      blurAt.current = Date.now()
+    }
+    const onFocus = () => {
+      if (blurAt.current && Date.now() - blurAt.current > 1000) {
+        if (bgReadyRef.current) scheduleReveal()
+        else pendingReveal.current = true
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('blur', onBlur)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('blur', onBlur)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [scheduleReveal])
 
   const showToast = (text: string) => {
     setToast(text)
@@ -164,7 +287,13 @@ export default function App() {
 
   return (
     <div ref={shellRef} className={shellClass} style={{ ['--veil' as string]: String(veil) }}>
-      <BackgroundStage imageUrl={latestImage} revealed={fold === 'folded'} />
+      <BackgroundStage imageUrl={latestImage} revealed={fold === 'folded'} onReady={markBgReady} />
+      <audio
+        ref={audioRef}
+        src="https://upload.wikimedia.org/wikipedia/commons/transcoded/5/52/Uniq_-_Art_Of_Silence_V2.ogg/Uniq_-_Art_Of_Silence_V2.ogg.mp3"
+        loop
+        preload="auto"
+      />
 
       <TopBar
         account={account}
@@ -196,6 +325,33 @@ export default function App() {
           }}
         >
           <ThinXIcon size={13} />
+        </button>
+      )}
+
+      {chatMounted && (
+        <button
+          type="button"
+          className="music-toggle"
+          aria-label={musicMuted ? (zh ? '打开音乐' : 'Unmute music') : (zh ? '关闭音乐' : 'Mute music')}
+          title={musicMuted ? (zh ? '打开音乐' : 'Unmute music') : (zh ? '关闭音乐' : 'Mute music')}
+          onClick={(e) => {
+            e.stopPropagation()
+            toggleMusic()
+          }}
+        >
+          {musicMuted ? (
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <line x1="23" y1="9" x2="17" y2="15" />
+              <line x1="17" y1="9" x2="23" y2="15" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+            </svg>
+          )}
         </button>
       )}
 
@@ -253,7 +409,7 @@ export default function App() {
             )}
           </div>
         </div>
-      ) : (
+      ) : hasRevealed ? (
         <>
           {/* Click anywhere on the scene to pull the chat back out. */}
           <div
@@ -267,7 +423,7 @@ export default function App() {
             {zh ? '展开聊天' : 'Open chat'}
           </button>
         </>
-      )}
+      ) : null}
 
       {viewerIndex != null && chatImages[viewerIndex] && (
         <ImageViewer

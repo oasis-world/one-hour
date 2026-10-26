@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { AccountState } from '../lib/account'
-import type { UserProfile } from '../lib/userProfile'
+import { preWelcomeProfile, type UserProfile } from '../lib/userProfile'
 import { useLang } from '../lib/i18n'
 import { useHoverCapable } from '../lib/media'
 import { useHoverReveal } from '../lib/useHoverReveal'
@@ -11,6 +11,8 @@ import AccountPopover from './AccountPopover'
  * Top-left corner: the player's DiceBear face (large). Hover (desktop)
  * or click opens the account popover — nickname at a glance, sign-in
  * for travelers, profile + sign-out once an email identity is bound.
+ * Before the welcome confirm the shared random draft plays the part,
+ * matching what the welcome gate offers.
  */
 export default function TopBar({
   account,
@@ -34,7 +36,8 @@ export default function TopBar({
     () => setOpen(true),
     () => setOpen(false),
   )
-  const label = profile?.nickname ?? (zh ? '旅人' : 'Traveler')
+  const shown = profile ?? preWelcomeProfile()
+  const label = shown.nickname
 
   return (
     <div className="top-bar" onMouseEnter={onEnter} onMouseLeave={onLeave}>
@@ -47,13 +50,13 @@ export default function TopBar({
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <AvatarBadge look={profile} fill className="top-avatar-img" />
+        <AvatarBadge look={shown} fill className="top-avatar-img" />
       </button>
 
       {open && (
         <AccountPopover
           account={account}
-          profile={profile}
+          profile={shown}
           onClose={() => setOpen(false)}
           onSignIn={onSignIn}
           onOpenProfile={onOpenProfile}

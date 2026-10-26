@@ -21,9 +21,11 @@ const ROTATE_CHECK_MS = 10_000
 export default function BackgroundStage({
   imageUrl,
   revealed,
+  onReady,
 }: {
   imageUrl: string | null
   revealed: boolean
+  onReady?: () => void
 }) {
   const [fallback, setFallback] = useState<BackgroundPhoto | null>(null)
   /** Chat photo that already served its full slot — it yields to the feed. */
@@ -39,6 +41,7 @@ export default function BackgroundStage({
   const liveRef = useRef(live)
   const rotatingRef = useRef(false)
   const sinceRef = useRef(0)
+  const readyFiredRef = useRef(false)
   /** Slot start time, mirrored into state for the corner ring. */
   const [slotSince, setSlotSince] = useState(0)
   useEffect(() => {
@@ -47,6 +50,15 @@ export default function BackgroundStage({
   useEffect(() => {
     liveRef.current = live
   }, [live])
+
+  // Notify the shell the first time a background photo is actually on
+  // screen, so the splash can retire and the chat can be revealed.
+  useEffect(() => {
+    if (live && !readyFiredRef.current) {
+      readyFiredRef.current = true
+      onReady?.()
+    }
+  }, [live, onReady])
 
   const rotate = useCallback(async () => {
     if (rotatingRef.current) return

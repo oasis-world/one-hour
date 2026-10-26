@@ -6,7 +6,9 @@ import { useEffect, type RefObject } from 'react'
  *    viewport (height + offset), so the composer rides above the keys.
  *    Android Chrome already resizes the layout via the
  *    `interactive-widget=resizes-content` meta; this covers iOS Safari
- *    and anything else that overlays instead.
+ *    and anything else that overlays instead. The shell also carries an
+ *    `is-keyboard-open` class while up — the CSS drops the dock to the
+ *    bottom edge and steps the gear aside.
  *  - Chat convention: a tap outside the composer or a scroll gesture
  *    dismisses the keyboard (blur). Touches inside the composer dock —
  *    the field, send, plus/emoji panels — never dismiss it.
@@ -34,9 +36,11 @@ export function useMobileKeyboard(shellRef: RefObject<HTMLElement | null>): void
     const apply = () => {
       const keyboard = window.innerHeight - vv.height - vv.offsetTop
       if (keyboard > KEYBOARD_MIN_PX) {
+        shell.classList.add('is-keyboard-open')
         shell.style.height = `${vv.height}px`
         shell.style.transform = `translateY(${vv.offsetTop}px)`
       } else {
+        shell.classList.remove('is-keyboard-open')
         shell.style.height = ''
         shell.style.transform = ''
       }
@@ -70,6 +74,7 @@ export function useMobileKeyboard(shellRef: RefObject<HTMLElement | null>): void
       document.removeEventListener('pointerdown', onDown)
       document.removeEventListener('touchmove', onMove)
       document.removeEventListener('gesturestart', onGesture)
+      shell.classList.remove('is-keyboard-open')
       shell.style.height = ''
       shell.style.transform = ''
     }

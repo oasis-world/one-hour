@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { EMOJI_LIST } from '../lib/emoji'
 import { useLang } from '../lib/i18n'
 import { useHoverCapable } from '../lib/media'
 import { useHoverReveal } from '../lib/useHoverReveal'
 import { useImeEnter } from '../lib/ime'
 import { CameraIcon, EmojiIcon, PlusIcon, SendIcon, UploadIcon } from './icons'
 import { PhotoIcon } from './userIcons'
+import EmojiPanel from './EmojiPanel'
 
 interface Props {
   onSend: (text: string) => void
@@ -118,13 +118,19 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
 
   const submit = () => {
     const text = draft.trim()
-    if (!text) return
-    onSend(text)
-    setDraft('')
-    setEmojiOpen(false)
-    // Keep the keyboard up on mobile — the player is mid-conversation.
+    if (text) {
+      onSend(text)
+      setDraft('')
+      setEmojiOpen(false)
+    }
+    // Keep the keyboard up on mobile — the player is mid-conversation,
+    // even when the tap landed on the gray (empty) send button.
     if (coarse) inputRef.current?.focus()
   }
+
+  /** Side-button taps must not steal the field's focus (the keyboard
+      would drop on Android, which moves focus on mousedown/pointerdown). */
+  const keepFocus = (e: React.SyntheticEvent) => e.preventDefault()
 
   const pickFile = (input: RefObject<HTMLInputElement | null>) => {
     setPlusOpen(false)
@@ -145,9 +151,12 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
             aria-label={zh ? '添加' : 'Add'}
             title={zh ? '添加' : 'Add'}
             aria-expanded={plusOpen}
+            onMouseDown={keepFocus}
+            onPointerDown={keepFocus}
             onClick={() => {
               setPlusOpen((v) => !v)
               setEmojiOpen(false)
+              if (coarse) inputRef.current?.focus()
             }}
           >
             <PlusIcon />
@@ -221,39 +230,28 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
             aria-label={zh ? '表情' : 'Emoji'}
             title={zh ? '表情' : 'Emoji'}
             aria-expanded={emojiOpen}
+            onMouseDown={keepFocus}
+            onPointerDown={keepFocus}
             onClick={() => {
               setEmojiOpen((v) => !v)
               setPlusOpen(false)
+              if (coarse) inputRef.current?.focus()
             }}
           >
             <EmojiIcon />
           </button>
 
-          {emojiOpen && (
-            <div className="popover emoji-panel" role="dialog" aria-label="表情选择">
-              <div className="emoji-grid" onMouseDown={(e) => e.preventDefault()}>
-                {EMOJI_LIST.map((emoji) => (
-                  <button
-                    key={emoji}
-                    type="button"
-                    className="emoji-cell"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => insertEmoji(emoji)}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {emojiOpen && <EmojiPanel onInsert={insertEmoji} />}
         </div>
 
         <button
           type="button"
-          className="composer-send"
-          disabled={draft.trim().length === 0}
+          className={`composer-send${draft.trim().length === 0 ? ' is-idle' : ''}`}
+          aria-disabled={draft.trim().length === 0}
           aria-label={zh ? '发送' : 'Send'}
           title={zh ? '发送' : 'Send'}
+          onMouseDown={keepFocus}
+          onPointerDown={keepFocus}
           onClick={submit}
         >
           <SendIcon />

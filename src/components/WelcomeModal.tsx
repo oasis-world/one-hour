@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useLang } from '../lib/i18n'
 import { useImeEnter } from '../lib/ime'
 import { useAccount } from '../lib/useAccount'
@@ -7,6 +7,7 @@ import {
   cleanNickname,
   loadUserProfile,
   NICKNAME_MAX,
+  preWelcomeProfile,
   randomNickname,
   randomProfile,
   saveUserProfile,
@@ -35,9 +36,14 @@ export default function WelcomeModal({
   const account = useAccount()
   const editing = mode === 'edit'
   const [draft, setDraft] = useState<UserProfile>(() =>
-    editing ? (loadUserProfile() ?? randomProfile(undefined, lang)) : randomProfile(undefined, lang),
+    editing
+      ? loadUserProfile() ?? randomProfile(undefined, lang)
+      : // First visit: start from the identity already shown in the room,
+        // so the faces behind and inside the modal match from the start.
+        preWelcomeProfile(),
   )
   const ime = useImeEnter()
+  const nicknameRef = useRef<HTMLInputElement>(null)
 
   // Edit mode is dismissable; the first-visit gate is not.
   useEffect(() => {
@@ -49,7 +55,10 @@ export default function WelcomeModal({
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const reroll = () => setDraft((prev) => randomProfile(prev, lang))
+  const reroll = () => {
+    setDraft((prev) => randomProfile(prev, lang))
+    nicknameRef.current?.focus()
+  }
 
   /** Adopt a style from the catalog; the row button also rolls a new seed. */
   const pickStyle = (style: string, rerollSeed: boolean) => {
@@ -60,6 +69,7 @@ export default function WelcomeModal({
       // Choosing a generated look drops any custom photo.
       avatarUrl: null,
     }))
+    nicknameRef.current?.focus()
   }
 
   const confirm = () => {
@@ -136,6 +146,7 @@ export default function WelcomeModal({
         <label className="field welcome-field">
           <span>{zh ? '我的昵称' : 'My nickname'}</span>
           <input
+            ref={nicknameRef}
             type="text"
             value={draft.nickname}
             maxLength={NICKNAME_MAX}

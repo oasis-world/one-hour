@@ -3,9 +3,9 @@ import type { ChatEntry } from '../lib/chatTypes'
 
 /**
  * Chat log scroll state machine (simplified from the oasis room hook):
- * keeps the newest line in view while the reader sits at the bottom, and
- * surfaces the jump-to-latest button once they scroll up. Programmatic
- * scrolls never count as user scrolls.
+ * a new message always brings the reader down to the newest line —
+ * gliding when it means traveling from older history, snapping when
+ * already close. Programmatic scrolls never count as user scrolls.
  */
 export function useChatScroll(opts: {
   scrollRef: RefObject<HTMLDivElement | null>
@@ -56,16 +56,20 @@ export function useChatScroll(opts: {
     setShowJumpEnd(distFromBottom > 56)
   }, [scrollRef])
 
-  // New entries only → keep the newest line in view when already at the
-  // bottom; never yank a reader who scrolled up.
+  // New entries only → always ride down to the newest line: a quick snap
+  // when the reader is near the bottom, a glide when it means traveling
+  // back from older history.
   const prevLenRef = useRef(entries.length)
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
     const grew = entries.length > prevLenRef.current
     prevLenRef.current = entries.length
-    if (grew && atBottomRef.current) scrollTo(el.scrollHeight)
-  }, [entries, scrollRef, scrollTo])
+    if (!grew) return
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    if (distFromBottom > 240) jumpToEnd()
+    else scrollToEnd()
+  }, [entries, scrollRef, scrollTo, jumpToEnd, scrollToEnd])
 
   // Container resize (keyboard, fold/unfold) must not strand a
   // bottom-anchored reader above the newest line.

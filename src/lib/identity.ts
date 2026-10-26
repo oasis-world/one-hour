@@ -1,13 +1,13 @@
 import type { AccountState } from './account'
 import { isSupabaseConfigured } from './supabaseConfig'
 import type { AvatarLook } from './avatar'
-import { loadUserProfile, randomNickname } from './userProfile'
+import { loadUserProfile, preWelcomeProfile } from './userProfile'
 
 /** Room identity: every visitor gets one via anonymous sign-in. */
 export interface ChatIdentity {
   userId: string
   displayName: string
-  /** DiceBear look broadcast through presence; null until picked. */
+  /** DiceBear look broadcast through presence. */
   avatar: AvatarLook | null
   /** Custom photo avatar URL; wins over the generated look. */
   avatarUrl: string | null
@@ -15,16 +15,13 @@ export interface ChatIdentity {
 
 const LOCAL_UID_KEY = 'one-hour-local-uid'
 
-/** Stable per-session name for the moments before the welcome confirm. */
-let preWelcomeName: string | null = null
-
 export function resolveChatIdentity(account: AccountState): ChatIdentity | null {
-  const profile = loadUserProfile()
-  const displayName = profile?.nickname ?? (preWelcomeName ??= randomNickname())
-  const avatar: AvatarLook | null = profile
-    ? { style: profile.style, seed: profile.seed }
-    : null
-  const avatarUrl = profile?.avatarUrl ?? null
+  // Before the welcome confirm the shared random draft plays the part, so
+  // the room (top bar, presence) shows the very identity the gate offers.
+  const profile = loadUserProfile() ?? preWelcomeProfile()
+  const displayName = profile.nickname
+  const avatar: AvatarLook | null = { style: profile.style, seed: profile.seed }
+  const avatarUrl = profile.avatarUrl ?? null
   if (account.userId) {
     return { userId: account.userId, displayName, avatar, avatarUrl }
   }

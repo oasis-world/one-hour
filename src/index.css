@@ -511,6 +511,7 @@ button {
   padding: 26px 18px 10px;
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
   gap: 2px;
   scrollbar-width: none;
 }
@@ -525,6 +526,15 @@ button {
    the log squishes every row instead of overflowing, and never scrolls. */
 .chat-log > * {
   flex-shrink: 0;
+}
+
+/* Bottom-anchored log: the leading spacer eats the free space so the
+   conversation starts at the bottom and is pushed upward as it grows —
+   a lone first message sits right above the composer, not at the top.
+   Overflow zeroes the auto margin, so scrolling is untouched. */
+.chat-log::before {
+  content: '';
+  margin-top: auto;
 }
 
 /* The signature fade: messages dissolve into the top edge only — the
@@ -550,8 +560,10 @@ button {
 }
 
 .chat-empty {
-  margin: auto;
-  padding: 30px 24px;
+  /* No auto vertical margins — the log's bottom anchor owns the free
+     space, so the copy hugs the composer instead of floating mid-log. */
+  margin: 0 auto;
+  padding: 30px 24px 18px;
   max-width: 300px;
   text-align: center;
   font-size: 13.5px;
@@ -823,6 +835,36 @@ button {
   pointer-events: none;
 }
 
+/* Music toggle: sits just below the page-corner close button. */
+.music-toggle {
+  position: absolute;
+  top: calc(max(14px, env(safe-area-inset-top)) + 40px);
+  right: max(16px, env(safe-area-inset-right));
+  z-index: 45;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--ink-soft);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+  box-shadow: 0 4px 14px var(--shadow);
+  transition: transform 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+
+.music-toggle:hover {
+  color: var(--ink);
+  background: var(--surface-strong);
+}
+
+.music-toggle:active {
+  transform: scale(0.92);
+}
+
 /* ---------- Jump-to-latest (bottom-right of the log) ---------- */
 
 .chat-jump {
@@ -950,6 +992,26 @@ button {
   padding: 0 10px;
 }
 
+/* ---------- Keyboard-up choreography (mobile) ----------
+   The shell carries .is-keyboard-open while the soft keyboard covers the
+   visual viewport (see useMobileKeyboard): the dock drops to a hair above
+   the edge, the gear steps aside, and the log reserves only the docked
+   composer — the welcome copy then sits right above the field. */
+.app-shell.is-keyboard-open .composer-dock {
+  bottom: 5px;
+}
+
+.app-shell.is-keyboard-open .chat-log-wrap {
+  /* docked composer ≈ 5px + pill height */
+  padding-bottom: 66px;
+}
+
+.app-shell.is-keyboard-open .settings-bar {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .composer {
   position: relative;
   width: 100%;
@@ -1039,15 +1101,17 @@ button {
   box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
-.composer-send:hover:not(:disabled) {
+.composer-send:hover:not(.is-idle) {
   filter: brightness(1.08);
 }
 
-.composer-send:active:not(:disabled) {
+.composer-send:active:not(.is-idle) {
   transform: scale(0.88);
 }
 
-.composer-send:disabled {
+/* Gray "nothing to send" state — kept clickable (no disabled attribute)
+   so the tap can refocus the field and hold the keyboard up. */
+.composer-send.is-idle {
   opacity: 0.35;
   cursor: default;
   box-shadow: none;

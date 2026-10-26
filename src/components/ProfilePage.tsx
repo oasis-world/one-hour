@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { AccountState } from '../lib/account'
 import { useLang } from '../lib/i18n'
 import { useImeEnter } from '../lib/ime'
@@ -35,6 +35,7 @@ export default function ProfilePage({
   const zh = lang === 'zh'
   const signedIn = account.status === 'signedIn'
   const ime = useImeEnter()
+  const nicknameRef = useRef<HTMLInputElement>(null)
   const [draft, setDraft] = useState<UserProfile | null>(() => loadUserProfile())
 
   useEffect(() => {
@@ -47,8 +48,10 @@ export default function ProfilePage({
 
   if (!draft) return null
 
-  const rerollLook = () =>
+  const rerollLook = () => {
     setDraft((prev) => (prev ? { ...prev, ...randomAvatarLook(prev), avatarUrl: null } : prev))
+    nicknameRef.current?.focus()
+  }
 
   /** Adopt a catalog style (row button also rolls a fresh seed). */
   const pickStyle = (style: string, rerollSeed: boolean) => {
@@ -62,6 +65,7 @@ export default function ProfilePage({
           }
         : prev,
     )
+    nicknameRef.current?.focus()
   }
 
   const save = () => {
@@ -120,8 +124,9 @@ export default function ProfilePage({
           <label className="field">
             <span>{zh ? '昵称' : 'Nickname'}</span>
             <input
-              type="text"
-              value={draft.nickname}
+            ref={nicknameRef}
+            type="text"
+            value={draft.nickname}
               maxLength={NICKNAME_MAX}
               spellCheck={false}
               onChange={(e) => setDraft({ ...draft, nickname: e.target.value })}
