@@ -1,5 +1,5 @@
 import { useRef, useState, type ChangeEvent, type SyntheticEvent } from 'react'
-import { useLang } from '../lib/i18n'
+import { useLang, t } from '../lib/i18n'
 import { uploadAvatarImage } from '../lib/avatarUpload'
 import type { AvatarLook } from '../lib/avatar'
 import AvatarBadge from './AvatarBadge'
@@ -33,8 +33,7 @@ export default function AvatarEditor({
   onPickStyle: (style: string, rerollSeed: boolean) => void
   onUploaded: (url: string) => void
 }) {
-  const lang = useLang()
-  const zh = lang === 'zh'
+  useLang()
   const [pickerOpen, setPickerOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -65,8 +64,8 @@ export default function AvatarEditor({
             onMouseDown={keepFocus}
             onPointerDown={keepFocus}
             onClick={onReroll}
-            aria-label={rerollLabel ?? (zh ? '换一个头像' : 'Reroll avatar')}
-            title={rerollLabel ?? (zh ? '换一个' : 'Reroll')}
+            aria-label={rerollLabel ?? (t('换一个头像', 'Reroll avatar'))}
+            title={rerollLabel ?? (t('换一个', 'Reroll'))}
           >
             <RefreshIcon size={15} />
           </button>
@@ -76,8 +75,8 @@ export default function AvatarEditor({
             onMouseDown={keepFocus}
             onPointerDown={keepFocus}
             onClick={() => setPickerOpen((v) => !v)}
-            aria-label={zh ? '选择风格' : 'Choose a style'}
-            title={zh ? '选择风格' : 'Styles'}
+            aria-label={t('选择风格', 'Choose a style')}
+            title={t('选择风格', 'Styles')}
             aria-expanded={pickerOpen}
           >
             <GridIcon size={15} />
@@ -90,8 +89,8 @@ export default function AvatarEditor({
               onPointerDown={keepFocus}
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              aria-label={zh ? '上传自己的头像' : 'Upload your photo'}
-              title={zh ? '上传自己的头像' : 'Upload your photo'}
+              aria-label={t('上传自己的头像', 'Upload your photo')}
+              title={t('上传自己的头像', 'Upload your photo')}
             >
               <UploadIcon size={15} />
             </button>

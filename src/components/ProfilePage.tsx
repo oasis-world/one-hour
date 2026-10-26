@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { AccountState } from '../lib/account'
-import { useLang } from '../lib/i18n'
+import { useLang, t } from '../lib/i18n'
 import { useImeEnter } from '../lib/ime'
 import { isSupabaseConfigured } from '../lib/supabaseConfig'
 import { randomAvatarLook, randomAvatarSeed } from '../lib/avatar'
@@ -32,7 +32,6 @@ export default function ProfilePage({
   onOpenSignIn: () => void
 }) {
   const lang = useLang()
-  const zh = lang === 'zh'
   const signedIn = account.status === 'signedIn'
   const ime = useImeEnter()
   const nicknameRef = useRef<HTMLInputElement>(null)
@@ -50,7 +49,6 @@ export default function ProfilePage({
 
   const rerollLook = () => {
     setDraft((prev) => (prev ? { ...prev, ...randomAvatarLook(prev), avatarUrl: null } : prev))
-    nicknameRef.current?.focus()
   }
 
   /** Adopt a catalog style (row button also rolls a fresh seed). */
@@ -65,7 +63,6 @@ export default function ProfilePage({
           }
         : prev,
     )
-    nicknameRef.current?.focus()
   }
 
   const save = () => {
@@ -95,17 +92,17 @@ export default function ProfilePage({
         className="account-dialog profile-page"
         role="dialog"
         aria-modal="true"
-        aria-label={zh ? '个人资料' : 'Profile'}
+        aria-label={t('个人资料', 'Profile')}
         onClick={(e) => e.stopPropagation()}
       >
         <header className="profile-head">
-          <h3 className="account-title">{zh ? '个人资料' : 'Profile'}</h3>
+          <h3 className="account-title">{t('个人资料', 'Profile')}</h3>
         </header>
         <button
           type="button"
           className="account-close"
           onClick={onClose}
-          aria-label={zh ? '关闭' : 'Close'}
+          aria-label={t('关闭', 'Close')}
         >
           <ThinXIcon size={15} />
         </button>
@@ -122,7 +119,7 @@ export default function ProfilePage({
           />
 
           <label className="field">
-            <span>{zh ? '昵称' : 'Nickname'}</span>
+            <span>{t('昵称', 'Nickname')}</span>
             <span className="field-input-wrap">
             <input
             ref={nicknameRef}
@@ -139,11 +136,10 @@ export default function ProfilePage({
               <button
                 type="button"
                 className="field-clear"
-                aria-label={zh ? '清空' : 'Clear'}
+                aria-label={t('清空', 'Clear')}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   setDraft((prev) => (prev ? { ...prev, nickname: '' } : prev))
-                  nicknameRef.current?.focus()
                 }}
               >
                 ×
@@ -157,23 +153,23 @@ export default function ProfilePage({
             {signedIn ? (
               <span>
                 {account.email}
-                {zh ? ' · 头像与昵称已同步云端' : ' · avatar & nickname synced to cloud'}
+                {t(' · 头像与昵称已同步云端', ' · avatar & nickname synced to cloud')}
               </span>
             ) : isSupabaseConfigured() ? (
               <>
-                <span>{zh ? '旅人身份，资料仅保存在本机。' : 'Traveler — profile saved on this device only.'}</span>
+                <span>{t('旅人身份，资料仅保存在本机。', 'Traveler — profile saved on this device only.')}</span>
                 <button type="button" className="profile-bind" onClick={onOpenSignIn}>
-                  {zh ? '绑定邮箱，多设备同步' : 'Bind an email to sync'}
+                  {t('绑定邮箱，多设备同步', 'Bind an email to sync')}
                 </button>
               </>
             ) : (
-              <span>{zh ? '同步服务未配置，资料仅保存在本机。' : 'Sync not configured — profile stays on this device.'}</span>
+              <span>{t('同步服务未配置，资料仅保存在本机。', 'Sync not configured — profile stays on this device.')}</span>
             )}
           </div>
 
           <div className="account-actions">
             <button type="button" className="btn-accent" onClick={save}>
-              {zh ? '保存' : 'Save'}
+              {t('保存', 'Save')}
             </button>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { useLang } from '../lib/i18n'
+import { useLang, t } from '../lib/i18n'
 import { ThinXIcon } from './icons'
 
 /**
@@ -37,8 +37,7 @@ export default function ImageViewer({
   onIndexChange: (index: number) => void
   onClose: () => void
 }) {
-  const lang = useLang()
-  const zh = lang === 'zh'
+  useLang()
   const [stripX, setStripX] = useState(0)
   const [followY, setFollowY] = useState(0)
   const [dim, setDim] = useState(0)
@@ -246,7 +245,7 @@ export default function ImageViewer({
       className="image-viewer"
       role="dialog"
       aria-modal="true"
-      aria-label={zh ? '查看图片' : 'View photo'}
+      aria-label={t('查看图片', 'View photo')}
       style={dim > 0 ? { background: `rgba(6, 7, 10, ${0.82 - dim * 0.5})` } : undefined}
     >
       <div
@@ -284,7 +283,7 @@ export default function ImageViewer({
       <button
         type="button"
         className="image-viewer-close"
-        aria-label={zh ? '关闭' : 'Close'}
+        aria-label={t('关闭', 'Close')}
         onClick={onClose}
       >
         <ThinXIcon size={17} />

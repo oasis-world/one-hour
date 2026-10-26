@@ -16,7 +16,7 @@ import { watchAccountForProfileSync } from './lib/profileCloud'
 import { useMobileKeyboard } from './lib/useMobileKeyboard'
 import './lib/settingsRuntime'
 import { fileToChatImage } from './lib/imageBlob'
-import { setLang, useLang } from './lib/i18n'
+import { useLang, t } from './lib/i18n'
 import { loadTheme, loadVeil, type ThemeName } from './lib/settings'
 
 /**
@@ -35,12 +35,26 @@ type FoldState = 'open' | 'folding' | 'folded' | 'unfolding'
 const FOLD_MS = 500
 const UNFOLD_MS = 540
 
-const MUSIC_TRACKS = [
-  'https://upload.wikimedia.org/wikipedia/commons/transcoded/5/52/Uniq_-_Art_Of_Silence_V2.ogg/Uniq_-_Art_Of_Silence_V2.ogg.mp3',
-  'https://upload.wikimedia.org/wikipedia/commons/8/8e/Scott_Buckley_-_Aurora.mp3',
-  'https://upload.wikimedia.org/wikipedia/commons/transcoded/3/31/SoundAudio_-_Forest_%28relaxing_music%29.opus/SoundAudio_-_Forest_%28relaxing_music%29.opus.mp3',
-  'https://upload.wikimedia.org/wikipedia/commons/transcoded/3/3e/Alex-Productions_-_Deep_%28Dark_Ambient_Background_music%29.oga/Alex-Productions_-_Deep_%28Dark_Ambient_Background_music%29.oga.mp3',
-]
+const MUSIC_TRACKS: Record<string, string[]> = {
+  zh: [
+    // Chinese traditional / folk (public domain or CC)
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/f/ff/%E4%BA%8C%E6%B3%89%E6%98%A0%E6%9C%88.ogg/%E4%BA%8C%E6%B3%89%E6%98%A0%E6%9C%88.ogg.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/6/60/Guqin-Yangguan_Sandie.ogg/Guqin-Yangguan_Sandie.ogg.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/1/16/Qiu_Feng_Ci.ogg/Qiu_Feng_Ci.ogg.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/e/ed/Kuai_le_de_qia_qia_gu_niang_-_Teresa_Teng_-_Deng_Lijun_%28%E5%BF%AB%E4%B9%90%E7%9A%84%E6%81%B0%E6%81%B0%E5%A7%91%E5%A8%98%29.opus/Kuai_le_de_qia_qia_gu_niang_-_Teresa_Teng_-_Deng_Lijun_%28%E5%BF%AB%E4%B9%90%E7%9A%84%E6%81%B0%E6%81%B0%E5%A7%91%E5%A8%98%29.opus.mp3',
+  ],
+  en: [
+    // Ambient / background
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/5/52/Uniq_-_Art_Of_Silence_V2.ogg/Uniq_-_Art_Of_Silence_V2.ogg.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/8/8e/Scott_Buckley_-_Aurora.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/3/31/SoundAudio_-_Forest_%28relaxing_music%29.opus/SoundAudio_-_Forest_%28relaxing_music%29.opus.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/3/3e/Alex-Productions_-_Deep_%28Dark_Ambient_Background_music%29.oga/Alex-Productions_-_Deep_%28Dark_Ambient_Background_music%29.oga.mp3',
+    // Country / English songs (public domain)
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/3/3b/Media.io_1-01_Walkin%27_After_Midnight.ogg/Media.io_1-01_Walkin%27_After_Midnight.ogg.mp3',
+    "https://upload.wikimedia.org/wikipedia/commons/transcoded/9/92/George_Jones_sings_%27I%27m_Ragged_But_I%27m_Right%27.oga/George_Jones_sings_%27I%27m_Ragged_But_I%27m_Right%27.oga.mp3",
+    "https://upload.wikimedia.org/wikipedia/commons/transcoded/b/b8/Don%27tLetYourDealGoDown2.ogg/Don%27tLetYourDealGoDown2.ogg.mp3",
+  ],
+}
 
 export default function App() {
   const account = useAccount()
@@ -58,15 +72,18 @@ export default function App() {
   const musicScheduledRef = useRef(false)
   const musicMutedRef = useRef(true)
   const lastTrackRef = useRef(-1)
+  const langRef = useRef(lang)
 
   const pickTrack = useCallback(() => {
-    if (MUSIC_TRACKS.length === 0) return ''
-    let idx = Math.floor(Math.random() * MUSIC_TRACKS.length)
-    if (MUSIC_TRACKS.length > 1 && idx === lastTrackRef.current) {
-      idx = (idx + 1) % MUSIC_TRACKS.length
+    const musicLang = langRef.current.startsWith('zh') ? 'zh' : 'en'
+    const tracks = MUSIC_TRACKS[musicLang] ?? MUSIC_TRACKS.en
+    if (tracks.length === 0) return ''
+    let idx = Math.floor(Math.random() * tracks.length)
+    if (tracks.length > 1 && idx === lastTrackRef.current) {
+      idx = (idx + 1) % tracks.length
     }
     lastTrackRef.current = idx
-    return MUSIC_TRACKS[idx]
+    return tracks[idx]
   }, [])
 
   const startTrack = useCallback((muted: boolean) => {
@@ -190,12 +207,23 @@ export default function App() {
 
   // Keep the document language in sync for a11y / IME hints.
   useEffect(() => {
-    document.documentElement.lang = zh ? 'zh-CN' : 'en'
+    const langMap: Record<string, string> = {
+      zh: 'zh-CN',
+      'zh-TW': 'zh-TW',
+      ja: 'ja',
+      fr: 'fr',
+      es: 'es',
+      de: 'de',
+      ko: 'ko',
+      it: 'it',
+      ar: 'ar',
+      en: 'en',
+    }
+    document.documentElement.lang = langMap[lang] ?? 'en'
     // Localized home-screen name for iOS "Add to Home Screen".
-    document.title = zh ? '一小时' : 'One Hour'
-    const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]')
-    if (appleTitle) appleTitle.setAttribute('content', zh ? '一小时' : 'One Hour')
-  }, [zh])
+    document.title = t('一小时', 'One Hour')
+    langRef.current = lang
+  }, [zh, lang])
 
   // First background ready → wait 1.5s, then unfold the chat from the
   // bottom-left corner.
@@ -316,7 +344,7 @@ export default function App() {
       const blob = await fileToChatImage(file)
       room.send('', blob)
     } catch {
-      showToast(zh ? '这张图片读取失败，换一张试试' : 'Could not read that image — try another one')
+      showToast(t('这张图片读取失败，换一张试试', 'Could not read that image — try another one'))
     }
   }
 
@@ -372,7 +400,6 @@ export default function App() {
         theme={theme}
         suppressed={composerMenuOpen}
         onToggleTheme={() => window.setOneHourTheme?.(theme === 'dark' ? 'warm' : 'dark')}
-        onToggleLang={() => setLang(zh ? 'en' : 'zh')}
       />
 
       {/* Page-corner close: small, top-right of the screen. */}
@@ -380,8 +407,8 @@ export default function App() {
         <button
           type="button"
           className={`chat-close${fold === 'folding' ? ' is-fading' : ''}`}
-          aria-label={zh ? '收起聊天' : 'Hide chat'}
-          title={zh ? '收起聊天' : 'Hide chat'}
+          aria-label={t('收起聊天', 'Hide chat')}
+          title={t('收起聊天', 'Hide chat')}
           onClick={(e) => {
             e.stopPropagation()
             closeChat()
@@ -395,8 +422,8 @@ export default function App() {
         <button
           type="button"
           className="music-toggle"
-          aria-label={musicMuted ? (zh ? '打开音乐' : 'Unmute music') : (zh ? '关闭音乐' : 'Mute music')}
-          title={musicMuted ? (zh ? '打开音乐' : 'Unmute music') : (zh ? '关闭音乐' : 'Mute music')}
+          aria-label={musicMuted ? (t('打开音乐', 'Unmute music')) : (t('关闭音乐', 'Mute music'))}
+          title={musicMuted ? (t('打开音乐', 'Unmute music')) : (t('关闭音乐', 'Mute music'))}
           onClick={(e) => {
             e.stopPropagation()
             toggleMusic()
@@ -465,7 +492,7 @@ export default function App() {
                       userSelect: 'none',
                     }}
                   >
-                    {zh ? '正在建立身份，稍候即可畅聊…' : 'Setting up your identity…'}
+                    {t('正在建立身份，稍候即可畅聊…', 'Setting up your identity…')}
                   </span>
                 </div>
               </div>
@@ -479,11 +506,11 @@ export default function App() {
             className="chat-reopen-veil"
             onClick={openChat}
             role="button"
-            aria-label={zh ? '展开聊天' : 'Open chat'}
+            aria-label={t('展开聊天', 'Open chat')}
           />
           <button type="button" className="chat-reopen-hint" onClick={openChat}>
             <ChatBubbleIcon />
-            {zh ? '展开聊天' : 'Open chat'}
+            {t('展开聊天', 'Open chat')}
           </button>
         </>
       ) : null}

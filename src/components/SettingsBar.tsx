@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PresenceMember } from '../lib/chatTypes'
 import type { ThemeName } from '../lib/settings'
-import { useLang } from '../lib/i18n'
+import { useLang, setLang, LANGS, LANG_LABELS, t } from '../lib/i18n'
 import { useHoverCapable } from '../lib/media'
 import { useHoverReveal } from '../lib/useHoverReveal'
 import { ChevronRightIcon, MoonIcon, PeopleIcon, SunIcon } from './icons'
@@ -19,7 +19,6 @@ export default function SettingsBar({
   theme,
   suppressed = false,
   onToggleTheme,
-  onToggleLang,
 }: {
   members: PresenceMember[]
   selfId: string | null
@@ -27,7 +26,6 @@ export default function SettingsBar({
   /** Composer popover is up — mobile hides the gear meanwhile. */
   suppressed?: boolean
   onToggleTheme: () => void
-  onToggleLang: () => void
 }) {
   const lang = useLang()
   const zh = lang === 'zh'
@@ -40,6 +38,7 @@ export default function SettingsBar({
   })()
   const [open, setOpen] = useState(false)
   const [listOpen, setListOpen] = useState(false)
+  const [langOpen, setLangOpen] = useState(false)
   const barRef = useRef<HTMLDivElement>(null)
   const hover = useHoverCapable()
   const { onEnter, onLeave } = useHoverReveal(
@@ -57,18 +56,20 @@ export default function SettingsBar({
   // Clicks anywhere outside the corner (popovers included via the ref)
   // fold both layers back down.
   useEffect(() => {
-    if (!open && !listOpen) return
+    if (!open && !listOpen && !langOpen) return
     const onDown = (e: PointerEvent) => {
       const target = e.target as HTMLElement | null
       if (barRef.current?.contains(target)) return
       if (target?.closest?.('.online-pop')) return
       setOpen(false)
       setListOpen(false)
+      setLangOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setOpen(false)
         setListOpen(false)
+        setLangOpen(false)
       }
     }
     document.addEventListener('pointerdown', onDown)
@@ -77,7 +78,7 @@ export default function SettingsBar({
       document.removeEventListener('pointerdown', onDown)
       window.removeEventListener('keydown', onKey)
     }
-  }, [open, listOpen])
+  }, [open, listOpen, langOpen])
 
   const onlineLabel = zh ? `在线 · ${members.length} 人` : `Online · ${members.length}`
 
@@ -95,16 +96,29 @@ export default function SettingsBar({
           setOpen((v) => !v)
           setListOpen(false)
         }}
-        aria-label={zh ? '设置' : 'Settings'}
-        title={zh ? '设置' : 'Settings'}
+        aria-label={t('设置', 'Settings')}
+        title={t('设置', 'Settings')}
         aria-haspopup="menu"
         aria-expanded={open}
       >
         <GearIcon size={15} />
       </button>
 
-      {open && !listOpen && (
-        <div className="settings-pop" role="menu" aria-label={zh ? '设置' : 'Settings'}>
+      {open && !listOpen && !langOpen && (
+        <div className="settings-pop" role="menu" aria-label={t('设置', 'Settings')}>
+          <button
+            type="button"
+            className="settings-row"
+            role="menuitem"
+            onClick={() => setLangOpen(true)}
+            title={t('切换语言', 'Switch language')}
+          >
+            <span className="settings-row-icon"><GlobeIcon size={15} /></span>
+            <span className="settings-row-label">{t('语言', 'Language')}</span>
+            <span className="settings-row-value">{LANG_LABELS[lang]}</span>
+            <ChevronRightIcon size={14} />
+          </button>
+
           <button
             type="button"
             className="settings-row"
@@ -120,34 +134,6 @@ export default function SettingsBar({
             <ChevronRightIcon size={14} />
           </button>
 
-          <button
-            type="button"
-            className="settings-row"
-            role="menuitem"
-            onClick={onToggleTheme}
-            title={zh ? '切换主题' : 'Switch theme'}
-          >
-            <span className="settings-row-icon">
-              {theme === 'dark' ? <SunIcon size={15} /> : <MoonIcon size={15} />}
-            </span>
-            <span className="settings-row-label">{zh ? '主题' : 'Theme'}</span>
-            <span className="settings-row-value">
-              {theme === 'dark' ? (zh ? '深色' : 'Dark') : zh ? '暖色' : 'Warm'}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            className="settings-row"
-            role="menuitem"
-            onClick={onToggleLang}
-            title={zh ? 'Switch to English' : '切换到中文'}
-          >
-            <span className="settings-row-icon"><GlobeIcon size={15} /></span>
-            <span className="settings-row-label">{zh ? '语言' : 'Language'}</span>
-            <span className="settings-row-value">{zh ? '中文' : 'English'}</span>
-          </button>
-
           {mobile && (
             <button
               type="button"
@@ -156,9 +142,46 @@ export default function SettingsBar({
               onClick={() => window.location.reload()}
             >
               <span className="settings-row-icon"><RefreshIcon size={15} /></span>
-              <span className="settings-row-label">{zh ? '刷新页面' : 'Reload page'}</span>
+              <span className="settings-row-label">{t('刷新页面', 'Reload page')}</span>
             </button>
           )}
+
+          <button
+            type="button"
+            className="settings-row"
+            role="menuitem"
+            onClick={onToggleTheme}
+            title={t('切换主题', 'Switch theme')}
+          >
+            <span className="settings-row-icon">
+              {theme === 'dark' ? <SunIcon size={15} /> : <MoonIcon size={15} />}
+            </span>
+            <span className="settings-row-label">{t('主题', 'Theme')}</span>
+            <span className="settings-row-value">
+              {theme === 'dark' ? (t('深色', 'Dark')) : t('暖色', 'Warm')}
+            </span>
+          </button>
+        </div>
+      )}
+
+      {open && langOpen && (
+        <div className="settings-pop" role="menu" aria-label={t('语言', 'Language')}>
+          {LANGS.map((code) => (
+            <button
+              key={code}
+              type="button"
+              className={`settings-row${code === lang ? ' is-current' : ''}`}
+              role="menuitem"
+              onClick={() => {
+                setLang(code)
+                setLangOpen(false)
+              }}
+            >
+              <span className="settings-row-icon"><GlobeIcon size={15} /></span>
+              <span className="settings-row-label">{LANG_LABELS[code]}</span>
+              {code === lang && <span className="settings-row-value">✓</span>}
+            </button>
+          ))}
         </div>
       )}
 

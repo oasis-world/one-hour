@@ -7,7 +7,7 @@ import {
   type AccountState,
   type AuthErrorKind,
 } from '../lib/account'
-import { useLang } from '../lib/i18n'
+import { useLang, t } from '../lib/i18n'
 import { useImeEnter } from '../lib/ime'
 import { ThinXIcon } from './icons'
 import { UserIcon } from './userIcons'
@@ -148,7 +148,7 @@ export default function AccountDialog({
       void submit()
     }
 
-  const title = mode === 'bind' ? (zh ? '注册' : 'Sign Up') : zh ? '登录' : 'Sign In'
+  const title = mode === 'bind' ? (t('注册', 'Sign Up')) : t('登录', 'Sign In')
   const feedbackText = (code: FeedbackCode) => {
     const [z, e] = ERROR_TEXT[code]
     return zh ? z : e
@@ -170,7 +170,7 @@ export default function AccountDialog({
           type="button"
           className="account-close"
           onClick={onClose}
-          aria-label={zh ? '关闭' : 'Close'}
+          aria-label={t('关闭', 'Close')}
         >
           <ThinXIcon size={15} />
         </button>
@@ -178,7 +178,7 @@ export default function AccountDialog({
           {account.status === 'signedIn' ? (
             <>
               <p className="account-status">
-                {zh ? '已登录' : 'Signed in'} · {account.email}
+                {t('已登录', 'Signed in')} · {account.email}
               </p>
               <div className="account-actions">
                 {onOpenProfile && (
@@ -189,7 +189,7 @@ export default function AccountDialog({
                     onClick={onOpenProfile}
                   >
                     <UserIcon size={15} />
-                    {zh ? '个人资料' : 'Profile'}
+                    {t('个人资料', 'Profile')}
                   </button>
                 )}
                 <button
@@ -198,7 +198,7 @@ export default function AccountDialog({
                   disabled={busy}
                   onClick={signOut}
                 >
-                  {zh ? '退出登录' : 'Sign out'}
+                  {t('退出登录', 'Sign out')}
                 </button>
               </div>
             </>
@@ -206,7 +206,7 @@ export default function AccountDialog({
             <>
               <div className="account-fields">
                 <label className="field">
-                  <span>{zh ? '邮箱' : 'Email'}</span>
+                  <span>{t('邮箱', 'Email')}</span>
                   <input
                     ref={emailRef}
                     type="email"
@@ -219,7 +219,7 @@ export default function AccountDialog({
                   />
                 </label>
                 <label className="field">
-                  <span>{zh ? '密码' : 'Password'}</span>
+                  <span>{t('密码', 'Password')}</span>
                   <input
                     ref={passwordRef}
                     type="password"
@@ -232,7 +232,7 @@ export default function AccountDialog({
                 </label>
                 {mode === 'bind' && (
                   <label className="field">
-                    <span>{zh ? '确认密码' : 'Confirm password'}</span>
+                    <span>{t('确认密码', 'Confirm password')}</span>
                     <input
                       ref={confirmRef}
                       type="password"
@@ -250,9 +250,7 @@ export default function AccountDialog({
               )}
               {feedback?.kind === 'bound' && (
                 <p className="account-feedback is-ok">
-                  {zh
-                    ? '确认邮件已发送，点击邮件中的链接后正式生效。'
-                    : 'Confirmation email sent — follow the link inside to finish.'}
+                  {t('确认邮件已发送，点击邮件中的链接后正式生效。', 'Confirmation email sent — follow the link inside to finish.')}
                 </p>
               )}
               <div className="account-actions">
@@ -269,24 +267,16 @@ export default function AccountDialog({
                 }}
               >
                 {mode === 'bind'
-                  ? zh
-                    ? '已有账号？直接登录'
-                    : 'Have an account? Sign in'
-                  : zh
-                    ? '注册新账号'
-                    : 'Create an account'}
+                  ? t('已有账号？直接登录', 'Have an account? Sign in')
+                  : t('注册新账号', 'Create an account')}
               </button>
               <p className="account-status is-bottom">
-                {zh
-                  ? '注册并登录后身份处处可用；未登录则为旅人身份，仅保存在本机。'
-                  : 'With an account your identity works everywhere; without one you stay a Traveler, saved on this device only.'}
+                {t('注册并登录后身份处处可用；未登录则为旅人身份，仅保存在本机。', 'With an account your identity works everywhere; without one you stay a Traveler, saved on this device only.')}
               </p>
             </>
           ) : (
             <p className="account-status">
-              {zh
-                ? '同步服务未配置 · 聊天仅保存在本机'
-                : 'Sync not configured · chat stays on this device'}
+              {t('同步服务未配置 · 聊天仅保存在本机', 'Sync not configured · chat stays on this device')}
             </p>
           )}
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { useLang } from '../lib/i18n'
+import { useLang, COMPOSER_PLACEHOLDER, t } from '../lib/i18n'
 import { useHoverCapable } from '../lib/media'
 import { useHoverReveal } from '../lib/useHoverReveal'
 import { useImeEnter } from '../lib/ime'
@@ -48,7 +48,6 @@ function useMobileFormFactor(): boolean {
  */
 export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Props) {
   const lang = useLang()
-  const zh = lang === 'zh'
   const [draft, setDraft] = useState('')
   const [plusOpen, setPlusOpen] = useState(false)
   const [emojiOpen, setEmojiOpen] = useState(false)
@@ -148,8 +147,8 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
           <button
             type="button"
             className={`composer-side-btn${plusOpen ? ' is-active' : ''}`}
-            aria-label={zh ? '添加' : 'Add'}
-            title={zh ? '添加' : 'Add'}
+            aria-label={t('添加', 'Add')}
+            title={t('添加', 'Add')}
             aria-expanded={plusOpen}
             onMouseDown={keepFocus}
             onPointerDown={keepFocus}
@@ -173,7 +172,7 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
                     onClick={() => pickFile(cameraInputRef)}
                   >
                     <CameraIcon size={17} />
-                    {zh ? '拍照' : 'Take photo'}
+                    {t('拍照', 'Take photo')}
                   </button>
                   <button
                     type="button"
@@ -182,7 +181,7 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
                     onClick={() => pickFile(uploadInputRef)}
                   >
                     <PhotoIcon size={17} />
-                    {zh ? '从相册选择' : 'Photo library'}
+                    {t('从相册选择', 'Photo library')}
                   </button>
                 </>
               ) : (
@@ -193,7 +192,7 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
                   onClick={() => pickFile(uploadInputRef)}
                 >
                   <UploadIcon size={17} />
-                  {zh ? '上传图片' : 'Upload image'}
+                  {t('上传图片', 'Upload image')}
                 </button>
               )}
             </div>
@@ -206,7 +205,7 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
           value={draft}
           rows={1}
           maxLength={500}
-          placeholder={zh ? '说点什么…' : 'Say something…'}
+          placeholder={COMPOSER_PLACEHOLDER[lang]}
           onChange={(e) => setDraft(e.target.value)}
           {...ime.imeProps}
           onKeyDown={(e) => {
@@ -227,8 +226,8 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
           <button
             type="button"
             className={`composer-side-btn${emojiOpen ? ' is-active' : ''}`}
-            aria-label={zh ? '表情' : 'Emoji'}
-            title={zh ? '表情' : 'Emoji'}
+            aria-label={t('表情', 'Emoji')}
+            title={t('表情', 'Emoji')}
             aria-expanded={emojiOpen}
             onMouseDown={keepFocus}
             onPointerDown={keepFocus}
@@ -248,8 +247,8 @@ export default function Composer({ onSend, onImagePicked, onMenuOpenChange }: Pr
           type="button"
           className={`composer-send${draft.trim().length === 0 ? ' is-idle' : ''}`}
           aria-disabled={draft.trim().length === 0}
-          aria-label={zh ? '发送' : 'Send'}
-          title={zh ? '发送' : 'Send'}
+          aria-label={t('发送', 'Send')}
+          title={t('发送', 'Send')}
           onMouseDown={keepFocus}
           onPointerDown={keepFocus}
           onClick={submit}

@@ -43,7 +43,7 @@ export function useMobileKeyboard(shellRef: RefObject<HTMLElement | null>): void
         shell.classList.add('is-keyboard-open')
         if (keyboardOpen) {
           shell.style.height = `${vv.height}px`
-          shell.style.transform = `translateY(${vv.offsetTop}px)`
+          shell.style.transform = `translateY(${vv.offsetTop - 10}px)`
         } else {
           shell.style.height = ''
           shell.style.transform = ''

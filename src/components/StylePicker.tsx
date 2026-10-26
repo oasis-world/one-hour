@@ -1,4 +1,4 @@
-import { useLang } from '../lib/i18n'
+import { useLang, t } from '../lib/i18n'
 import type { SyntheticEvent } from 'react'
 import { STYLE_IDS, styleTitle } from '../lib/avatar'
 import AvatarBadge from './AvatarBadge'
@@ -24,7 +24,7 @@ export default function StylePicker({
   const keepFocus = (e: SyntheticEvent) => e.preventDefault()
 
   return (
-    <div className="style-picker" role="listbox" aria-label={zh ? '选择风格' : 'Choose a style'}>
+    <div className="style-picker" role="listbox" aria-label={t('选择风格', 'Choose a style')}>
       <div className="style-picker-list">
         {STYLE_IDS.map((id) => {
           const title = styleTitle(id)

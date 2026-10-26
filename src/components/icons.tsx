@@ -210,30 +210,28 @@ export function ChevronDownIcon({ size = 14 }: GlyphProps) {
   )
 }
 
-/** Minimal hourglass — the one-hour mark (same glyph as the favicon). */
+/** Logo mark — orange-red tile with a white Roman numeral I. */
 export function HourglassIcon({ size = 13 }: GlyphProps) {
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 14 14"
-      fill="none"
       aria-hidden="true"
       focusable="false"
     >
-      <path
-        d="M3.1 1.6h7.8M3.1 12.4h7.8"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-      <path
-        d="M4.4 1.6v1.7L7 5.9l2.6-2.6V1.6M4.4 12.4v-1.7L7 8.1l2.6 2.6v1.7"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <rect width="14" height="14" rx="3" fill="#e85d3a" />
+      <text
+        x="7"
+        y="11"
+        text-anchor="middle"
+        font-family="serif"
+        font-size="11"
+        font-weight="700"
+        fill="#ffffff"
+      >
+        I
+      </text>
     </svg>
   )
 }

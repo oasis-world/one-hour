@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { PresenceMember } from '../lib/chatTypes'
-import { useLang } from '../lib/i18n'
+import { useLang, t } from '../lib/i18n'
 import { userAvatarTint, userNameColor } from '../lib/identity'
 import AvatarBadge from './AvatarBadge'
 
@@ -43,7 +43,7 @@ export default function OnlineList({
       className={`online-pop${placement === 'bottom' ? ' is-bottom' : ''}`}
       ref={popRef}
       role="dialog"
-      aria-label={zh ? '在线列表' : 'Online members'}
+      aria-label={t('在线列表', 'Online members')}
     >
       <header className="online-pop-head">
         {zh ? `在线 · ${members.length}` : `Online · ${members.length}`}
@@ -73,15 +73,15 @@ export default function OnlineList({
               {member.displayName}
             </span>
             {member.userId === selfId && (
-              <span className="online-pop-self">{zh ? '我' : 'you'}</span>
+              <span className="online-pop-self">{t('我', 'you')}</span>
             )}
-            <span className="online-pop-time" title={zh ? '加入时间' : 'Joined at'}>
+            <span className="online-pop-time" title={t('加入时间', 'Joined at')}>
               {formatClock(member.enteredAt)}
             </span>
           </li>
         ))}
         {members.length === 0 && (
-          <li className="online-pop-empty">{zh ? '现在没有其他玩家在线' : 'Nobody else is here'}</li>
+          <li className="online-pop-empty">{t('现在没有其他玩家在线', 'Nobody else is here')}</li>
         )}
       </ul>
     </div>

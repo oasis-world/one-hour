@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { useLang } from '../lib/i18n'
+import { useLang, t } from '../lib/i18n'
 import { useImeEnter } from '../lib/ime'
 import { useAccount } from '../lib/useAccount'
 import { pushProfileToCloud } from '../lib/profileCloud'
@@ -32,7 +32,6 @@ export default function WelcomeModal({
   onClose?: () => void
 }) {
   const lang = useLang()
-  const zh = lang === 'zh'
   const account = useAccount()
   const editing = mode === 'edit'
   const [draft, setDraft] = useState<UserProfile>(() =>
@@ -57,7 +56,6 @@ export default function WelcomeModal({
 
   const reroll = () => {
     setDraft((prev) => randomProfile(prev, lang))
-    nicknameRef.current?.focus()
   }
 
   /** Adopt a style from the catalog; the row button also rolls a new seed. */
@@ -69,7 +67,6 @@ export default function WelcomeModal({
       // Choosing a generated look drops any custom photo.
       avatarUrl: null,
     }))
-    nicknameRef.current?.focus()
   }
 
   const confirm = () => {
@@ -108,43 +105,37 @@ export default function WelcomeModal({
         className="welcome-card"
         role="dialog"
         aria-modal="true"
-        aria-label={zh ? '欢迎' : 'Welcome'}
+        aria-label={t('欢迎', 'Welcome')}
       >
         <h2 className="welcome-title">
           <HourglassIcon size={15} />
           {editing
-            ? zh
-              ? '我的形象'
-              : 'Your look'
-            : zh
-              ? '一小时聊天室'
-              : 'the one-hour room'}
+            ? t('我的形象', 'Your look')
+            : t('一小时聊天室', 'the one-hour room')}
         </h2>
 
         {editing ? (
           <p className="welcome-copy">
-            {zh ? '换一个头像，或直接修改昵称。' : 'Reroll the avatar, or edit your nickname.'}
+            {t('换一个头像，或直接修改昵称。', 'Reroll the avatar, or edit your nickname.')}
           </p>
         ) : (
           <p className="welcome-copy">
-            <strong>{zh ? '欢迎来到一小时聊天室' : 'Welcome to the one-hour room'}</strong>
-            {zh
-              ? '每条消息只存在一个小时，留下的都是此刻，畅所欲言吧。'
-              : 'Every message lives for just one hour. Say what matters, now.'}
+            <strong>{t('欢迎来到一小时聊天室', 'Welcome to the one-hour room')}</strong>
+            {t('每条消息只存在一个小时，留下的都是此刻，畅所欲言吧。', 'Every message lives for just one hour. Say what matters, now.')}
           </p>
         )}
 
         <AvatarEditor
           look={draft}
           size={116}
-          rerollLabel={zh ? '换一个头像和昵称' : 'Reroll avatar and nickname'}
+          rerollLabel={t('换一个头像和昵称', 'Reroll avatar and nickname')}
           onReroll={reroll}
           onPickStyle={pickStyle}
           onUploaded={(url) => setDraft((prev) => ({ ...prev, avatarUrl: url }))}
         />
 
         <label className="field welcome-field">
-          <span>{zh ? '我的昵称' : 'My nickname'}</span>
+          <span>{t('我的昵称', 'My nickname')}</span>
           <span className="field-input-wrap">
             <input
               ref={nicknameRef}
@@ -162,11 +153,10 @@ export default function WelcomeModal({
               <button
                 type="button"
                 className="field-clear"
-                aria-label={zh ? '清空' : 'Clear'}
+                aria-label={t('清空', 'Clear')}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   setDraft((prev) => ({ ...prev, nickname: '' }))
-                  nicknameRef.current?.focus()
                 }}
               >
                 ×
@@ -176,7 +166,7 @@ export default function WelcomeModal({
         </label>
 
         <button type="button" className="btn-accent welcome-confirm" onClick={confirm}>
-          {editing ? (zh ? '保存' : 'Save') : zh ? '开始聊天' : 'Enter the room'}
+          {editing ? (t('保存', 'Save')) : t('开始聊天', 'Enter the room')}
         </button>
 
         {editing && onClose && (
@@ -184,7 +174,7 @@ export default function WelcomeModal({
             type="button"
             className="account-close"
             onClick={onClose}
-            aria-label={zh ? '关闭' : 'Close'}
+            aria-label={t('关闭', 'Close')}
           >
             <ThinXIcon size={15} />
           </button>
