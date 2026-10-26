@@ -1,0 +1,31 @@
+.online-pop.is-bottom {
+  top: calc(100% + 10px);
+  right: 0;
+  left: auto;
+  bottom: auto;
+  min-height: 172px;
+  transform-origin: top right;
+}
+
+.settings-online-btn {
+  color: var(--ok);
+}
+
+.settings-online-count {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  padding: 0 3px;
+  border: 1px solid var(--surface-raised);
+  border-radius: 999px;
+  background: var(--surface-strong);
+  color: var(--ink);
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 2px 6px var(--shadow);
+}

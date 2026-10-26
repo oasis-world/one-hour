@@ -23,7 +23,7 @@ import {
   type ChatOutboxItem,
 } from './chatOutbox'
 import { isExpired, MESSAGE_TTL_MS } from './expiry'
-import type { ChatEntry, ChatStatus, ChatMessage, PresenceMember } from './chatTypes'
+import type { ChatEntry, ChatStatus, ChatMessage, MessageReply, PresenceMember } from './chatTypes'
 import type { ChatIdentity } from './identity'
 import type { RoomReactionChange, RoomReactionRecord } from './chatReactions'
 
@@ -45,6 +45,8 @@ export interface ChatCallbacks {
   onEntry: (entry: ChatEntry) => void
   /** A message finished dissolving and is gone for good. */
   onRemoved: (id: string) => void
+  /** A genuinely new message from another player arrived over Realtime. */
+  onIncomingMessage: () => void
   onPresence: (members: PresenceMember[]) => void
   onStatus: (status: ChatStatus) => void
   onReactionSnapshot: (reactions: RoomReactionRecord[]) => void
@@ -52,7 +54,7 @@ export interface ChatCallbacks {
 }
 
 export interface ChatApi {
-  send(content: string, imageBlob?: Blob): void
+  send(content: string, imageBlob?: Blob, replyTo?: MessageReply | null): void
   /** Retry every failed/pending message right now. */
   retry(): void
   /** Load and prepend the page older than the current oldest message. */
@@ -173,6 +175,9 @@ export function enterChat(
     if (existing?.avatarUrl && !merged.avatarUrl) {
       merged.avatarUrl = existing.avatarUrl
     }
+    if (existing?.replyTo && !merged.replyTo) {
+      merged.replyTo = existing.replyTo
+    }
     if (existing?.localImage && !merged.imageUrl) {
       merged.localImage = existing.localImage
     } else if (existing?.localImage && merged.imageUrl) {
@@ -203,6 +208,9 @@ export function enterChat(
     const merged = mergeIntoEntry(message, existing)
     entries = existing ? replace(entries, merged) : [...entries, merged].slice(-MEMORY_CAP)
     emit(merged)
+    if (!existing && message.userId !== currentIdentity.userId && !isExpired(merged)) {
+      callbacks.onIncomingMessage()
+    }
     void saveChatCache(entries)
   }
 
@@ -271,6 +279,7 @@ export function enterChat(
             result = await handle.send({
               id: item.id,
               content: item.content,
+              replyTo: item.replyTo,
               displayName: item.displayName,
               avatar: item.avatar,
               avatarUrl: item.avatarUrl ?? null,
@@ -333,6 +342,7 @@ export function enterChat(
         avatarSeed: item.avatar?.seed ?? null,
         avatarUrl: item.avatarUrl ?? null,
         content: item.content,
+        replyTo: item.replyTo ?? null,
         at: item.at,
         state: 'pending',
       }
@@ -420,12 +430,13 @@ export function enterChat(
   }, PURGE_INTERVAL_MS)
 
   return {
-    send(content, imageBlob) {
+    send(content, imageBlob, replyTo) {
       const trimmed = content.trim()
       if ((!trimmed && !imageBlob) || closed) return
       const item: ChatOutboxItem = {
         id: newId(),
         content: trimmed,
+        replyTo: replyTo ?? null,
         displayName: currentIdentity.displayName,
         avatar: currentIdentity.avatar ?? undefined,
         avatarUrl: currentIdentity.avatarUrl,
@@ -441,6 +452,7 @@ export function enterChat(
         avatarSeed: currentIdentity.avatar?.seed ?? null,
         avatarUrl: currentIdentity.avatarUrl,
         content: trimmed,
+        replyTo: replyTo ?? null,
         at: item.at,
         state: 'pending',
       }

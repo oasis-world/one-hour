@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getSupabaseClient } from './supabaseClient'
 import { isSupabaseConfigured } from './supabaseConfig'
 import { withTimeout } from './withTimeout'
-import type { ChatMessage, PresenceMember } from './chatTypes'
+import type { ChatMessage, MessageReply, PresenceMember } from './chatTypes'
 import type { RoomReactionChange, RoomReactionRecord } from './chatReactions'
 import { fetchRoomReactionSnapshot, persistRoomReaction } from './chatReactionRemote'
 
@@ -72,6 +72,7 @@ export interface RoomHandle {
   send(draft: {
     id: string
     content: string
+    replyTo?: MessageReply | null
     displayName: string
     avatar?: { style: string; seed: string }
     avatarUrl?: string | null
@@ -93,6 +94,7 @@ interface MessageRow {
   avatar_seed: string | null
   avatar_url: string | null
   content: string
+  reply_to?: MessageReply | null
   image_url: string | null
   created_at: string
 }
@@ -381,7 +383,9 @@ export async function joinChatRoom(options: {
           display_name: draft.displayName,
           content: draft.content || '',
           image_url: imageUrl,
+          reply_to: draft.replyTo ?? null,
         }
+        let payloadBase: Omit<typeof base, 'reply_to'> | typeof base = base
         let { error } = await withTimeout(
           ctx.from(MESSAGES_TABLE).insert({
             ...base,
@@ -391,11 +395,30 @@ export async function joinChatRoom(options: {
           }),
           INSERT_TIMEOUT_MS,
         )
+        if (error && isMissingReplyColumnError(error)) {
+          payloadBase = {
+            id: base.id,
+            user_id: base.user_id,
+            display_name: base.display_name,
+            content: base.content,
+            image_url: base.image_url,
+          }
+          const retry = await withTimeout(
+            ctx.from(MESSAGES_TABLE).insert({
+              ...payloadBase,
+              avatar_style: draft.avatar?.style ?? null,
+              avatar_seed: draft.avatar?.seed ?? null,
+              avatar_url: draft.avatarUrl ?? null,
+            }),
+            INSERT_TIMEOUT_MS,
+          )
+          error = retry.error
+        }
         if (error && isMissingColumnError(error)) {
           // Schema not migrated yet: the avatar is cosmetic, the words are
           // not — retry once without the unknown columns.
           ({ error } = await withTimeout(
-            ctx.from(MESSAGES_TABLE).insert(base),
+            ctx.from(MESSAGES_TABLE).insert(payloadBase),
             INSERT_TIMEOUT_MS,
           ))
         }
@@ -474,6 +497,7 @@ function rowToMessage(row: MessageRow): ChatMessage {
     avatarSeed: row.avatar_seed ?? null,
     avatarUrl: row.avatar_url ?? null,
     content: row.content,
+    replyTo: row.reply_to ?? null,
     at: new Date(row.created_at).getTime(),
     serverCreatedAt: row.created_at,
     imageUrl: row.image_url ?? null,
@@ -491,4 +515,8 @@ function isMissingColumnError(error: { message?: string; code?: string }): boole
     error.code === 'PGRST204' ||
     /could not find the .*avatar_(style|seed|url) column/i.test(error.message ?? '')
   )
+}
+
+function isMissingReplyColumnError(error: { message?: string }): boolean {
+  return /could not find the .*reply_to column/i.test(error.message ?? '')
 }

@@ -9,9 +9,13 @@
   right: max(16px, env(safe-area-inset-right));
   top: calc(max(14px, env(safe-area-inset-top)) + 80px);
   z-index: 40;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
 }
 
 .settings-btn {
+  position: relative;
   width: 32px;
   height: 32px;
   display: grid;
@@ -39,20 +43,20 @@
 
 /* The cog eases into a turn on hover — same token language as the
    corner close button's rotate. Respects reduced motion. */
-.settings-btn svg {
+.settings-btn:not(.settings-online-btn) svg {
   transition: transform 0.35s cubic-bezier(0.3, 0.7, 0.3, 1);
 }
 
-.settings-btn:hover svg {
+.settings-btn:not(.settings-online-btn):hover svg {
   transform: rotate(45deg);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .settings-btn svg {
+  .settings-btn:not(.settings-online-btn) svg {
     transition: none;
   }
 
-  .settings-btn:hover svg {
+  .settings-btn:not(.settings-online-btn):hover svg {
     transform: none;
   }
 }
@@ -151,18 +155,6 @@
 
 .settings-row > svg:last-child {
   color: var(--ink-mute);
-}
-
-/* Online list anchored above the settings gear instead of the top bar —
-   the same anchor as the settings pop so the pointer never falls out of
-   the hover container when one swaps for the other. */
-.online-pop.is-bottom {
-  top: calc(100% + 10px);
-  right: 0;
-  left: auto;
-  bottom: auto;
-  min-height: 172px;
-  transform-origin: top right;
 }
 
 .online-pop-face {

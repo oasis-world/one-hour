@@ -18,6 +18,7 @@ create table if not exists public.chat_messages (
   avatar_seed text, -- dicebear seed captured at send time
   avatar_url text, -- custom photo avatar URL captured at send time
   content text not null default '' check (char_length(content) <= 1000),
+  reply_to jsonb, -- snapshot of the message being replied to
   image_url text, -- public storage URL of the attached photo, null for text-only
   created_at timestamptz not null default now(),
   expires_at timestamptz not null default (now() + interval '1 hour'),
@@ -29,6 +30,7 @@ create table if not exists public.chat_messages (
 alter table public.chat_messages add column if not exists avatar_style text;
 alter table public.chat_messages add column if not exists avatar_seed text;
 alter table public.chat_messages add column if not exists avatar_url text;
+alter table public.chat_messages add column if not exists reply_to jsonb;
 
 -- Existing deployments: raise the message length cap 500 → 1000.
 alter table public.chat_messages drop constraint if exists chat_messages_content_check;

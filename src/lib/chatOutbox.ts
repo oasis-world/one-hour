@@ -1,4 +1,5 @@
 import { idbDelete, idbGetAll, idbPut, OUTBOX_STORE } from './idb'
+import type { MessageReply } from './chatTypes'
 
 /**
  * Durable outbox for chat sends (oasis-game pattern, moved to IndexedDB so
@@ -11,6 +12,7 @@ export interface ChatOutboxItem {
   /** Client-generated message id — also the id of the optimistic entry. */
   id: string
   content: string
+  replyTo?: MessageReply | null
   displayName: string
   /** DiceBear look captured at send time. */
   avatar?: { style: string; seed: string }

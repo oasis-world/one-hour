@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { ChatEntry, ChatStatus } from '../lib/chatTypes'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { ChatEntry, ChatStatus, MessageReply } from '../lib/chatTypes'
 import { setPopoverOpen } from '../lib/popoverGuard'
 import {
   recordEmojiUse,
@@ -16,6 +16,8 @@ interface Props {
   selfId: string | null
   status: ChatStatus
   layoutKey: boolean
+  incomingMessageSequence: number
+  sentMessageSequence: number
   reactions: RoomReactionState
   onImageClick: (src: string) => void
   onRetry: () => void
@@ -23,6 +25,7 @@ interface Props {
   onToast: (text: string) => void
   onLoadOlder: () => Promise<{ loaded: number; hasMore: boolean }>
   onReact: (entryId: string, emoji: string) => void
+  onReply: (reply: MessageReply) => void
 }
 
 interface OpenMenu {
@@ -45,6 +48,8 @@ export default function MessageList({
   selfId,
   status,
   layoutKey,
+  incomingMessageSequence,
+  sentMessageSequence,
   reactions,
   onImageClick,
   onRetry,
@@ -52,6 +57,7 @@ export default function MessageList({
   onToast,
   onLoadOlder,
   onReact,
+  onReply,
 }: Props) {
   useLang() // re-render on language flips
   const logRef = useRef<HTMLDivElement>(null)
@@ -70,23 +76,58 @@ export default function MessageList({
   }, [menuOpen])
   const loadingRef = useRef(false)
   const anchorRef = useRef<{ height: number; firstId: string | undefined } | null>(null)
+  const autoProbeRef = useRef(false)
+  const previousStatusRef = useRef(status)
 
-  const scroll = useChatScroll({ scrollRef: logRef, entries, layoutKey })
+  const scroll = useChatScroll({ scrollRef: logRef, entries, incomingMessageSequence, layoutKey })
+  const { jumpToEnd } = scroll
+  const seenSentMessageRef = useRef(sentMessageSequence)
 
-  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
-    scroll.handleScroll()
-    const el = event.currentTarget
-    if (el.scrollTop > 24 || loadingRef.current || !hasOlder) return
+  useLayoutEffect(() => {
+    if (seenSentMessageRef.current === sentMessageSequence) return
+    seenSentMessageRef.current = sentMessageSequence
+    jumpToEnd()
+  }, [jumpToEnd, sentMessageSequence])
+
+  const requestOlder = useCallback(() => {
+    const el = logRef.current
+    if (!el || loadingRef.current || !hasOlder) return
     loadingRef.current = true
     anchorRef.current = { height: el.scrollHeight, firstId: entries[0]?.id }
     setLoadingOlder(true)
     void onLoadOlder()
-      .then((result) => setHasOlder(result.hasMore))
+      .then((result) => {
+        setHasOlder(result.hasMore)
+        if (result.loaded > 0) autoProbeRef.current = false
+      })
+      .catch(() => {})
       .finally(() => {
         loadingRef.current = false
         setLoadingOlder(false)
       })
+  }, [entries, hasOlder, onLoadOlder])
+
+  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    scroll.handleScroll()
+    if (event.currentTarget.scrollTop <= 24) requestOlder()
   }
+
+  // If the initial messages don't fill the viewport, there may be no scroll
+  // gesture to discover that history is exhausted. Probe older pages until
+  // the log can scroll or the server confirms this is the beginning.
+  useEffect(() => {
+    if (status === 'online' && previousStatusRef.current !== 'online') {
+      autoProbeRef.current = false
+    }
+    previousStatusRef.current = status
+    const el = logRef.current
+    if (
+      !el || loadingOlder || !hasOlder || entries.length === 0 ||
+      status === 'offline' || autoProbeRef.current || el.scrollHeight > el.clientHeight + 1
+    ) return
+    autoProbeRef.current = true
+    requestOlder()
+  }, [entries.length, hasOlder, loadingOlder, requestOlder, status])
 
   // Keep the viewport anchored on the same oldest row after a page prepend.
   useLayoutEffect(() => {
@@ -131,6 +172,36 @@ export default function MessageList({
     recordEmojiUse(emoji)
   }
 
+  const jumpToReply = async (id: string) => {
+    let target = document.getElementById(`msg-${id}`)
+    if (!target && loadingRef.current) return
+    let more = hasOlder
+    while (!target && more) {
+      loadingRef.current = true
+      setLoadingOlder(true)
+      let result: { loaded: number; hasMore: boolean }
+      try {
+        result = await onLoadOlder()
+        more = result.hasMore
+        setHasOlder(result.hasMore)
+      } catch {
+        break
+      } finally {
+        loadingRef.current = false
+        setLoadingOlder(false)
+      }
+      if (result.loaded === 0) break
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))
+      })
+      target = document.getElementById(`msg-${id}`)
+    }
+    if (!target) return
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    target.classList.add('is-reply-target')
+    window.setTimeout(() => target?.classList.remove('is-reply-target'), 1500)
+  }
+
   return (
     <div className="chat-log-wrap">
       <div className="chat-list-backdrop" aria-hidden="true" />
@@ -147,6 +218,9 @@ export default function MessageList({
           <div className="chat-loading-older" role="status">
             {t('正在加载更早的消息…', 'Loading earlier messages…')}
           </div>
+        )}
+        {!hasOlder && entries.length > 0 && (
+          <div className="chat-top-hint">{t('已经到顶部了', 'You’re at the top')}</div>
         )}
         {entries.length === 0 && (
           <p className="chat-empty">
@@ -172,6 +246,7 @@ export default function MessageList({
             }
             onReact={reactEntry}
             onCopy={copyEntry}
+            onJumpToReply={jumpToReply}
           />        ))}
         {status === 'offline' && (
           <p className="chat-offline-note">
@@ -186,8 +261,22 @@ export default function MessageList({
         <button
           type="button"
           className="chat-jump"
-          aria-label={t('回到底部', 'Jump to latest')}
-          title={t('回到底部', 'Jump to latest')}
+          aria-label={
+            scroll.newMessageCount > 0
+              ? t(
+                  `回到底部，${scroll.newMessageCount} 条新消息`,
+                  `Jump to latest, ${scroll.newMessageCount} new messages`,
+                )
+              : t('回到底部', 'Jump to latest')
+          }
+          title={
+            scroll.newMessageCount > 0
+              ? t(
+                  `回到底部，${scroll.newMessageCount} 条新消息`,
+                  `Jump to latest, ${scroll.newMessageCount} new messages`,
+                )
+              : t('回到底部', 'Jump to latest')
+          }
           onClick={(e) => {
             e.stopPropagation()
             scroll.jumpToEnd()
@@ -203,6 +292,11 @@ export default function MessageList({
               strokeLinejoin="round"
             />
           </svg>
+          {scroll.newMessageCount > 0 && (
+            <span className="chat-jump-count" aria-hidden="true">
+              {scroll.newMessageCount > 99 ? '99+' : scroll.newMessageCount}
+            </span>
+          )}
         </button>
       )}
       {menu?.sheet && (
@@ -232,6 +326,15 @@ export default function MessageList({
             setMenu(null)
           }}
           onCopy={copyEntry}
+          onReply={(entry) => {
+            onReply({
+              id: entry.id,
+              displayName: entry.displayName,
+              content: entry.content,
+              hasImage: Boolean(entry.imageUrl || entry.localImage),
+            })
+            setMenu(null)
+          }}
           onDelete={removeEntry}
         />
       )}

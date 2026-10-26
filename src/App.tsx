@@ -22,6 +22,7 @@ import { popoverJustClosed } from './lib/popoverGuard'
 import { useLang, t } from './lib/i18n'
 import { loadCountdownAnimation, loadTheme, loadVeil, saveCountdownAnimation, type ThemeName } from './lib/settings'
 import type { CountdownAnimation } from './lib/countdownAnimations'
+import type { MessageReply } from './lib/chatTypes'
 
 /**
  * 一小时 / one-hour — the ephemeral chat room. Every message, text or
@@ -169,6 +170,8 @@ export default function App() {
     }
   }
   const [toast, setToast] = useState<string | null>(null)
+  const [replyTo, setReplyTo] = useState<MessageReply | null>(null)
+  const [sentMessageSequence, setSentMessageSequence] = useState(0)
   const toastTimer = useRef<number | null>(null)
   const bgReadyRef = useRef(false)
   const revealTimer = useRef<number | null>(null)
@@ -429,14 +432,18 @@ export default function App() {
     }, UNFOLD_MS)
   }
 
-  const handleSend = (text: string) => {
-    room.send(text)
+  const handleSend = (text: string, reply?: MessageReply | null) => {
+    room.send(text, undefined, reply)
+    setSentMessageSequence((sequence) => sequence + 1)
+    setReplyTo(null)
   }
 
   const handleImagePicked = async (file: File) => {
     try {
       const blob = await withTimeout(fileToChatImage(file), 60_000)
-      room.send('', blob)
+      room.send('', blob, replyTo)
+      setSentMessageSequence((sequence) => sequence + 1)
+      setReplyTo(null)
     } catch {
       showToast(
         looksLikeHeic(file)
@@ -457,12 +464,18 @@ export default function App() {
       showToast(t('一次最多发送 5 张照片，多余的已略过', 'You can send up to 5 photos at a time — extras skipped'))
     }
     let sent = 0
+    let replyForNext = replyTo
     let heicFailed = 0
     let otherFailed = 0
     for (const file of files.slice(0, 5)) {
       try {
         const blob = await withTimeout(fileToChatImage(file), 60_000)
-        room.send('', blob)
+        room.send('', blob, replyForNext)
+        setSentMessageSequence((sequence) => sequence + 1)
+        if (replyForNext) {
+          replyForNext = null
+          setReplyTo(null)
+        }
         sent += 1
       } catch {
         if (looksLikeHeic(file)) heicFailed += 1
@@ -535,7 +548,6 @@ export default function App() {
 
       <SettingsBar
         members={room.presence}
-        selfId={room.identity?.userId ?? null}
         theme={theme}
         countdownAnimation={countdownAnimation}
         suppressed={composerMenuOpen}
@@ -611,6 +623,8 @@ export default function App() {
               selfId={room.identity?.userId ?? null}
               status={room.status}
               layoutKey={fold === 'unfolding'}
+              incomingMessageSequence={room.incomingMessageSequence}
+              sentMessageSequence={sentMessageSequence}
               reactions={room.reactions}
               onImageClick={openImage}
               onRetry={room.retry}
@@ -618,11 +632,14 @@ export default function App() {
               onToast={showToast}
               onLoadOlder={room.loadOlder}
               onReact={room.toggleReaction}
+              onReply={setReplyTo}
             />
 
             {room.identity ? (
               <Composer
                 onSend={handleSend}
+                replyTo={replyTo}
+                onClearReply={() => setReplyTo(null)}
                 onImagePicked={handleImagePicked}
                 onImagesPicked={handleImagesPicked}
                 onMenuOpenChange={handleMenuOpenChange}

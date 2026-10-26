@@ -1,13 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import type { MessageReply } from '../lib/chatTypes'
 import { useLang, COMPOSER_PLACEHOLDER, t } from '../lib/i18n'
 import { useImeEnter } from '../lib/ime'
 import { markFilePickerOpened } from '../lib/filePickerGuard'
-import { CameraIcon, EmojiIcon, PlusIcon, SendIcon, UploadIcon } from './icons'
+import { CameraIcon, EmojiIcon, PlusIcon, SendIcon, ThinXIcon, UploadIcon } from './icons'
 import { PhotoIcon } from './userIcons'
 import EmojiPanel from './EmojiPanel'
 
 interface Props {
-  onSend: (text: string) => void
+  onSend: (text: string, replyTo?: MessageReply | null) => void
+  replyTo: MessageReply | null
+  onClearReply: () => void
   /** Photo from the camera (single shot). */
   onImagePicked: (file: File) => void
   /** Photos from the library — up to 5, sent as independent messages. */
@@ -47,7 +50,7 @@ function useMobileFormFactor(): boolean {
  * or emoji button toggles its popover (a click outside closes it); there
  * is no hover-to-open.
  */
-export default function Composer({ onSend, onImagePicked, onImagesPicked, onMenuOpenChange }: Props) {
+export default function Composer({ onSend, replyTo, onClearReply, onImagePicked, onImagesPicked, onMenuOpenChange }: Props) {
   const lang = useLang()
   const [draft, setDraft] = useState('')
   const [plusOpen, setPlusOpen] = useState(false)
@@ -60,6 +63,23 @@ export default function Composer({ onSend, onImagePicked, onImagesPicked, onMenu
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
+  useLayoutEffect(() => {
+    if (replyTo) inputRef.current?.focus()
+  }, [replyTo])
+
+  useEffect(() => {
+    if (!replyTo) return
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      const active = document.activeElement
+      if (active instanceof HTMLElement && active.closest('[role="dialog"], [role="alertdialog"], [role="menu"]')) return
+      event.preventDefault()
+      event.stopPropagation()
+      onClearReply()
+    }
+    window.addEventListener('keydown', onEscape)
+    return () => window.removeEventListener('keydown', onEscape)
+  }, [onClearReply, replyTo])
 
   // Auto-grow: the single-line height stays on the CSS 38px so every
   // webview (including WeChat's, whose font metrics differ) renders the
@@ -114,7 +134,7 @@ export default function Composer({ onSend, onImagePicked, onImagesPicked, onMenu
     // send tapped with the keyboard down — e.g. after picking an emoji
     // from a closed keyboard — must not pop it back up.
     const holdKeyboard = document.activeElement === inputRef.current
-    onSend(text)
+    onSend(text, replyTo)
     setDraft('')
     setEmojiOpen(false)
     if (coarse && holdKeyboard) inputRef.current?.focus()
@@ -135,6 +155,22 @@ export default function Composer({ onSend, onImagePicked, onImagesPicked, onMenu
 
   return (
     <div className="composer-dock" ref={rootRef}>
+      {replyTo && (
+        <div className="composer-reply-preview">
+          <div className="composer-reply-copy">
+            <strong>{t('回复给', 'Replying to')} {replyTo.displayName}</strong>
+            <span>{replyTo.content || (replyTo.hasImage ? t('图片', 'Image') : '')}</span>
+          </div>
+          <button
+            type="button"
+            className="composer-reply-close"
+            aria-label={t('取消回复', 'Cancel reply')}
+            onClick={onClearReply}
+          >
+            <ThinXIcon size={14} />
+          </button>
+        </div>
+      )}
       <div className={`composer${multiline ? ' is-multiline' : ''}`}>
         <div className="composer-zone">
           <button
@@ -210,6 +246,12 @@ export default function Composer({ onSend, onImagePicked, onImagesPicked, onMenu
           onChange={(e) => setDraft(e.target.value)}
           {...ime.imeProps}
           onKeyDown={(e) => {
+            if (e.key === 'Escape' && replyTo) {
+              e.preventDefault()
+              e.stopPropagation()
+              onClearReply()
+              return
+            }
             if (e.key !== 'Enter' || e.shiftKey) return
             // Guard IME confirmation (candidates) — that Enter commits
             // the composition, it must not send.

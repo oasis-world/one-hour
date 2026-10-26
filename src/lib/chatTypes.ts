@@ -10,12 +10,21 @@ export interface ChatMessage {
   /** Custom photo avatar URL captured at send time; wins over the look. */
   avatarUrl?: string | null
   content: string
+  /** Snapshot of the message this one replies to, retained with this message. */
+  replyTo?: MessageReply | null
   /** epoch ms (client send time, or server created_at once confirmed). */
   at: number
   /** Exact database timestamp for gap-free pagination + expiry anchor. */
   serverCreatedAt?: string
   /** Public storage URL of the attached image, if any. */
   imageUrl?: string | null
+}
+
+export interface MessageReply {
+  id: string
+  displayName: string
+  content: string
+  hasImage: boolean
 }
 
 export type ChatSendState = 'pending' | 'failed'

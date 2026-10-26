@@ -12,15 +12,11 @@ import AvatarBadge from './AvatarBadge'
  */
 export default function OnlineList({
   members,
-  selfId,
   onClose,
-  onBack,
   placement = 'top',
 }: {
   members: PresenceMember[]
-  selfId: string | null
   onClose: () => void
-  onBack: () => void
   placement?: 'top' | 'bottom'
 }) {
   const popRef = useRef<HTMLDivElement>(null)
@@ -46,10 +42,6 @@ export default function OnlineList({
       aria-label={t('在线列表', 'Online members')}
     >
       <header className="online-pop-head">
-        <button type="button" className="settings-subview-back" onClick={onBack}>
-          <span aria-hidden="true">‹</span>
-          {t('设置', 'Settings')}
-        </button>
         <span>{`${t('在线', 'Online')} · ${members.length}`}</span>
       </header>
       <ul className="online-pop-list">
@@ -76,12 +68,6 @@ export default function OnlineList({
             <span className="online-pop-name" style={{ color: userNameColor(member.userId) }}>
               {member.displayName}
             </span>
-            {member.userId === selfId && (
-              <span className="online-pop-self">{t('我', 'you')}</span>
-            )}
-            <span className="online-pop-time" title={t('加入时间', 'Joined at')}>
-              {formatClock(member.enteredAt)}
-            </span>
           </li>
         ))}
         {members.length === 0 && (
@@ -90,11 +76,4 @@ export default function OnlineList({
       </ul>
     </div>
   )
-}
-
-/** HH:MM:SS — join times benefit from the seconds. */
-function formatClock(at: number): string {
-  const d = new Date(at)
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
 }

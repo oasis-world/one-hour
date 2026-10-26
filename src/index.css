@@ -321,20 +321,6 @@ button {
   text-overflow: ellipsis;
 }
 
-.online-pop-self {
-  flex-shrink: 0;
-  font-size: 10px;
-  font-weight: 800;
-  color: var(--accent);
-}
-
-.online-pop-time {
-  flex-shrink: 0;
-  font-size: 10.5px;
-  color: var(--ink-mute);
-  font-variant-numeric: tabular-nums;
-}
-
 .online-pop-empty {
   padding: 18px 12px;
   text-align: center;
@@ -488,6 +474,10 @@ button {
   padding: 26px 0 96px; /* breathing room for the composer */
 }
 
+.chat-column:has(.composer-reply-preview) .chat-log-wrap {
+  padding-bottom: 146px;
+}
+
 /* Square corners — the chat column reads as a full-height panel. */
 .chat-list-backdrop {
   position: absolute;
@@ -595,6 +585,15 @@ button {
   text-align: center;
   font-size: 12px;
   color: var(--ink-mute);
+}
+
+.chat-top-hint {
+  padding: 5px 0 12px;
+  color: var(--ink-mute);
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: center;
+  user-select: none;
 }
 
 /* ---------- One message row ---------- */
@@ -724,6 +723,56 @@ button {
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
+}
+
+.msg-reply-quote {
+  max-width: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 5px 0 4px;
+  padding: 5px 9px;
+  border: 0;
+  border-left: 2px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  background: var(--row-hover);
+  color: inherit;
+  appearance: none;
+  font: inherit;
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.msg-reply-name {
+  color: var(--accent);
+  font-weight: 750;
+}
+
+.msg-reply-content {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.msg-reply-quote:disabled {
+  cursor: default;
+}
+
+.msg-row.is-reply-target .msg-main {
+  animation: reply-target-flash 1.5s ease;
+  border-radius: 10px;
+}
+
+@keyframes reply-target-flash {
+  0%, 100% { background: transparent; }
+  25%, 65% { background: var(--accent-soft); }
 }
 
 .msg-body .msg-state {
@@ -898,6 +947,25 @@ button {
   transform: translateY(-2px);
 }
 
+.chat-jump-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+  border: 1px solid var(--surface-raised);
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 9px;
+  font-weight: 850;
+  line-height: 1;
+  box-shadow: 0 3px 9px var(--shadow);
+}
+
 /* ---------- Backdrop slot ring (bottom-right, chat folded) ----------
    Frosted glass like the reopen hint — translucent, theme-tinted, only
    ever sitting on the revealed photo. */
@@ -1011,6 +1079,10 @@ button {
   padding-bottom: 66px;
 }
 
+.app-shell.is-keyboard-open:has(.composer-reply-preview) .chat-log-wrap {
+  padding-bottom: 116px;
+}
+
 .app-shell.is-keyboard-open .settings-bar {
   opacity: 0;
   visibility: hidden;
@@ -1031,6 +1103,74 @@ button {
   -webkit-backdrop-filter: blur(16px) saturate(1.15);
   box-shadow: 0 10px 32px var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   transition: border-radius 0.2s ease, border-color 0.2s ease;
+}
+
+.composer-dock {
+  flex-direction: column;
+  align-items: center;
+}
+
+.composer-reply-preview {
+  width: 50%;
+  min-width: 0;
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  opacity: 0.7;
+}
+
+.composer-dock:has(.composer.is-multiline) .composer-reply-preview {
+  border-radius: 26px;
+}
+
+.composer-reply-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  text-align: left;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.composer-reply-copy strong {
+  overflow: hidden;
+  color: var(--accent);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-reply-copy span {
+  overflow: hidden;
+  color: var(--ink-soft);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-reply-close {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.composer-reply-close:hover {
+  background: var(--row-hover);
+  color: var(--ink);
 }
 
 .composer.is-multiline {

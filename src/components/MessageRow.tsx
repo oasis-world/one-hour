@@ -25,6 +25,7 @@ interface Props {
   ) => void
   onReact: (entryId: string, emoji: string) => void
   onCopy: (entry: ChatEntry) => void
+  onJumpToReply: (id: string) => void
 }
 
 /** Touch form factors (phones, tablets) get the long-press sheet. */
@@ -61,6 +62,7 @@ export default function MessageRow({
   onOpenMenu,
   onReact,
   onCopy,
+  onJumpToReply,
 }: Props) {
   const imageSrc = entry.imageUrl ?? entry.localImage ?? null
 
@@ -166,6 +168,20 @@ export default function MessageRow({
           <span className="msg-dot" aria-hidden="true" />
           <CountdownRing entry={entry} />
         </div>
+        {entry.replyTo && (
+          <button
+            type="button"
+            className="msg-reply-quote"
+            disabled={Boolean(entry.state)}
+            onClick={() => entry.replyTo && onJumpToReply(entry.replyTo.id)}
+            aria-label={t('跳转到被引用的消息', 'Jump to replied message')}
+          >
+            <span className="msg-reply-name">{entry.replyTo.displayName}</span>
+            <span className="msg-reply-content">
+              {entry.replyTo.content || (entry.replyTo.hasImage ? t('图片', 'Image') : '')}
+            </span>
+          </button>
+        )}
         <div className="msg-body">
           {entry.content}
           {entry.state === 'pending' && (

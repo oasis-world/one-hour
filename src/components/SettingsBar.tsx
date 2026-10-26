@@ -4,15 +4,15 @@ import type { ThemeName } from '../lib/settings'
 import { COUNTDOWN_ANIMATIONS, type CountdownAnimation } from '../lib/countdownAnimations'
 import { useLang, LANG_LABELS, t } from '../lib/i18n'
 import { setPopoverOpen } from '../lib/popoverGuard'
-import { ChevronRightIcon, MoonIcon, PeopleIcon, SunIcon } from './icons'
+import { ChevronRightIcon, MoonIcon, SunIcon } from './icons'
 import { GearIcon, GlobeIcon, RefreshIcon } from './userIcons'
 import CountdownAnimationPicker from './CountdownAnimationPicker'
 import LanguagePicker from './LanguagePicker'
 import OnlineList from './OnlineList'
+import OnlineTrigger from './OnlineTrigger'
 
 export default function SettingsBar({
   members,
-  selfId,
   theme,
   countdownAnimation,
   suppressed = false,
@@ -20,7 +20,6 @@ export default function SettingsBar({
   onChangeCountdownAnimation,
 }: {
   members: PresenceMember[]
-  selfId: string | null
   theme: ThemeName
   countdownAnimation: CountdownAnimation
   /** Composer popover is up — mobile hides the gear meanwhile. */
@@ -72,8 +71,6 @@ export default function SettingsBar({
     }
   }, [anyOpen])
 
-  const onlineLabel = `${t('在线', 'Online')} · ${members.length}`
-
   return (
     <div
       className={`settings-bar${suppressed ? ' is-suppressed' : ''}`}
@@ -94,6 +91,16 @@ export default function SettingsBar({
       >
         <GearIcon size={15} />
       </button>
+
+      <OnlineTrigger
+        members={members}
+        open={listOpen}
+        onClick={() => {
+          setListOpen((value) => !value)
+          setOpen(false)
+          setSubview(null)
+        }}
+      />
 
       {open && !listOpen && !subview && (
         <div className="settings-pop" role="menu" aria-label={t('设置', 'Settings')}>
@@ -122,22 +129,6 @@ export default function SettingsBar({
             <span className="settings-row-value settings-current-animation">
               {currentAnimation ? t(currentAnimation.zh, currentAnimation.en) : ''}
             </span>
-            <ChevronRightIcon size={14} />
-          </button>
-
-          <button
-            type="button"
-            className="settings-row"
-            role="menuitem"
-            aria-expanded={listOpen}
-            onClick={() => {
-              setListOpen(true)
-              setOpen(false)
-              setSubview(null)
-            }}
-          >
-            <span className="settings-row-icon is-ok"><PeopleIcon size={15} /></span>
-            <span className="settings-row-label">{onlineLabel}</span>
             <ChevronRightIcon size={14} />
           </button>
 
@@ -189,10 +180,8 @@ export default function SettingsBar({
       {listOpen && (
         <OnlineList
           members={members}
-          selfId={selfId}
           placement="bottom"
           onClose={() => setListOpen(false)}
-          onBack={() => { setListOpen(false); setOpen(true) }}
         />
       )}
     </div>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { enterChat, type ChatApi } from '../lib/chatSync'
-import type { ChatEntry, ChatStatus, PresenceMember } from '../lib/chatTypes'
+import type { ChatEntry, ChatStatus, MessageReply, PresenceMember } from '../lib/chatTypes'
 import { resolveChatIdentity, type ChatIdentity } from '../lib/identity'
 import { useAccount } from '../lib/useAccount'
 import {
@@ -26,6 +26,7 @@ export function useChatRoom(enabled: boolean) {
   const [entries, setEntries] = useState<ChatEntry[]>([])
   const [presence, setPresence] = useState<PresenceMember[]>([])
   const [reactionRows, setReactionRows] = useState<RoomReactionRecord[]>([])
+  const [incomingMessageSequence, setIncomingMessageSequence] = useState(0)
   const [status, setStatus] = useState<ChatStatus>('connecting')
   const apiRef = useRef<ChatApi | null>(null)
 
@@ -50,6 +51,7 @@ export function useChatRoom(enabled: boolean) {
       },
       onPresence: setPresence,
       onStatus: setStatus,
+      onIncomingMessage: () => setIncomingMessageSequence((sequence) => sequence + 1),
       onReactionSnapshot: setReactionRows,
       onReaction: (change: RoomReactionChange) =>
         setReactionRows((rows) => applyRoomReactionChange(rows, change)),
@@ -72,8 +74,8 @@ export function useChatRoom(enabled: boolean) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, displayName, avatarKey, avatarUrl])
 
-  const send = useCallback((text: string, imageBlob?: Blob) => {
-    apiRef.current?.send(text, imageBlob)
+  const send = useCallback((text: string, imageBlob?: Blob, replyTo?: MessageReply | null) => {
+    apiRef.current?.send(text, imageBlob, replyTo)
   }, [])
   const retry = useCallback(() => apiRef.current?.retry(), [])
   const remove = useCallback((id: string) => apiRef.current?.remove(id), [])
@@ -123,6 +125,7 @@ export function useChatRoom(enabled: boolean) {
     remove,
     reactions,
     toggleReaction,
+    incomingMessageSequence,
     loadOlder,
     identity,
   }

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import type { ChatEntry } from '../lib/chatTypes'
 import { t, useLang } from '../lib/i18n'
 import { REACTION_PALETTE, getQuickEmojis } from '../lib/chatReactions'
-import { ChevronRightIcon, CopyIcon, ReactIcon, TrashIcon } from './icons'
+import { ChevronRightIcon, CopyIcon, ReactIcon, ReplyIcon, TrashIcon } from './icons'
 
 export interface MenuAnchor {
   x: number
@@ -25,6 +25,7 @@ interface Props {
   onClose: () => void
   onReact: (emoji: string) => void
   onCopy: (entry: ChatEntry) => void
+  onReply: (entry: ChatEntry) => void
   onDelete: (entry: ChatEntry) => void
 }
 
@@ -45,6 +46,7 @@ export default function MessageMenu({
   onClose,
   onReact,
   onCopy,
+  onReply,
   onDelete,
 }: Props) {
   useLang() // re-render on language flips
@@ -252,6 +254,7 @@ export default function MessageMenu({
             </div>
           )}
           <div className="msg-menu-sep" aria-hidden="true" />
+          {item(t('回复', 'Reply'), <ReplyIcon size={18} />, () => onReply(entry))}
           {item(t('复制', 'Copy Text'), <CopyIcon size={18} />, () => onCopy(entry))}
           {mine && (
             <>

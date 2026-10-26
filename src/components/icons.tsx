@@ -24,6 +24,14 @@ export function ThinXIcon({ size = 16 }: GlyphProps) {
   )
 }
 
+export function ReplyIcon({ size = 18 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false">
+      <path d="M8 5 3.5 9 8 13V10.5c4.2 0 6.5 1.5 8.5 4.5-.5-5-3-7.5-8.5-7.5V5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export function PlusIcon({ size = 20 }: GlyphProps) {
   return (
     <svg
