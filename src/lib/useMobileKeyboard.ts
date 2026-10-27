@@ -59,8 +59,13 @@ export function useMobileKeyboard(shellRef: RefObject<HTMLElement | null>): void
       const el = document.activeElement
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.blur()
     }
-    const outsideComposer = (e: Event) =>
-      (e.target as HTMLElement | null)?.closest?.('.composer-dock') == null
+    const outsideComposer = (e: Event) => {
+      const target = e.target as HTMLElement | null
+      if (target?.closest?.('.composer-dock')) return false
+      // Account dialog inputs must not drop the keyboard when tapped.
+      if (target?.closest?.('.account-dialog')) return false
+      return true
+    }
 
     const onDown = (e: PointerEvent) => {
       if (outsideComposer(e)) blurField()

@@ -49,6 +49,7 @@ export default function AccountDialog({
 }) {
   const lang = useLang()
   const zh = lang === 'zh'
+  const isMobile = window.matchMedia?.('(pointer: coarse)').matches ?? false
   const configured = isSupabaseConfigured()
   const [mode, setMode] = useState<'bind' | 'signin'>(initialMode)
   const [email, setEmail] = useState('')
@@ -212,7 +213,7 @@ export default function AccountDialog({
                     type="email"
                     value={email}
                     autoComplete="email"
-                    autoFocus
+                    autoFocus={!isMobile}
                     onChange={(e) => setEmail(e.target.value)}
                     onKeyDown={onFieldEnter('email')}
                     {...ime.imeProps}
