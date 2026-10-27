@@ -62,8 +62,10 @@ export function useMobileKeyboard(shellRef: RefObject<HTMLElement | null>): void
     const outsideComposer = (e: Event) => {
       const target = e.target as HTMLElement | null
       if (target?.closest?.('.composer-dock')) return false
-      // Account dialog inputs must not drop the keyboard when tapped.
+      // Dialog inputs must not drop the keyboard when tapped.
       if (target?.closest?.('.account-dialog')) return false
+      if (target?.closest?.('.welcome-card')) return false
+      if (target?.closest?.('.welcome-backdrop')) return false
       return true
     }
 
