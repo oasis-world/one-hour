@@ -40,8 +40,8 @@ export const VEIL_MAX = 0.92
 export const VEIL_DEFAULT = 0.62
 
 /** A backdrop photo holds the screen for at most this long. */
-export const BG_TTL_DEFAULT_MS = 10 * 60 * 1000
-export const BG_TTL_MIN_MS = 15 * 1000
+export const BG_TTL_DEFAULT_MS = 60 * 60 * 1000
+export const BG_TTL_MIN_MS = 60 * 60 * 1000
 
 export function loadVeil(): number {
   try {

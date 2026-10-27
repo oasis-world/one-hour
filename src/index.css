@@ -478,6 +478,15 @@ button {
   padding-bottom: 146px;
 }
 
+/* Composer grows up to ~5 lines when the draft wraps — reserve that
+   height so the newest message never slides under the dock. */
+.chat-column:has(.composer.is-multiline) .chat-log-wrap {
+  padding-bottom: 160px;
+}
+.chat-column:has(.composer.is-multiline):has(.composer-reply-preview) .chat-log-wrap {
+  padding-bottom: 216px;
+}
+
 /* Square corners — the chat column reads as a full-height panel. */
 .chat-list-backdrop {
   position: absolute;
@@ -723,6 +732,17 @@ button {
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
+}
+
+.msg-emoji {
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+.msg-emoji-single {
+  display: inline-block;
+  font-size: 30px;
+  line-height: 1;
 }
 
 .msg-reply-quote {
@@ -1005,30 +1025,25 @@ button {
   color: var(--accent);
 }
 
-/* mm:ss readout: floats above the ring on hover (desktop) or tap (touch). */
+/* mm:ss readout: always shown above the ring. */
 .bg-tip {
   position: absolute;
   bottom: calc(100% + 8px);
   right: 0;
   white-space: nowrap;
-  padding: 5px 10px;
-  border-radius: 9px;
+  padding: 3px 8px;
+  border-radius: 999px;
   border: 1px solid var(--line);
-  background: var(--surface-raised);
+  background: var(--surface-glass);
   color: var(--ink);
-  font-size: 11.5px;
+  font-size: 10px;
   font-weight: 700;
   box-shadow: 0 8px 22px var(--shadow);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity 0.18s ease, visibility 0.18s ease;
-}
-
-.bg-slot-ring:hover .bg-tip,
-.bg-slot-ring.is-tip-open .bg-tip {
   opacity: 1;
   visibility: visible;
+  pointer-events: none;
+  backdrop-filter: blur(8px) saturate(1.1);
+  -webkit-backdrop-filter: blur(8px) saturate(1.1);
 }
 
 .bg-link-btn {
@@ -1079,8 +1094,16 @@ button {
   padding-bottom: 66px;
 }
 
+.app-shell.is-keyboard-open:has(.composer.is-multiline) .chat-log-wrap {
+  padding-bottom: 140px;
+}
+
 .app-shell.is-keyboard-open:has(.composer-reply-preview) .chat-log-wrap {
   padding-bottom: 116px;
+}
+
+.app-shell.is-keyboard-open:has(.composer.is-multiline):has(.composer-reply-preview) .chat-log-wrap {
+  padding-bottom: 190px;
 }
 
 .app-shell.is-keyboard-open .settings-bar {
@@ -1219,9 +1242,9 @@ button {
   color: var(--ink);
   font: inherit;
   font-size: 14.5px;
-  line-height: 38px;
+  line-height: 20px;
   height: 38px; /* single-line pill height — JS only overrides when grown */
-  padding: 0 4px;
+  padding: 9px 4px;
   max-height: 108px; /* ~3 lines */
   user-select: text;
   -webkit-user-select: text;
@@ -1788,6 +1811,45 @@ button {
 @media (max-width: 820px) {
   .chat-log-wrap {
     padding: 26px 0 92px;
+  }
+  .chat-column:has(.composer.is-multiline) .chat-log-wrap {
+    padding-bottom: 160px;
+  }
+  .chat-column:has(.composer.is-multiline):has(.composer-reply-preview) .chat-log-wrap {
+    padding-bottom: 216px;
+  }
+
+  /* Mobile: popovers are opaque (no glass blur). */
+  .popover {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .app-shell .popover {
+    background: rgba(24, 26, 32, 0.98);
+  }
+  .app-shell.theme-warm .popover {
+    background: rgba(252, 243, 220, 0.98);
+  }
+
+  /* Mobile: bigger emoji cells, fewer per row. */
+  .emoji-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  .emoji-cell {
+    font-size: 26px;
+  }
+
+  /* Mobile: single-emoji messages render larger. */
+  .msg-emoji-single {
+    font-size: 30px;
+  }
+  .msg-emoji {
+    font-size: 1.25em;
+  }
+
+  /* Mobile: floating message menu sized to exactly six quick emojis. */
+  .msg-menu:not(.is-sheet) {
+    width: 256px;
   }
 
   /* Full-width column with 10px side gutters (matches the composer dock). */

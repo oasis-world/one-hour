@@ -11,20 +11,20 @@
 .settings-subview-back {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
+  gap: 8px;
+  padding: 6px 10px;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--ink-mute);
   font: inherit;
-  font-size: 11px;
+  font-size: 12.5px;
   cursor: pointer;
 }
 
 .settings-subview-back > span {
-  font-size: 20px;
-  line-height: 14px;
+  font-size: 22px;
+  line-height: 1;
 }
 
 .animation-picker-title {

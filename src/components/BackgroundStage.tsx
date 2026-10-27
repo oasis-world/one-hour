@@ -3,56 +3,210 @@ import { fetchRandomBackground, type BackgroundPhoto } from '../lib/backgroundFe
 import { loadBgTtlMs } from '../lib/settings'
 import BgSlotRing from './BgSlotRing'
 
-/** How often the stage checks whether the current photo's slot is over. */
 const ROTATE_CHECK_MS = 10_000
+const BG_STATE_KEY = 'one-hour-bg-state'
 
-/**
- * The dynamic backdrop:
- *  - The newest photo in the chat paints the stage the moment it lands.
- *  - With no chat photo (fresh room, or all expired), a random photo from
- *    the background feed (Unsplash API / keyless stand-in) fills in.
- *  - The ten-minute rule: whatever is on screen — chat photo or feed photo —
- *    steps down after its slot (loadBgTtlMs(), default 10 min) and a fresh
- *    feed photo crossfades in. A *newer* chat photo still wins instantly.
- *
- * While the chat is folded away (`revealed`), a small ring-only countdown
- * of the current photo's slot sits in the bottom-right corner.
- */
+interface BgState {
+  type: 'chat' | 'cloud'
+  url: string
+  since: number
+  index: number
+}
+
 export default function BackgroundStage({
-  imageUrl,
+  imageUrls,
   revealed,
   onReady,
 }: {
-  imageUrl: string | null
+  imageUrls: string[]
   revealed: boolean
   onReady?: () => void
 }) {
-  const [fallback, setFallback] = useState<BackgroundPhoto | null>(null)
-  /** Chat photo that already served its full slot — it yields to the feed. */
-  const [demotedUrl, setDemotedUrl] = useState<string | null>(null)
-
-  const liveChat = imageUrl && imageUrl !== demotedUrl ? imageUrl : null
-  const live = liveChat ?? fallback?.url ?? null
-  /** Feed photos link to their resolved source; chat photos stay private. */
-  const cornerLink = liveChat ? null : (fallback?.source ?? null)
-
-  // Refs for the async rotate() — kept fresh in effects (never in render).
-  const latestImageRef = useRef(imageUrl)
-  const liveRef = useRef(live)
-  const rotatingRef = useRef(false)
-  const sinceRef = useRef(0)
-  const readyFiredRef = useRef(false)
-  /** Slot start time, mirrored into state for the corner ring. */
+  const [live, setLive] = useState<string | null>(null)
+  const [isChat, setIsChat] = useState(false)
+  const [cloudPhoto, setCloudPhoto] = useState<BackgroundPhoto | null>(null)
   const [slotSince, setSlotSince] = useState(0)
+
+  const imageUrlsRef = useRef(imageUrls)
   useEffect(() => {
-    latestImageRef.current = imageUrl
-  }, [imageUrl])
+    imageUrlsRef.current = imageUrls
+  }, [imageUrls])
+  const liveRef = useRef(live)
   useEffect(() => {
     liveRef.current = live
   }, [live])
+  const isChatRef = useRef(isChat)
+  useEffect(() => {
+    isChatRef.current = isChat
+  }, [isChat])
+  const slotSinceRef = useRef(slotSince)
+  useEffect(() => {
+    slotSinceRef.current = slotSince
+  }, [slotSince])
 
-  // Notify the shell the first time a background photo is actually on
-  // screen, so the splash can retire and the chat can be revealed.
+  const indexRef = useRef(0)
+  const rotatingRef = useRef(false)
+  const readyFiredRef = useRef(false)
+  const initializedRef = useRef(false)
+  const cloudTimerRef = useRef<number | null>(null)
+  const pendingPersistedChatRef = useRef<{ url: string; since: number } | null>(null)
+
+  const persist = useCallback((state: BgState) => {
+    try {
+      localStorage.setItem(BG_STATE_KEY, JSON.stringify(state))
+    } catch {
+      // Private mode: in-memory only.
+    }
+  }, [])
+
+  const showChatAt = useCallback(
+    (index: number) => {
+      const urls = imageUrlsRef.current
+      if (index < 0 || index >= urls.length) return false
+      const url = urls[index]
+      indexRef.current = index
+      setIsChat(true)
+      setLive(url)
+      const now = Date.now()
+      setSlotSince(now)
+      persist({ type: 'chat', url, since: now, index })
+      return true
+    },
+    [persist],
+  )
+
+  const showCloud = useCallback(async () => {
+    if (rotatingRef.current) return
+    rotatingRef.current = true
+    try {
+      const photo = await fetchRandomBackground()
+      if (!photo) return
+      setCloudPhoto((prev) => {
+        if (prev?.url.startsWith('blob:')) URL.revokeObjectURL(prev.url)
+        return photo
+      })
+      setIsChat(false)
+      setLive(photo.url)
+      const now = Date.now()
+      setSlotSince(now)
+      persist({ type: 'cloud', url: photo.url, since: now, index: -1 })
+    } finally {
+      rotatingRef.current = false
+    }
+  }, [persist])
+
+  const scheduleCloud = useCallback(() => {
+    if (cloudTimerRef.current) return
+    cloudTimerRef.current = window.setTimeout(() => {
+      cloudTimerRef.current = null
+      void showCloud()
+    }, 10000)
+  }, [showCloud])
+
+  const cancelCloud = useCallback(() => {
+    if (cloudTimerRef.current) {
+      window.clearTimeout(cloudTimerRef.current)
+      cloudTimerRef.current = null
+    }
+  }, [])
+
+  // Initial selection: resume a persisted chat photo if it is still live,
+  // otherwise start at the first chat photo, or fetch a cloud photo.
+  useEffect(() => {
+    if (initializedRef.current) return
+    initializedRef.current = true
+    const persisted: BgState | null = (() => {
+      try {
+        return JSON.parse(localStorage.getItem(BG_STATE_KEY) || 'null') as BgState | null
+      } catch {
+        return null
+      }
+    })()
+    const urls = imageUrlsRef.current
+    if (persisted?.type === 'chat') {
+      // Remember it; resume (without resetting the timer) once the chat
+      // image list has loaded.
+      pendingPersistedChatRef.current = {
+        url: persisted.url,
+        since: persisted.since || Date.now(),
+      }
+      if (urls.includes(persisted.url)) {
+        const idx = urls.indexOf(persisted.url)
+        indexRef.current = idx
+        setIsChat(true)
+        setLive(persisted.url)
+        setSlotSince(persisted.since || Date.now())
+        pendingPersistedChatRef.current = null
+      } else if (urls.length > 0) {
+        showChatAt(0)
+      } else {
+        scheduleCloud()
+      }
+    } else if (urls.length > 0) {
+      showChatAt(0)
+    } else {
+      // No chat images: fetch a cloud photo now.
+      void showCloud()
+    }
+  }, [scheduleCloud, showChatAt, showCloud])
+
+  // React to the chat image list changing (new photo / expiry).
+  useEffect(() => {
+    if (!initializedRef.current) return
+    imageUrlsRef.current = imageUrls
+    if (imageUrls.length === 0) {
+      if (isChatRef.current) {
+        // All chat photos gone: fall back to cloud.
+        void showCloud()
+      }
+      // Cloud is already on screen: leave it until its slot expires.
+      return
+    }
+    const pending = pendingPersistedChatRef.current
+    if (pending && imageUrls.includes(pending.url)) {
+      pendingPersistedChatRef.current = null
+      const idx = imageUrls.indexOf(pending.url)
+      indexRef.current = idx
+      setIsChat(true)
+      setLive(pending.url)
+      setSlotSince(pending.since)
+      return
+    }
+    const current = liveRef.current
+    if (isChatRef.current && current && imageUrls.includes(current)) {
+      indexRef.current = imageUrls.indexOf(current)
+      return
+    }
+    // Chat photos available (or current gone): chat wins.
+    showChatAt(0)
+  }, [cancelCloud, imageUrls, scheduleCloud, showChatAt, showCloud])
+
+  // Slot timer: advance chat photos hourly, refresh cloud photos hourly.
+  useEffect(() => {
+    if (!live) return
+    const check = () => {
+      if (rotatingRef.current) return
+      const ttl = loadBgTtlMs()
+      const elapsed = Date.now() - slotSinceRef.current
+      if (elapsed < ttl) return
+      if (isChatRef.current) {
+        const next = indexRef.current + 1
+        const urls = imageUrlsRef.current
+        if (next < urls.length) {
+          showChatAt(next)
+        } else {
+          void showCloud()
+        }
+      } else {
+        void showCloud()
+      }
+    }
+    check()
+    const timer = setInterval(check, ROTATE_CHECK_MS)
+    return () => clearInterval(timer)
+  }, [live, showChatAt, showCloud])
+
+  // Splash promotion.
   useEffect(() => {
     if (live && !readyFiredRef.current) {
       readyFiredRef.current = true
@@ -60,54 +214,13 @@ export default function BackgroundStage({
     }
   }, [live, onReady])
 
-  const rotate = useCallback(async () => {
-    if (rotatingRef.current) return
-    rotatingRef.current = true
-    try {
-      // fetchRandomBackground resolves the blob first — a dead URL or a
-      // CORS wall never blanks the stage.
-      const photo = await fetchRandomBackground()
-      if (!photo) return
-      const current = liveRef.current
-      if (current && current === latestImageRef.current) {
-        // The chat photo on screen held its full slot — demote it. A newer
-        // chat photo (different URL) still takes over immediately after.
-        setDemotedUrl(current)
-      }
-      setFallback((prev) => {
-        if (prev?.url.startsWith('blob:')) URL.revokeObjectURL(prev.url)
-        return photo
-      })
-    } finally {
-      rotatingRef.current = false
-    }
-  }, [])
+  useEffect(() => () => cancelCloud(), [cancelCloud])
 
-  // The slot timer (and the no-photo-yet fetch). Re-armed whenever `live`
-  // changes: each photo's slot starts the moment it goes on screen — a
-  // chat photo that just took over must NOT inherit the previous photo's
-  // elapsed time (it would be demoted instantly).
-  useEffect(() => {
-    sinceRef.current = Date.now()
-    setSlotSince(sinceRef.current)
-    const check = () => {
-      if (!liveRef.current) {
-        void rotate() // fresh visit / everything expired — fetch a feed photo
-      } else if (Date.now() - sinceRef.current >= loadBgTtlMs()) {
-        void rotate() // slot over — step the current photo down
-      }
-    }
-    check()
-    const timer = setInterval(check, ROTATE_CHECK_MS)
-    return () => clearInterval(timer)
-  }, [live, rotate])
-
-  // Crossfade layers: the incoming photo fades over the outgoing one.
+  // Crossfade layers.
   const [layers, setLayers] = useState<{ id: number; url: string }[]>(() =>
     live ? [{ id: 0, url: live }] : [],
   )
   const seqRef = useRef(1)
-
   useEffect(() => {
     if (!live) return
     setLayers((prev) => {
@@ -115,8 +228,6 @@ export default function BackgroundStage({
       return [...prev, { id: seqRef.current++, url: live }].slice(-2)
     })
   }, [live])
-
-  // Trim the faded-out layer once the crossfade settles.
   useEffect(() => {
     if (layers.length <= 1) return
     const timer = setTimeout(() => {
@@ -124,6 +235,8 @@ export default function BackgroundStage({
     }, 1400)
     return () => clearTimeout(timer)
   }, [layers])
+
+  const cornerLink = isChat ? null : (cloudPhoto?.source ?? null)
 
   return (
     <div className="bg-stage" aria-hidden="true">

@@ -360,25 +360,50 @@ export function enterChat(
     void pruneChatCache()
   })()
 
-  void fetchChatPage().then((page) => {
-    if (closed || !page) return
-    hasMoreOlder = page.hasMore
-    serverCursor = page.messages[0]
-      ? { createdAt: page.messages[0].serverCreatedAt!, id: page.messages[0].id }
-      : null
-    // Merge the authoritative page over whatever cache/outbox restored:
-    // confirmed rows win, cached-but-older rows survive beneath the page.
-    const byId = new Map(entries.map((entry) => [entry.id, entry]))
-    for (const message of page.messages) {
-      byId.set(message.id, mergeIntoEntry(message, byId.get(message.id)))
-    }
-    entries = [...byId.values()]
-      .filter((entry) => entry.state || !isExpired(entry))
-      .sort(compareEntries)
-      .slice(-MEMORY_CAP)
-    callbacks.onSnapshot(entries)
-    void saveChatCache(entries)
-  })
+  const syncFromServer = () => {
+    if (closed) return
+    void fetchChatPage().then((page) => {
+      if (closed || !page) return
+      hasMoreOlder = page.hasMore
+      if (page.messages.length > 0) {
+        serverCursor = {
+          createdAt: page.messages[0].serverCreatedAt!,
+          id: page.messages[0].id,
+        }
+      }
+      // Merge the authoritative page over whatever cache/outbox restored:
+      // confirmed rows win, cached-but-older rows survive beneath the page.
+      const byId = new Map(entries.map((entry) => [entry.id, entry]))
+      for (const message of page.messages) {
+        byId.set(message.id, mergeIntoEntry(message, byId.get(message.id)))
+      }
+      entries = [...byId.values()]
+        .filter((entry) => entry.state || !isExpired(entry))
+        .sort(compareEntries)
+        .slice(-MEMORY_CAP)
+      callbacks.onSnapshot(entries)
+      void saveChatCache(entries)
+    })
+  }
+
+  // Initial authoritative fetch.
+  syncFromServer()
+
+  // Catch-up after the tab/app was backgrounded or the realtime socket
+  // dropped silently: browsers throttle/suspend background tabs, so the
+  // postgres_changes stream can miss rows. Re-pulling on visibility/focus
+  // (and on a slow heartbeat) guarantees eventual consistency.
+  const onVisible = () => {
+    if (document.hidden) return
+    window.setTimeout(syncFromServer, 200)
+    window.setTimeout(() => {
+      if (!closed) void flush()
+    }, 300)
+  }
+  document.addEventListener('visibilitychange', onVisible)
+  window.addEventListener('focus', onVisible)
+  window.addEventListener('pageshow', onVisible)
+  const syncTimer = setInterval(syncFromServer, 120_000)
 
   void joinChatRoom({
     presenceKey: currentIdentity.userId,
@@ -541,6 +566,10 @@ export function enterChat(
       if (sweepTimer) clearInterval(sweepTimer)
       if (purgeTimer) clearInterval(purgeTimer)
       if (firstPurgeTimer) clearTimeout(firstPurgeTimer)
+      if (syncTimer) clearInterval(syncTimer)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+      window.removeEventListener('pageshow', onVisible)
       handle?.leave()
       handle = null
     },

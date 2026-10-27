@@ -5,7 +5,7 @@ import { COUNTDOWN_ANIMATIONS, type CountdownAnimation } from '../lib/countdownA
 import { useLang, LANG_LABELS, t } from '../lib/i18n'
 import { setPopoverOpen } from '../lib/popoverGuard'
 import { ChevronRightIcon, MoonIcon, SunIcon } from './icons'
-import { GearIcon, GlobeIcon, RefreshIcon } from './userIcons'
+import { AnimationIcon, GearIcon, GlobeIcon, RefreshIcon } from './userIcons'
 import CountdownAnimationPicker from './CountdownAnimationPicker'
 import LanguagePicker from './LanguagePicker'
 import OnlineList from './OnlineList'
@@ -124,7 +124,7 @@ export default function SettingsBar({
             onClick={() => setSubview('animation')}
             title={t('选择倒计时动画', 'Choose countdown animation')}
           >
-            <span className="settings-row-icon" aria-hidden="true">✧</span>
+            <span className="settings-row-icon"><AnimationIcon size={15} /></span>
             <span className="settings-row-label">{t('动画', 'Animation')}</span>
             <span className="settings-row-value settings-current-animation">
               {currentAnimation ? t(currentAnimation.zh, currentAnimation.en) : ''}

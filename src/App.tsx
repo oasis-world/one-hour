@@ -503,8 +503,6 @@ export default function App() {
     return urls
   }, [room.entries])
 
-  const latestImage = chatImages.length > 0 ? chatImages[chatImages.length - 1] : null
-
   const openImage = (src: string) => {
     // A click that just dismissed a popover (+ / emoji / message menu /
     // avatar / gear) only closes the popover — it must not open the
@@ -530,7 +528,7 @@ export default function App() {
       data-countdown-animation={countdownAnimation}
       style={{ ['--veil' as string]: String(veil) }}
     >
-      <BackgroundStage imageUrl={latestImage} revealed={fold === 'folded'} onReady={markBgReady} />
+      <BackgroundStage imageUrls={chatImages} revealed={fold === 'folded'} onReady={markBgReady} />
       <audio
         ref={audioRef}
         preload="auto"

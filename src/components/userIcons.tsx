@@ -155,6 +155,26 @@ export function UserIcon({ size = 16 }: GlyphProps) {
 }
 
 /** Globe — the language row. */
+export function AnimationIcon({ size = 16 }: GlyphProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M8 1.6l1.7 4.7 4.7 1.7-4.7 1.7L8 14.4l-1.7-4.7-4.7-1.7 4.7-1.7L8 1.6z"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 export function GlobeIcon({ size = 16 }: GlyphProps) {
   return (
     <svg

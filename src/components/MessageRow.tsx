@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, type ReactNode } from 'react'
 import type { ChatEntry } from '../lib/chatTypes'
 import { t } from '../lib/i18n'
 import type { RoomReactionMap } from '../lib/chatReactions'
@@ -40,6 +40,41 @@ function isTouchUI(): boolean {
 }
 
 const TOUCH = typeof window === 'undefined' ? false : isTouchUI()
+
+function isSingleEmoji(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed || /\s/.test(trimmed)) return false
+  try {
+    const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+    const segments = [...seg.segment(trimmed)]
+    if (segments.length !== 1) return false
+  } catch {
+    if (Array.from(trimmed).length !== 1) return false
+  }
+  return /\p{Extended_Pictographic}/u.test(trimmed)
+}
+
+function renderMessageContent(content: string): ReactNode {
+  if (!content) return content
+  if (isSingleEmoji(content)) {
+    return <span className="msg-emoji-single">{content}</span>
+  }
+  try {
+    const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+    const parts = [...seg.segment(content)].map((s) => s.segment)
+    return parts.map((part, i) =>
+      /\p{Extended_Pictographic}/u.test(part) ? (
+        <span key={i} className="msg-emoji">
+          {part}
+        </span>
+      ) : (
+        part
+      ),
+    )
+  } catch {
+    return content
+  }
+}
 
 /**
  * One message row (every row carries its own header — each message owns a
@@ -84,6 +119,7 @@ export default function MessageRow({
     sheetFired.current = false
   }
   const openSheet = () => {
+    const start = pressStart.current
     pressTimer.current = null
     pressStart.current = null
     sheetFired.current = true
@@ -92,7 +128,12 @@ export default function MessageRow({
     } catch {
       // Haptics are best-effort.
     }
-    onOpenMenu(entry, { x: window.innerWidth / 2, y: window.innerHeight / 2 }, true)
+    // Show the menu just below the finger (desktop context-menu parity),
+    // not as a centered bottom sheet. The clamp in MessageMenu pushes it
+    // above the finger when there is no room below.
+    const x = start?.x ?? window.innerWidth / 2
+    const y = (start?.y ?? window.innerHeight / 2) + 12
+    onOpenMenu(entry, { x, y }, false)
   }
 
   return (
@@ -183,7 +224,7 @@ export default function MessageRow({
           </button>
         )}
         <div className="msg-body">
-          {entry.content}
+          {renderMessageContent(entry.content)}
           {entry.state === 'pending' && (
             <span className="msg-state">{t('发送中…', ' sending…')}</span>
           )}
