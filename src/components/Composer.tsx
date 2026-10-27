@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import type { MessageReply } from '../lib/chatTypes'
+import type { ChatEntry, MessageReply } from '../lib/chatTypes'
 import { useLang, COMPOSER_PLACEHOLDER, t } from '../lib/i18n'
 import { useImeEnter } from '../lib/ime'
 import { markFilePickerOpened } from '../lib/filePickerGuard'
@@ -11,6 +11,10 @@ interface Props {
   onSend: (text: string, replyTo?: MessageReply | null) => void
   replyTo: MessageReply | null
   onClearReply: () => void
+  /** When set, the composer edits this existing message instead of sending. */
+  editing: ChatEntry | null
+  onClearEditing: () => void
+  onEdit: (id: string, text: string) => void
   /** Photo from the camera (single shot). */
   onImagePicked: (file: File) => void
   /** Photos from the library — up to 5, sent as independent messages. */
@@ -50,9 +54,9 @@ function useMobileFormFactor(): boolean {
  * or emoji button toggles its popover (a click outside closes it); there
  * is no hover-to-open.
  */
-export default function Composer({ onSend, replyTo, onClearReply, onImagePicked, onImagesPicked, onMenuOpenChange }: Props) {
+export default function Composer({ onSend, replyTo, onClearReply, editing, onClearEditing, onEdit, onImagePicked, onImagesPicked, onMenuOpenChange }: Props) {
   const lang = useLang()
-  const [draft, setDraft] = useState('')
+  const [draft, setDraft] = useState(editing?.content ?? '')
   const [plusOpen, setPlusOpen] = useState(false)
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [multiline, setMultiline] = useState(false)
@@ -67,6 +71,19 @@ export default function Composer({ onSend, replyTo, onClearReply, onImagePicked,
     if (replyTo) inputRef.current?.focus()
   }, [replyTo])
 
+  useLayoutEffect(() => {
+    if (!editing) return
+    const el = inputRef.current
+    if (!el) return
+    el.focus()
+    const len = el.value.length
+    try {
+      el.setSelectionRange(len, len)
+    } catch {
+      // Some mobile inputs don't support selection ranges.
+    }
+  }, [editing])
+
   useEffect(() => {
     if (!replyTo) return
     const onEscape = (event: KeyboardEvent) => {
@@ -80,6 +97,20 @@ export default function Composer({ onSend, replyTo, onClearReply, onImagePicked,
     window.addEventListener('keydown', onEscape)
     return () => window.removeEventListener('keydown', onEscape)
   }, [onClearReply, replyTo])
+
+  useEffect(() => {
+    if (!editing) return
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      const active = document.activeElement
+      if (active instanceof HTMLElement && active.closest('[role="dialog"], [role="alertdialog"], [role="menu"]')) return
+      event.preventDefault()
+      event.stopPropagation()
+      onClearEditing()
+    }
+    window.addEventListener('keydown', onEscape)
+    return () => window.removeEventListener('keydown', onEscape)
+  }, [onClearEditing, editing])
 
   // Auto-grow: the single-line height stays on the CSS 38px so every
   // webview (including WeChat's, whose font metrics differ) renders the
@@ -125,8 +156,24 @@ export default function Composer({ onSend, replyTo, onClearReply, onImagePicked,
     setDraft((prev) => prev + emoji)
   }
 
+  const canSubmit = editing
+    ? draft.trim().length > 0 || Boolean(editing.imageUrl || editing.localImage)
+    : draft.trim().length > 0
+
   const submit = () => {
     const text = draft.trim()
+    // Editing an existing message: update it in place instead of sending new.
+    if (editing) {
+      const hasImage = Boolean(editing.imageUrl || editing.localImage)
+      if (!text && !hasImage) return
+      const holdKeyboard = document.activeElement === inputRef.current
+      onEdit(editing.id, text)
+      setDraft('')
+      onClearEditing()
+      setEmojiOpen(false)
+      if (coarse && holdKeyboard) inputRef.current?.focus()
+      return
+    }
     // Idle (gray) send: ignore the tap entirely — no keyboard pop, and the
     // field doesn't take focus either.
     if (!text) return
@@ -285,8 +332,8 @@ export default function Composer({ onSend, replyTo, onClearReply, onImagePicked,
 
         <button
           type="button"
-          className={`composer-send${draft.trim().length === 0 ? ' is-idle' : ''}`}
-          aria-disabled={draft.trim().length === 0}
+          className={`composer-send${canSubmit ? '' : ' is-idle'}`}
+          aria-disabled={!canSubmit}
           aria-label={t('发送', 'Send')}
           title={t('发送', 'Send')}
           onMouseDown={keepFocus}

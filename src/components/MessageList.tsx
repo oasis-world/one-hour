@@ -26,6 +26,7 @@ interface Props {
   onLoadOlder: () => Promise<{ loaded: number; hasMore: boolean }>
   onReact: (entryId: string, emoji: string) => void
   onReply: (reply: MessageReply) => void
+  onEdit: (entry: ChatEntry) => void
 }
 
 interface OpenMenu {
@@ -58,6 +59,7 @@ export default function MessageList({
   onLoadOlder,
   onReact,
   onReply,
+  onEdit,
 }: Props) {
   useLang() // re-render on language flips
   const logRef = useRef<HTMLDivElement>(null)
@@ -170,6 +172,12 @@ export default function MessageList({
     // only offers Delete on the player's own messages).
     if (entry.userId !== selfId) return
     onRemove(entry.id)
+  }
+
+  const editEntry = (entry: ChatEntry) => {
+    setMenu(null)
+    if (entry.userId !== selfId) return
+    onEdit(entry)
   }
 
   const reactEntry = (id: string, emoji: string) => {
@@ -331,6 +339,7 @@ export default function MessageList({
             setMenu(null)
           }}
           onCopy={copyEntry}
+          onEdit={editEntry}
           onReply={(entry) => {
             onReply({
               id: entry.id,

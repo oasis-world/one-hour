@@ -734,6 +734,14 @@ button {
   overflow-wrap: anywhere;
 }
 
+.msg-edited {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--ink-mute);
+  font-style: italic;
+  user-select: none;
+}
+
 .msg-emoji {
   font-size: 1.2em;
   line-height: 1;

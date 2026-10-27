@@ -20,6 +20,7 @@ create table if not exists public.chat_messages (
   content text not null default '' check (char_length(content) <= 1000),
   reply_to jsonb, -- snapshot of the message being replied to
   image_url text, -- public storage URL of the attached photo, null for text-only
+  edited_at timestamptz, -- set when the author edits the message text
   created_at timestamptz not null default now(),
   expires_at timestamptz not null default (now() + interval '1 hour'),
   constraint chat_messages_has_payload
@@ -31,6 +32,11 @@ alter table public.chat_messages add column if not exists avatar_style text;
 alter table public.chat_messages add column if not exists avatar_seed text;
 alter table public.chat_messages add column if not exists avatar_url text;
 alter table public.chat_messages add column if not exists reply_to jsonb;
+alter table public.chat_messages add column if not exists edited_at timestamptz;
+
+-- Full replica identity so Realtime UPDATE/DELETE payloads carry every column
+-- (including edited_at) instead of just the primary key.
+alter table public.chat_messages replica identity full;
 
 -- Existing deployments: raise the message length cap 500 → 1000.
 alter table public.chat_messages drop constraint if exists chat_messages_content_check;
@@ -72,6 +78,14 @@ drop policy if exists "players may delete their own messages"
 create policy "players may delete their own messages"
   on public.chat_messages for delete
   using (auth.uid() = user_id);
+
+-- Authors may edit their own messages in place.
+drop policy if exists "players may update their own messages"
+  on public.chat_messages;
+create policy "players may update their own messages"
+  on public.chat_messages for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 -- Feed the Realtime postgres_changes subscription the app listens to.
 do $$

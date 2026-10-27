@@ -79,6 +79,7 @@ export function useChatRoom(enabled: boolean) {
   }, [])
   const retry = useCallback(() => apiRef.current?.retry(), [])
   const remove = useCallback((id: string) => apiRef.current?.remove(id), [])
+  const edit = useCallback((id: string, content: string) => apiRef.current?.edit(id, content), [])
   const toggleReaction = useCallback((messageId: string, emoji: string) => {
     const reactionUserId = identity?.userId
     if (!reactionUserId) return
@@ -123,6 +124,7 @@ export function useChatRoom(enabled: boolean) {
     send,
     retry,
     remove,
+    edit,
     reactions,
     toggleReaction,
     incomingMessageSequence,

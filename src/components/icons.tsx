@@ -247,6 +247,34 @@ export function TravelerGlyph({ size = 20 }: GlyphProps) {
 }
 
 /** Copy glyph: front sheet over a back plate (menu "copy" action). */
+/** Edit glyph: pencil (menu "Edit Message"). */
+export function EditIcon({ size = 20 }: GlyphProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M3.5 14.5l1.2-4.2L13.4 1.6a1.4 1.4 0 012 0l1 1a1.4 1.4 0 010 2L7.7 13.3 3.5 14.5z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M11.8 3.2l3 3"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 export function CopyIcon({ size = 20 }: GlyphProps) {
   return (
     <svg

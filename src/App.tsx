@@ -22,7 +22,7 @@ import { popoverJustClosed } from './lib/popoverGuard'
 import { useLang, t } from './lib/i18n'
 import { loadCountdownAnimation, loadTheme, loadVeil, saveCountdownAnimation, type ThemeName } from './lib/settings'
 import type { CountdownAnimation } from './lib/countdownAnimations'
-import type { MessageReply } from './lib/chatTypes'
+import type { ChatEntry, MessageReply } from './lib/chatTypes'
 
 /**
  * 一小时 / one-hour — the ephemeral chat room. Every message, text or
@@ -171,6 +171,7 @@ export default function App() {
   }
   const [toast, setToast] = useState<string | null>(null)
   const [replyTo, setReplyTo] = useState<MessageReply | null>(null)
+  const [editingMessage, setEditingMessage] = useState<ChatEntry | null>(null)
   const [sentMessageSequence, setSentMessageSequence] = useState(0)
   const toastTimer = useRef<number | null>(null)
   const bgReadyRef = useRef(false)
@@ -438,6 +439,16 @@ export default function App() {
     setReplyTo(null)
   }
 
+  const handleStartEdit = (entry: ChatEntry) => {
+    setEditingMessage(entry)
+    setReplyTo(null)
+  }
+
+  const handleEditMessage = (id: string, text: string) => {
+    room.edit(id, text)
+    setEditingMessage(null)
+  }
+
   const handleImagePicked = async (file: File) => {
     try {
       const blob = await withTimeout(fileToChatImage(file), 60_000)
@@ -631,13 +642,18 @@ export default function App() {
               onLoadOlder={room.loadOlder}
               onReact={room.toggleReaction}
               onReply={setReplyTo}
+              onEdit={handleStartEdit}
             />
 
             {room.identity ? (
               <Composer
+                key={editingMessage?.id ?? 'compose'}
                 onSend={handleSend}
                 replyTo={replyTo}
                 onClearReply={() => setReplyTo(null)}
+                editing={editingMessage}
+                onClearEditing={() => setEditingMessage(null)}
+                onEdit={handleEditMessage}
                 onImagePicked={handleImagePicked}
                 onImagesPicked={handleImagesPicked}
                 onMenuOpenChange={handleMenuOpenChange}

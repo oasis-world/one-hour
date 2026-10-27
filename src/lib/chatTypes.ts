@@ -18,6 +18,8 @@ export interface ChatMessage {
   serverCreatedAt?: string
   /** Public storage URL of the attached image, if any. */
   imageUrl?: string | null
+  /** Set when the message text was edited after sending. */
+  editedAt?: string | null
 }
 
 export interface MessageReply {

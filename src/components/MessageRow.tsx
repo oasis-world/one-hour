@@ -224,6 +224,9 @@ export default function MessageRow({
         )}
         <div className="msg-body">
           {renderMessageContent(entry.content)}
+          {entry.editedAt && (
+            <span className="msg-edited">{t('（已编辑）', ' (edited)')}</span>
+          )}
           {entry.state === 'pending' && (
             <span className="msg-state">{t('发送中…', ' sending…')}</span>
           )}

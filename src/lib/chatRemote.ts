@@ -82,6 +82,7 @@ export interface RoomHandle {
    *  and, through the storage API (SQL deletes on storage.objects are
    *  platform-blocked), the photo object under the author's folder. */
   deleteMessage(id: string, imagePath?: string | null): Promise<{ ok: true } | { ok: false; error: 'network' | 'rejected' }>
+  updateMessage(id: string, content: string): Promise<{ ok: true } | { ok: false; error: 'network' | 'rejected' }>
   toggleReaction(messageId: string, emoji: string, active: boolean): Promise<boolean>
   leave(): void
 }
@@ -97,6 +98,7 @@ interface MessageRow {
   reply_to?: MessageReply | null
   image_url: string | null
   created_at: string
+  edited_at?: string | null
 }
 
 interface ReactionRow {
@@ -269,6 +271,14 @@ export async function joinChatRoom(options: {
         (payload) => {
           const old = payload.old as { id?: string } | null
           if (old?.id) options.onDeleted(old.id)
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: MESSAGES_TABLE },
+        (payload) => {
+          const row = payload.new as MessageRow
+          if (row?.id) options.onMessage(rowToMessage(row))
         },
       )
       .on(
@@ -451,6 +461,29 @@ export async function joinChatRoom(options: {
         return { ok: false, error: 'network' }
       }
     },
+    async updateMessage(id, content) {
+      try {
+        const { data } = await ctx.auth.getSession()
+        const uid = data.session?.user?.id
+        if (!uid) return { ok: false, error: 'rejected' }
+        let { error } = await withTimeout(
+          ctx.from(MESSAGES_TABLE).update({ content, edited_at: new Date().toISOString() }).eq('id', id).eq('user_id', uid),
+          INSERT_TIMEOUT_MS,
+        )
+        if (error && isMissingColumnError(error)) {
+          ({ error } = await withTimeout(
+            ctx.from(MESSAGES_TABLE).update({ content }).eq('id', id).eq('user_id', uid),
+            INSERT_TIMEOUT_MS,
+          ))
+        }
+        if (error) {
+          return { ok: false, error: isNetworkError(error) ? 'network' : 'rejected' }
+        }
+        return { ok: true }
+      } catch {
+        return { ok: false, error: 'network' }
+      }
+    },
     async toggleReaction(messageId, emoji, active) {
       return persistRoomReaction(ctx, messageId, emoji, active)
     },
@@ -501,6 +534,7 @@ function rowToMessage(row: MessageRow): ChatMessage {
     at: new Date(row.created_at).getTime(),
     serverCreatedAt: row.created_at,
     imageUrl: row.image_url ?? null,
+    editedAt: row.edited_at ?? null,
   }
 }
 
@@ -513,7 +547,7 @@ function isNetworkError(error: { message?: string }): boolean {
 function isMissingColumnError(error: { message?: string; code?: string }): boolean {
   return (
     error.code === 'PGRST204' ||
-    /could not find the .*avatar_(style|seed|url) column/i.test(error.message ?? '')
+    /could not find the .*(avatar_(style|seed|url)|edited_at) column/i.test(error.message ?? '')
   )
 }
 

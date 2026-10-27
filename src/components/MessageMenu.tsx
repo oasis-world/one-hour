@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import type { ChatEntry } from '../lib/chatTypes'
 import { t, useLang } from '../lib/i18n'
 import { REACTION_PALETTE, getQuickEmojis } from '../lib/chatReactions'
-import { ChevronRightIcon, CopyIcon, ReactIcon, ReplyIcon, TrashIcon } from './icons'
+import { ChevronRightIcon, CopyIcon, EditIcon, ReactIcon, ReplyIcon, TrashIcon } from './icons'
 
 export interface MenuAnchor {
   x: number
@@ -26,6 +26,7 @@ interface Props {
   onReact: (emoji: string) => void
   onCopy: (entry: ChatEntry) => void
   onReply: (entry: ChatEntry) => void
+  onEdit: (entry: ChatEntry) => void
   onDelete: (entry: ChatEntry) => void
 }
 
@@ -47,6 +48,7 @@ export default function MessageMenu({
   onReact,
   onCopy,
   onReply,
+  onEdit,
   onDelete,
 }: Props) {
   useLang() // re-render on language flips
@@ -90,18 +92,23 @@ export default function MessageMenu({
       if (!el) return
       const rect = el.getBoundingClientRect()
       const margin = 8
-      const gap = 12
+      const bottomGap = touchUI ? 30 : 100
+      const gap = touchUI ? 30 : 12
       let x = Math.max(margin, Math.min(anchor.x, window.innerWidth - rect.width - margin))
-      let y = Math.max(margin, Math.min(anchor.y, window.innerHeight - rect.height - margin))
+      let y = anchor.y
+      if (y + rect.height > window.innerHeight - bottomGap) {
+        y = window.innerHeight - rect.height - bottomGap
+      }
+      y = Math.max(margin, y)
       if (touchUI) {
         // Mobile long-press: horizontally centered, and vertically placed
         // below the finger in the upper half of the screen, above it in
         // the lower half.
         x = Math.max(margin, (window.innerWidth - rect.width) / 2)
         if (anchor.y < window.innerHeight / 2) {
-          y = Math.max(margin, Math.min(anchor.y + gap, window.innerHeight - rect.height - margin))
+          y = Math.max(margin, Math.min(anchor.y + gap, window.innerHeight - rect.height - bottomGap))
         } else {
-          y = Math.max(margin, Math.min(anchor.y - rect.height - gap, window.innerHeight - rect.height - margin))
+          y = Math.max(margin, Math.min(anchor.y - rect.height - gap, window.innerHeight - rect.height - bottomGap))
         }
       }
       setPos({ x, y })
@@ -270,6 +277,7 @@ export default function MessageMenu({
           {mine && (
             <>
               <div className="msg-menu-sep" aria-hidden="true" />
+              {item(t('编辑消息', 'Edit Message'), <EditIcon size={18} />, () => onEdit(entry))}
               {item(
                 t('删除消息', 'Delete Message'),
                 <TrashIcon size={18} />,

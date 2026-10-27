@@ -20,6 +20,7 @@ import {
   markOutboxFailed,
   readOutbox,
   removeFromOutbox,
+  updateOutboxContent,
   type ChatOutboxItem,
 } from './chatOutbox'
 import { isExpired, MESSAGE_TTL_MS } from './expiry'
@@ -61,6 +62,8 @@ export interface ChatApi {
   loadOlder(): Promise<{ loaded: number; hasMore: boolean }>
   /** Author deletes one own message: dissolve here, purge the cloud row. */
   remove(id: string): void
+  /** Author edits one own message's text in place (no new row). */
+  edit(id: string, content: string): void
   toggleReaction(messageId: string, emoji: string, active: boolean): Promise<boolean>
   updateIdentity(identity: ChatIdentity): void
   leave(): void
@@ -178,6 +181,9 @@ export function enterChat(
     if (existing?.replyTo && !merged.replyTo) {
       merged.replyTo = existing.replyTo
     }
+    if (existing?.editedAt && !merged.editedAt) {
+      merged.editedAt = existing.editedAt
+    }
     if (existing?.localImage && !merged.imageUrl) {
       merged.localImage = existing.localImage
     } else if (existing?.localImage && merged.imageUrl) {
@@ -202,8 +208,16 @@ export function enterChat(
     const existing = entries.find((e) => e.id === message.id)
     if (existing && existing.expiring) return
     if (existing && existing.serverCreatedAt) {
-      // Same confirmed row resent (refetch): keep as-is.
-      return
+      // Same confirmed row resent (refetch): keep as-is — unless the
+      // content/image actually changed (an edit), in which case overlay.
+      if (
+        existing.content === message.content &&
+        existing.imageUrl === message.imageUrl &&
+        existing.replyTo?.content === message.replyTo?.content &&
+        existing.editedAt === message.editedAt
+      ) {
+        return
+      }
     }
     const merged = mergeIntoEntry(message, existing)
     entries = existing ? replace(entries, merged) : [...entries, merged].slice(-MEMORY_CAP)
@@ -502,6 +516,43 @@ export function enterChat(
       // Pending/failed rows never reached the cloud — the farewell alone is
       // enough (dropEntry also clears their outbox slot).
       beginExpire(id, !entry.state)
+    },
+    edit(id, content) {
+      const entry = entries.find((e) => e.id === id)
+      if (!entry || entry.expiring) return
+      if (entry.userId !== currentIdentity.userId) return
+      const trimmed = content.trim()
+      // Pending/failed rows live in the outbox — patch the queued copy too.
+      if (entry.state) {
+        const updated: ChatEntry = { ...entry, content: trimmed }
+        entries = replace(entries, updated)
+        emit(updated)
+        void saveChatCache(entries)
+        void updateOutboxContent(id, trimmed)
+        return
+      }
+      const previousContent = entry.content
+      const updated: ChatEntry = {
+        ...entry,
+        content: trimmed,
+        editedAt: new Date().toISOString(),
+      }
+      entries = replace(entries, updated)
+      emit(updated)
+      void saveChatCache(entries)
+      void (async () => {
+        if (!handle) return
+        const result = await handle.updateMessage(id, trimmed)
+        if (result.ok) return
+        // Revert on a hard failure so the row doesn't lie about its text.
+        const current = entries.find((e) => e.id === id)
+        if (current && current.content === trimmed) {
+          const reverted: ChatEntry = { ...current, content: previousContent, editedAt: entry.editedAt }
+          entries = replace(entries, reverted)
+          emit(reverted)
+          void saveChatCache(entries)
+        }
+      })()
     },
     toggleReaction(messageId, emoji, active) {
       if (closed || !handle) return Promise.resolve(false)

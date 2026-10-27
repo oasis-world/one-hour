@@ -45,6 +45,15 @@ export async function removeFromOutbox(id: string): Promise<void> {
   await idbDelete(OUTBOX_STORE, id)
 }
 
+/** Patch the text of a queued (still-pending) message in place. */
+export async function updateOutboxContent(id: string, content: string): Promise<void> {
+  const queue = await readOutbox()
+  const item = queue.find((entry) => entry.id === id)
+  if (!item) return
+  item.content = content
+  await writeOutbox(queue)
+}
+
 /** Record one failed attempt; returns true when retries are exhausted. */
 export async function markOutboxFailed(id: string): Promise<boolean> {
   const queue = await readOutbox()
