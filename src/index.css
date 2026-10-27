@@ -827,6 +827,21 @@ button {
   box-shadow: 0 8px 24px var(--shadow);
 }
 
+/* Touch: :hover sticks after a tap and the scale jitter pushes the
+   long-press menu around — keep the image still on coarse pointers. */
+@media (hover: none), (pointer: coarse) {
+  .msg-image {
+    transition: none;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+  }
+  .msg-image:hover {
+    transform: none;
+    box-shadow: none;
+  }
+}
+
 .msg-image-pending {
   filter: saturate(0.8);
   opacity: 0.85;
@@ -1386,6 +1401,13 @@ button {
   width: max-content;
   max-width: min(78vw, 360px);
   padding: 6px;
+  /* Desktop: keep the plus menu fully opaque (no glass blur). */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(24, 26, 32, 0.98);
+}
+.app-shell.theme-warm .plus-menu {
+  background: rgba(252, 243, 220, 0.98);
 }
 
 .plus-menu-item {
