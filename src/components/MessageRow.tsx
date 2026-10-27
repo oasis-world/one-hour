@@ -131,9 +131,8 @@ export default function MessageRow({
     // Show the menu just below the finger (desktop context-menu parity),
     // not as a centered bottom sheet. The clamp in MessageMenu pushes it
     // above the finger when there is no room below.
-    const x = start?.x ?? window.innerWidth / 2
-    const y = (start?.y ?? window.innerHeight / 2) + 12
-    onOpenMenu(entry, { x, y }, false)
+    const y = start?.y ?? window.innerHeight / 2
+    onOpenMenu(entry, { x: window.innerWidth / 2, y }, false)
   }
 
   return (

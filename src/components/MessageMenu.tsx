@@ -90,15 +90,26 @@ export default function MessageMenu({
       if (!el) return
       const rect = el.getBoundingClientRect()
       const margin = 8
-      setPos({
-        x: Math.max(margin, Math.min(anchor.x, window.innerWidth - rect.width - margin)),
-        y: Math.max(margin, Math.min(anchor.y, window.innerHeight - rect.height - margin)),
-      })
+      const gap = 12
+      let x = Math.max(margin, Math.min(anchor.x, window.innerWidth - rect.width - margin))
+      let y = Math.max(margin, Math.min(anchor.y, window.innerHeight - rect.height - margin))
+      if (touchUI) {
+        // Mobile long-press: horizontally centered, and vertically placed
+        // below the finger in the upper half of the screen, above it in
+        // the lower half.
+        x = Math.max(margin, (window.innerWidth - rect.width) / 2)
+        if (anchor.y < window.innerHeight / 2) {
+          y = Math.max(margin, Math.min(anchor.y + gap, window.innerHeight - rect.height - margin))
+        } else {
+          y = Math.max(margin, Math.min(anchor.y - rect.height - gap, window.innerHeight - rect.height - margin))
+        }
+      }
+      setPos({ x, y })
     }
     clamp()
     window.addEventListener('resize', clamp)
     return () => window.removeEventListener('resize', clamp)
-  }, [anchor, pickerOpen, sheet])
+  }, [anchor, pickerOpen, sheet, touchUI])
 
   useLayoutEffect(() => {
     const onDown = (e: Event) => {
