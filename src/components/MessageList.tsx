@@ -86,7 +86,12 @@ export default function MessageList({
   useLayoutEffect(() => {
     if (seenSentMessageRef.current === sentMessageSequence) return
     seenSentMessageRef.current = sentMessageSequence
-    jumpToEnd()
+    // Mobile keyboards reflow the viewport after a send; defer the
+    // scroll so it runs after layout settles instead of mid-reflow.
+    const raf = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => jumpToEnd())
+    })
+    return () => window.cancelAnimationFrame(raf)
   }, [jumpToEnd, sentMessageSequence])
 
   const requestOlder = useCallback(() => {
