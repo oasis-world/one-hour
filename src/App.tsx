@@ -514,6 +514,24 @@ export default function App() {
     return urls
   }, [room.entries])
 
+  // The backdrop follows the newest live chat photo; its slot start time is
+  // the photo's own send time so every client counts down in lockstep.
+  const latestChatImage = useMemo(() => {
+    let result: { url: string; since: number } | null = null
+    for (const entry of room.entries) {
+      if (entry.expiring || entry.state) continue
+      const url = entry.imageUrl ?? entry.localImage
+      if (!url) continue
+      result = {
+        url,
+        since: entry.serverCreatedAt
+          ? new Date(entry.serverCreatedAt).getTime()
+          : entry.at,
+      }
+    }
+    return result
+  }, [room.entries])
+
   const openImage = (src: string) => {
     // A click that just dismissed a popover (+ / emoji / message menu /
     // avatar / gear) only closes the popover — it must not open the
@@ -539,7 +557,7 @@ export default function App() {
       data-countdown-animation={countdownAnimation}
       style={{ ['--veil' as string]: String(veil) }}
     >
-      <BackgroundStage imageUrls={chatImages} revealed={fold === 'folded'} onReady={markBgReady} />
+      <BackgroundStage chatImage={latestChatImage} revealed={fold === 'folded'} onReady={markBgReady} />
       <audio
         ref={audioRef}
         preload="auto"
