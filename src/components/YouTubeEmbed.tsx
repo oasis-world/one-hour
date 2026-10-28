@@ -1,35 +1,30 @@
 import { useState } from 'react'
+import { useYouTubePlayer } from './useYouTubePlayer'
+import MediaSkeleton from './MediaSkeleton'
 
 interface Props {
   id: string
   title?: string
+  storageKey?: string
 }
 
-export default function YouTubeEmbed({ id, title }: Props) {
-  const [loaded, setLoaded] = useState(false)
-  const src = `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1`
-
+export default function YouTubeEmbed({ id, title, storageKey }: Props) {
+  const [ready, setReady] = useState(false)
+  const iframeRef = useYouTubePlayer(id, storageKey)
   return (
     <div className="msg-youtube">
       <div className="msg-youtube-frame">
-        {!loaded && <div className="msg-youtube-placeholder" aria-hidden="true" />}
+        {!ready && <MediaSkeleton />}
         <iframe
-          src={src}
+          ref={iframeRef}
+          src={`https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&enablejsapi=1`}
           title={title || 'YouTube video'}
           loading="lazy"
+          onLoad={() => setReady(true)}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
-          onLoad={() => setLoaded(true)}
         />
       </div>
-      <a
-        className="msg-youtube-link"
-        href={`https://www.youtube.com/watch?v=${id}`}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        YouTube ↗
-      </a>
     </div>
   )
 }

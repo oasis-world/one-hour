@@ -340,6 +340,10 @@ button {
   cursor: pointer;
 }
 
+.chat-stage.is-hidden {
+  pointer-events: none;
+}
+
 .chat-column {
   cursor: default;
 }
@@ -387,6 +391,13 @@ button {
 .chat-column.is-folded {
   animation: fold-away 0.5s cubic-bezier(0.5, 0, 0.75, 0.2) forwards;
   pointer-events: none;
+}
+
+.chat-column.is-folded.is-settled {
+  animation: none;
+  opacity: 0;
+  transform: translate(-46vw, 34vh) scale(0.06) rotate(-8deg);
+  filter: blur(4px);
 }
 
 .chat-column.is-unfolding {
@@ -613,6 +624,7 @@ button {
   grid-template-columns: 34px minmax(0, 1fr);
   gap: 0 10px;
   padding: 4px 10px;
+  margin-bottom: 3px;
   border-radius: 10px;
   /* Overflow stays visible so the hover toolbar can float above the row
      top; only the dissolve animation clips (see .is-expiring). */
@@ -668,7 +680,7 @@ button {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding-top: 4px;
+  padding-top: 0;
 }
 
 .msg-avatar {
@@ -871,11 +883,24 @@ button {
   max-width: min(420px, 100%);
 }
 
+.msg-media-inview {
+  width: 100%;
+}
+
+.msg-media-inview-video {
+  aspect-ratio: 16 / 9;
+}
+
+.msg-media-inview-spotify {
+  height: 152px;
+}
+
 .msg-youtube {
-  border: 1px solid var(--line-soft);
-  border-radius: 14px;
-  overflow: hidden;
-  background: #000;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+  background: transparent;
 }
 
 .msg-youtube-frame {
@@ -885,12 +910,84 @@ button {
   background: #000;
 }
 
+.msg-youtube-frame,
+.msg-audio-frame,
+.msg-spotify-shell,
+.msg-media-audio:has(audio) {
+  position: relative;
+}
+
+.media-loading-skeleton {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: linear-gradient(100deg, #252525 25%, #383838 38%, #252525 60%);
+  background-size: 200% 100%;
+  animation: media-skeleton-shimmer 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
 .msg-youtube-frame iframe {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   border: 0;
+  box-shadow: none;
+}
+
+.msg-media-audio audio {
+  display: block;
+  width: 100%;
+  min-height: 42px;
+}
+
+.msg-audio-frame {
+  position: relative;
+  width: 100%;
+  min-height: 166px;
+}
+
+.msg-audio-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 166px;
+  border: 0;
+}
+
+.msg-spotify-shell {
+  position: relative;
+  width: 100%;
+  height: 152px;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  line-height: 0;
+}
+
+.msg-spotify-frame,
+.msg-spotify-frame iframe {
+  display: block;
+  width: 100%;
+  height: 152px !important;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  vertical-align: top;
+}
+
+@keyframes media-skeleton-shimmer {
+  to { background-position-x: -200%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-loading-skeleton { animation: none; }
 }
 
 .msg-youtube-placeholder {
@@ -1025,6 +1122,70 @@ button {
 
 .music-toggle:active {
   transform: scale(0.92);
+}
+
+/* Equalizer bars inside the music toggle. */
+.music-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+  width: 14px;
+}
+
+.music-bars span {
+  display: block;
+  width: 2.5px;
+  border-radius: 1.5px;
+  background: currentColor;
+  transition: height 0.2s ease;
+}
+
+.music-bars span:nth-child(1) {
+  height: 6px;
+}
+.music-bars span:nth-child(2) {
+  height: 11px;
+}
+.music-bars span:nth-child(3) {
+  height: 5px;
+}
+.music-bars span:nth-child(4) {
+  height: 9px;
+}
+
+.music-bars.is-playing span {
+  animation: music-bar-bounce 0.9s ease-in-out infinite;
+}
+
+.music-bars.is-playing span:nth-child(1) {
+  animation-delay: 0s;
+}
+.music-bars.is-playing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.music-bars.is-playing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.music-bars.is-playing span:nth-child(4) {
+  animation-delay: 0.45s;
+}
+
+@keyframes music-bar-bounce {
+  0%,
+  100% {
+    height: 4px;
+  }
+  50% {
+    height: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .music-bars.is-playing span {
+    animation: none;
+    height: 9px;
+  }
 }
 
 /* ---------- Jump-to-latest (bottom-right of the log) ---------- */

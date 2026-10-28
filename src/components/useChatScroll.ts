@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import type { ChatEntry } from '../lib/chatTypes'
+
+let savedListPosition: { top: number; atBottom: boolean } | null = null
 
 /**
  * Chat log scroll state machine (simplified from the oasis room hook):
@@ -18,6 +20,26 @@ export function useChatScroll(opts: {
   const [newMessageCount, setNewMessageCount] = useState(0)
   const atBottomRef = useRef(true)
   const programmaticRef = useRef(false)
+  const hasSavedPosition = savedListPosition !== null
+
+  // MessageList is unmounted while the room is folded. Restore before paint
+  // so the reader returns to the same part of the conversation.
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    const saved = savedListPosition
+    if (!el || !saved) return
+    programmaticRef.current = true
+    atBottomRef.current = saved.atBottom
+    el.scrollTop = saved.atBottom ? el.scrollHeight : saved.top
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    setShowJumpEnd(!saved.atBottom && distFromBottom > 56)
+    const frame = window.requestAnimationFrame(() => {
+      el.scrollTop = saved.atBottom ? el.scrollHeight : saved.top
+      programmaticRef.current = false
+      savedListPosition = { top: el.scrollTop, atBottom: saved.atBottom }
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [scrollRef])
 
   const scrollTo = useCallback(
     (top: number, smooth = false) => {
@@ -26,6 +48,7 @@ export function useChatScroll(opts: {
       programmaticRef.current = true
       if (smooth) el.scrollTo({ top, behavior: 'smooth' })
       else el.scrollTop = top
+      savedListPosition = { top: el.scrollTop, atBottom: atBottomRef.current }
       requestAnimationFrame(() => {
         programmaticRef.current = false
       })
@@ -56,6 +79,7 @@ export function useChatScroll(opts: {
     if (!el || programmaticRef.current) return
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     atBottomRef.current = distFromBottom <= 56
+    savedListPosition = { top: el.scrollTop, atBottom: atBottomRef.current }
     setShowJumpEnd(distFromBottom > 56)
     if (atBottomRef.current) setNewMessageCount(0)
   }, [scrollRef])
@@ -114,5 +138,5 @@ export function useChatScroll(opts: {
     scrollTo(el.scrollHeight)
   }, [scrollRef, scrollTo])
 
-  return { showJumpEnd, newMessageCount, scrollToEnd, jumpToEnd, handleScroll, stickToBottom }
+  return { showJumpEnd, newMessageCount, scrollToEnd, jumpToEnd, handleScroll, stickToBottom, hasSavedPosition }
 }

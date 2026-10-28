@@ -150,7 +150,7 @@ export default function MessageList({
   }, [entries, loadingOlder])
 
   // First paint: start at the newest line.
-  const startedRef = useRef(false)
+  const startedRef = useRef(scroll.hasSavedPosition)
   useLayoutEffect(() => {
     if (startedRef.current || entries.length === 0) return
     startedRef.current = true

@@ -20,10 +20,11 @@ import { withTimeout } from './lib/withTimeout'
 import { consumeFilePickerFlag } from './lib/filePickerGuard'
 import { popoverJustClosed } from './lib/popoverGuard'
 import { useLang, t } from './lib/i18n'
+import { pauseMessageMedia, resumeMessageMedia } from './lib/mediaPlayback'
+import { useBackgroundMusic } from './lib/useBackgroundMusic'
 import { loadCountdownAnimation, loadTheme, loadVeil, saveCountdownAnimation, type ThemeName } from './lib/settings'
 import type { CountdownAnimation } from './lib/countdownAnimations'
 import type { ChatEntry, MessageReply } from './lib/chatTypes'
-import { MUSIC_TRACKS } from './lib/musicTracks'
 
 /**
  * 一小时 / one-hour — the ephemeral chat room. Every message, text or
@@ -52,47 +53,8 @@ export default function App() {
   const [bgReady, setBgReady] = useState(false)
   /** Whether the initial choreography has completed (gates the reopen hint). */
   const [hasRevealed, setHasRevealed] = useState(false)
-  const [musicMuted, setMusicMuted] = useState(true)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const musicScheduledRef = useRef(false)
-  const musicMutedRef = useRef(true)
-  const lastTrackRef = useRef(-1)
-  const langRef = useRef(lang)
-
-  const pickTrack = useCallback(() => {
-    const musicLang = langRef.current.startsWith('zh') ? 'zh' : 'en'
-    const tracks = MUSIC_TRACKS[musicLang] ?? MUSIC_TRACKS.en
-    if (tracks.length === 0) return ''
-    let idx = Math.floor(Math.random() * tracks.length)
-    if (tracks.length > 1 && idx === lastTrackRef.current) {
-      idx = (idx + 1) % tracks.length
-    }
-    lastTrackRef.current = idx
-    return tracks[idx]
-  }, [])
-
-  const startTrack = useCallback((muted: boolean) => {
-    const audio = audioRef.current
-    if (!audio) return
-    audio.src = pickTrack()
-    audio.loop = false
-    audio.muted = muted
-    audio.setAttribute('playsinline', '')
-    musicMutedRef.current = muted
-    setMusicMuted(muted)
-    audio.load()
-    const tryPlay = () => void audio.play().catch(() => {})
-    audio.addEventListener('canplay', tryPlay, { once: true })
-    tryPlay()
-  }, [pickTrack])
-
-  const handleTrackEnded = useCallback(() => {
-    const audio = audioRef.current
-    if (!audio) return
-    audio.src = pickTrack()
-    audio.muted = musicMutedRef.current
-    void audio.play().catch(() => {})
-  }, [pickTrack])
+  const backgroundMusic = useBackgroundMusic(lang, Boolean(profile))
+  const { audioRef, muted: musicMuted, playing: musicPlaying, toggle: toggleMusic, ended: handleTrackEnded } = backgroundMusic
   /** Which account dialog view is open, if any. */
   const [accountView, setAccountView] = useState<'closed' | 'signin' | 'bind'>('closed')
   const [profileOpen, setProfileOpen] = useState(false)
@@ -163,6 +125,7 @@ export default function App() {
         revealStageTimer.current = null
         revealActive.current = false
         setFold('open')
+        resumeMessageMedia()
         setHasRevealed(true)
       }, UNFOLD_MS)
     }, 1500)
@@ -254,7 +217,6 @@ export default function App() {
     document.documentElement.lang = langMap[lang] ?? 'en'
     // Localized home-screen name for iOS "Add to Home Screen".
     document.title = t('一小时', 'One Hour')
-    langRef.current = lang
   }, [zh, lang])
 
   // First background ready → wait 1.5s, then unfold the chat from the
@@ -273,53 +235,6 @@ export default function App() {
     }, 4000)
     return () => window.clearTimeout(timer)
   }, [markBgReady])
-
-  // Start the looping background music 3s after the player has an identity.
-  useEffect(() => {
-    if (!profile || musicScheduledRef.current) return
-    musicScheduledRef.current = true
-    const timer = window.setTimeout(() => {
-      startTrack(true)
-    }, 3000)
-    return () => window.clearTimeout(timer)
-  }, [profile, startTrack])
-
-  /**
-   * Switching on always plays a brand-new random track right away (never
-   * resumes the old song). Switching off silences the room at once and
-   * stops streaming; the next switch-on draws another fresh track.
-   */
-  const toggleMusic = () => {
-    const audio = audioRef.current
-    if (!audio) return
-    if (!musicMuted) {
-      audio.muted = true
-      musicMutedRef.current = true
-      setMusicMuted(true)
-      audio.pause()
-      return
-    }
-    startTrack(false)
-  }
-
-  // Browsers may block the delayed autoplay; retry once the user interacts.
-  useEffect(() => {
-    const retry = () => {
-      if (!musicScheduledRef.current) return
-      const audio = audioRef.current
-      if (audio && audio.paused) {
-        audio.muted = musicMutedRef.current
-        if (!audio.src) audio.src = pickTrack()
-        void audio.play().catch(() => {})
-      }
-    }
-    window.addEventListener('pointerdown', retry)
-    window.addEventListener('touchstart', retry)
-    return () => {
-      window.removeEventListener('pointerdown', retry)
-      window.removeEventListener('touchstart', retry)
-    }
-  }, [pickTrack])
 
   // If the tab/app returns while folded, replay the choreography after
   // being away for a while. An open chat is deliberately left alone.
@@ -363,6 +278,7 @@ export default function App() {
 
   const closeChat = () => {
     if (fold !== 'open') return
+    pauseMessageMedia()
     setFold('folding')
     window.setTimeout(() => setFold('folded'), FOLD_MS)
   }
@@ -379,6 +295,7 @@ export default function App() {
       revealStageTimer.current = null
       revealActive.current = false
       setFold('open')
+      resumeMessageMedia()
     }, UNFOLD_MS)
   }
 
@@ -512,6 +429,8 @@ export default function App() {
         preload="auto"
         playsInline
         onEnded={handleTrackEnded}
+        onPlay={backgroundMusic.onPlay}
+        onPause={backgroundMusic.onPause}
       />
 
       <TopBar
@@ -558,25 +477,21 @@ export default function App() {
             toggleMusic()
           }}
         >
-          {musicMuted ? (
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-              <line x1="23" y1="9" x2="17" y2="15" />
-              <line x1="17" y1="9" x2="23" y2="15" />
-            </svg>
-          ) : (
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-            </svg>
-          )}
+          <span
+            className={`music-bars${musicPlaying ? ' is-playing' : ''}`}
+            aria-hidden="true"
+          >
+            <span />
+            <span />
+            <span />
+            <span />
+          </span>
         </button>
       )}
 
-      {chatMounted ? (
+      {
         <div
-          className="chat-stage"
+          className={`chat-stage${fold === 'folded' ? ' is-hidden' : ''}`}
           onClick={(e) => {
             // Desktop: the stage showing around the column is one big
             // "fold the chat" hit target; a click that only dismissed a
@@ -591,7 +506,7 @@ export default function App() {
         >
           <div
             className={`chat-column${
-              fold === 'folding' ? ' is-folded' : fold === 'unfolding' ? ' is-unfolding' : ''
+              fold === 'folding' ? ' is-folded' : fold === 'folded' ? ' is-folded is-settled' : fold === 'unfolding' ? ' is-unfolding' : ''
             }`}
           >
             <MessageList
@@ -644,7 +559,8 @@ export default function App() {
             )}
           </div>
         </div>
-      ) : hasRevealed ? (
+      }
+      {!chatMounted && hasRevealed ? (
         <>
           {/* Click anywhere on the scene to pull the chat back out. */}
           <div

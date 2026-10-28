@@ -3,8 +3,8 @@ import type { ChatEntry } from '../lib/chatTypes'
 import { t } from '../lib/i18n'
 import type { RoomReactionMap } from '../lib/chatReactions'
 import { isAutoTravelerName } from '../lib/nickname'
-import { findYouTubeVideos } from '../lib/youtube'
-import YouTubeEmbed from './YouTubeEmbed'
+import { findMessageMedia, stripRenderedMediaMarkup } from '../lib/messageMedia'
+import MessageMediaEmbed from './MessageMediaEmbed'
 import { userAvatarTint, userNameColor } from '../lib/identity'
 import AvatarBadge from './AvatarBadge'
 import CountdownRing from './CountdownRing'
@@ -102,7 +102,8 @@ export default function MessageRow({
   onJumpToReply,
 }: Props) {
   const imageSrc = entry.imageUrl ?? entry.localImage ?? null
-  const youtubeVideos = findYouTubeVideos(entry.content)
+  const messageMedia = findMessageMedia(entry.content)
+  const displayContent = stripRenderedMediaMarkup(entry.content)
 
   // Mobile long-press → bottom sheet. Scrolling (pointermove / cancel)
   // aborts the press; interactive children opt out via the closest() guard.
@@ -226,7 +227,7 @@ export default function MessageRow({
           </button>
         )}
         <div className="msg-body">
-          {renderMessageContent(entry.content)}
+          {renderMessageContent(displayContent)}
           {entry.editedAt && (
             <span className="msg-edited">{t('（已编辑）', ' (edited)')}</span>
           )}
@@ -263,10 +264,10 @@ export default function MessageRow({
             onClick={() => !entry.expiring && onImageClick(imageSrc)}
           />
         )}
-        {youtubeVideos.length > 0 && (
+        {messageMedia.length > 0 && (
           <div className="msg-youtube-list">
-            {youtubeVideos.map((v) => (
-              <YouTubeEmbed key={v.id} id={v.id} />
+            {messageMedia.map((media) => (
+              <MessageMediaEmbed key={media.key} media={media} storageKey={`${entry.id}:${media.key}`} />
             ))}
           </div>
         )}
