@@ -827,18 +827,34 @@ button {
   box-shadow: 0 8px 24px var(--shadow);
 }
 
+/* Never react to a press on the image itself — not even a tap highlight
+   or :active scale — so a long-press opens the menu without the photo
+   visibly moving first. */
+.msg-image:active,
+.msg-image:focus,
+.msg-image:focus-visible {
+  transform: none;
+  box-shadow: none;
+  outline: none;
+}
+
 /* Touch: :hover sticks after a tap and the scale jitter pushes the
    long-press menu around — keep the image still on coarse pointers. */
 @media (hover: none), (pointer: coarse) {
-  .msg-image {
+  .msg-image,
+  .msg-image:hover,
+  .msg-image:active,
+  .msg-image:focus,
+  .msg-image:focus-visible {
     transition: none;
+    transform: none;
+    box-shadow: none;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
     touch-action: manipulation;
-  }
-  .msg-image:hover {
-    transform: none;
-    box-shadow: none;
   }
 }
 

@@ -256,6 +256,7 @@ export default function MessageRow({
             alt=""
             loading="lazy"
             decoding="async"
+            draggable={false}
             onClick={() => !entry.expiring && onImageClick(imageSrc)}
           />
         )}
