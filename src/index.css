@@ -387,6 +387,20 @@ button {
   }
 }
 
+/* Touch devices in landscape keep a narrower chat column and shift the
+   room avatar right to clear the left edge. */
+@media (orientation: landscape) and (pointer: coarse) {
+  .chat-column {
+    width: 60vw;
+    max-width: 60vw;
+  }
+
+  .top-bar {
+    left: max(20px, env(safe-area-inset-left));
+    transform: none;
+  }
+}
+
 /* Fold into the bottom-left corner (close), unfold back (open). */
 .chat-column.is-folded {
   animation: fold-away 0.5s cubic-bezier(0.5, 0, 0.75, 0.2) forwards;

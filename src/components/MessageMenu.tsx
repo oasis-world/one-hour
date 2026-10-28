@@ -189,7 +189,7 @@ export default function MessageMenu({
   return (
     <div
       ref={ref}
-      className={`msg-menu${sheet ? ' is-sheet' : ''}`}
+      className={`msg-menu${sheet ? ' is-sheet' : ''}${sheet && confirming ? ' is-confirming' : ''}`}
       role="menu"
       aria-label={t('消息操作', 'Message actions')}
       style={sheet ? undefined : { left: pos.x, top: pos.y }}

@@ -478,7 +478,7 @@ export default function App() {
           }}
         >
           <span
-            className={`music-bars${musicPlaying ? ' is-playing' : ''}`}
+            className={`music-bars${musicPlaying && !musicMuted ? ' is-playing' : ''}`}
             aria-hidden="true"
           >
             <span />
