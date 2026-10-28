@@ -3,6 +3,8 @@ import type { ChatEntry } from '../lib/chatTypes'
 import { t } from '../lib/i18n'
 import type { RoomReactionMap } from '../lib/chatReactions'
 import { isAutoTravelerName } from '../lib/nickname'
+import { findYouTubeVideos } from '../lib/youtube'
+import YouTubeEmbed from './YouTubeEmbed'
 import { userAvatarTint, userNameColor } from '../lib/identity'
 import AvatarBadge from './AvatarBadge'
 import CountdownRing from './CountdownRing'
@@ -100,6 +102,7 @@ export default function MessageRow({
   onJumpToReply,
 }: Props) {
   const imageSrc = entry.imageUrl ?? entry.localImage ?? null
+  const youtubeVideos = findYouTubeVideos(entry.content)
 
   // Mobile long-press → bottom sheet. Scrolling (pointermove / cancel)
   // aborts the press; interactive children opt out via the closest() guard.
@@ -162,7 +165,7 @@ export default function MessageRow({
       onPointerDown={(e) => {
         if (!TOUCH || entry.expiring || e.pointerType === 'mouse') return
         const target = e.target as HTMLElement | null
-        if (target?.closest?.('button, a, textarea, input')) return
+        if (target?.closest?.('button, a, textarea, input, iframe')) return
         sheetFired.current = false
         pressStart.current = { x: e.clientX, y: e.clientY }
         if (pressTimer.current !== null) window.clearTimeout(pressTimer.current)
@@ -259,6 +262,13 @@ export default function MessageRow({
             draggable={false}
             onClick={() => !entry.expiring && onImageClick(imageSrc)}
           />
+        )}
+        {youtubeVideos.length > 0 && (
+          <div className="msg-youtube-list">
+            {youtubeVideos.map((v) => (
+              <YouTubeEmbed key={v.id} id={v.id} />
+            ))}
+          </div>
         )}
         {!entry.expiring && reactions && (
           <MsgReactions reactions={reactions} onToggle={(emoji) => onReact(entry.id, emoji)} />

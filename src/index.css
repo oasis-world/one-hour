@@ -863,6 +863,55 @@ button {
   opacity: 0.85;
 }
 
+.msg-youtube-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  max-width: min(420px, 100%);
+}
+
+.msg-youtube {
+  border: 1px solid var(--line-soft);
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+}
+
+.msg-youtube-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+
+.msg-youtube-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.msg-youtube-placeholder {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #1a1d26, #0e1014);
+}
+
+.msg-youtube-link {
+  display: block;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--ink-mute);
+  text-decoration: none;
+  background: var(--row-hover, rgba(255, 255, 255, 0.04));
+}
+
+.msg-youtube-link:hover {
+  color: var(--accent);
+}
+
 /* ---------- Countdown ring ---------- */
 
 .msg-countdown {
