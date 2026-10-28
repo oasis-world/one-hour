@@ -2,13 +2,16 @@
 
 > Language: **English** | [中文](README.zh-CN.md)
 
-An ephemeral public chat room: **every message (text or photo) lives for exactly one hour, both locally and in the cloud.** When its hour runs out the message dissolves gracefully, and every player online watches it leave together.
+An ephemeral public chat room: **every message (text or photo) lives for exactly one hour, both locally and in the cloud.** When its hour runs out the message dissolves gracefully, and every player online watches it leave together. And this is a small experimental social product and exploring new ways to make social interactions more engaging with AI.
 
 ## Features
 
 - 🕐 **One-hour lifecycle**: Every message (text or photo) exists for exactly one hour from send time. Each message carries a ring countdown (mm:ss) — amber in the last 10 minutes, red and pulsing in the last 2. When time runs out it blurs upward and folds away (`msg-dissolve`), removed from IndexedDB and the cloud at once, with other players seeing the same farewell over Realtime DELETE. The countdown's visual style can be switched from the settings menu (classic ring, soft progress line, fading segments, breathing light, gradient halo, orbiting dot, and more).
+
 - 🖼️ **Image messages**: Desktop uploads via the `+` menu (multi-select up to 5, each becomes its own message); on touch devices `+` expands to "Take photo / Photo library", with the camera capturing directly. Photos are compressed in-browser (long edge 1440px, JPEG 0.82) with HEIC/HEIF auto-conversion; on weak/offline networks the image Blob travels with the text in the IndexedDB outbox and retries with backoff (per-file timeouts keep one stuck decode from blocking the rest). Tap any image to open the fullscreen viewer with swipe, pinch/double-tap zoom, pan, and vertical-fling dismiss. Images expire and are cleaned up with their message.
+
 - 🌄 **Dynamic backdrop**: The fullscreen backdrop prefers the newest image in chat (synchronized across all clients, including its countdown); with no chat image it fetches a random photo (official Unsplash API when `VITE_UNSPLASH_ACCESS_KEY` is set, otherwise the keyless picsum Unsplash-sourced feed). Either way each backdrop photo stays at most one hour, then crossfades to a new one; a new chat image takes over immediately. The backdrop blurs while chat is open; tapping the top-right X folds the whole chat column (input included) into the bottom-left corner and the backdrop goes fully clear; tapping anywhere (or the bottom-left hint) unfolds it again. While folded, a ring-only countdown in the bottom-right shows the remaining backdrop slot, and a globe button opens the source photo.
+
 - 🟢 **Realtime sync**: Supabase Realtime (postgres_changes INSERT/UPDATE/DELETE + presence) keeps new messages, edits, reactions, disappearances, and the online list in sync, with catch-up on reconnect and tab return.
 
 ## Quick start

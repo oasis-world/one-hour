@@ -26,33 +26,12 @@ export default function BackgroundStage({
   revealed: boolean
   onReady?: () => void
 }) {
-  const [cloudLive, setCloudLive] = useState<string | null>(() => {
-    try {
-      const persisted = JSON.parse(localStorage.getItem(BG_STATE_KEY) || 'null') as BgState | null
-      if (persisted?.type === 'cloud') {
-        const ttl = loadBgTtlMs()
-        const since = persisted.since || Date.now()
-        if (Date.now() - since < ttl) return persisted.url
-      }
-    } catch {
-      // ignore
-    }
-    return null
-  })
+  // Never restore a blob: URL from a previous session — object URLs do not
+  // survive a reload, so a persisted value would paint a broken image.
+  // Always start empty and fetch a fresh cloud photo when needed.
+  const [cloudLive, setCloudLive] = useState<string | null>(null)
   const [cloudPhoto, setCloudPhoto] = useState<BackgroundPhoto | null>(null)
-  const [cloudSlotSince, setCloudSlotSince] = useState<number>(() => {
-    try {
-      const persisted = JSON.parse(localStorage.getItem(BG_STATE_KEY) || 'null') as BgState | null
-      if (persisted?.type === 'cloud') {
-        const ttl = loadBgTtlMs()
-        const since = persisted.since || Date.now()
-        if (Date.now() - since < ttl) return since
-      }
-    } catch {
-      // ignore
-    }
-    return 0
-  })
+  const [cloudSlotSince, setCloudSlotSince] = useState<number>(0)
 
   // Chat photos are derived directly from the (globally synchronized) prop,
   // so every client shows the same photo with the same countdown. Only cloud

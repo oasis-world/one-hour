@@ -2,13 +2,16 @@
 
 > Language: [English](README.md) | **中文**
 
-一个 ephemeral public chat room: **every message (text or photo) lives for exactly one hour, both locally and in the cloud.** When its hour runs out the message dissolves gracefully, and every player online watches it leave together.
+一个阅后即焚的公共聊天室：**每条消息（文字或图片）在本地与云端都只存在 1 小时。** 倒计时归零后消息优雅消散，所有在线玩家同时目送它离开。这也是一个小型实验性社交产品，探索用 AI 让社交互动更有趣、更吸引人。
 
 ## 功能
 
 - 🕐 **一小时生命周期**：每条消息（文字或图片）从发送起只存在 1 小时；消息旁有环形倒计时（mm:ss），最后 10 分钟变琥珀色、最后 2 分钟红色脉动；归零时消息模糊上浮、折叠消失（`msg-dissolve` 动画），本地 IndexedDB 与云端同时删除，其它玩家通过 Realtime DELETE 同步看到。倒计时的视觉样式可在设置菜单中自由切换（经典圆环、轻盈进度线、渐隐刻度、呼吸光点、渐变光环、轨道光点等）。
+
 - 🖼️ **图片消息**：桌面端通过 `+` 菜单上传图片（支持多选，最多 5 张，每张作为独立消息）；触屏设备 `+` 自动展开为「拍照 / 从相册选择」，拍照直接调起后置摄像头。发送前在浏览器内压缩（长边 1440px / JPEG 0.82），并兼容 HEIC/HEIF 相册格式（自动转码）；弱网/断网时图片 Blob 与文字一起进入 IndexedDB outbox，指数退避自动重试，单文件超时保护避免卡死。点击消息图片可全屏查看，支持左右滑动切换、双击/捏合缩放、拖拽平移与垂直滑动关闭。图片随消息一小时后自动过期并清理。
+
 - 🌄 **动态背景**：全屏背景优先显示聊天里最新一张图片（所有客户端同步同一张图与倒计时）；聊天里没有图片时自动从随机图源取一张（配置 `VITE_UNSPLASH_ACCESS_KEY` 使用 Unsplash 官方 API，未配置时使用 picsum 的 Unsplash 图源，开箱即用）。无论来源，每张背景图最多展示 1 小时，到时自动淡出换新；新的聊天图片随时接管。聊天展开时背景高斯模糊；点击右上角 X，整个聊天列（含输入区）折叠进屏幕左下角，背景随之完全清晰；再点击画面任意处（或左下角提示）又从左下角弹出展开。折叠状态下右下角显示仅圆环（无数字）的小倒计时，提示当前背景图剩余展示时间；右下角地球按钮可打开图源原图。
+
 - 🟢 **实时同步**：Supabase Realtime（postgres_changes INSERT/UPDATE/DELETE + presence），新消息、编辑、表情反应、消失事件与在线列表实时同步；断线重连与标签页切回自动 catch-up。
 
 ## 快速开始
