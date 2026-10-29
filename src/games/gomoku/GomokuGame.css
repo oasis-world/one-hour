@@ -242,7 +242,7 @@
   .gomoku-board { width: 100%; max-width: none; }
   .gomoku-head { align-items: flex-start; }
   .gomoku-heading { align-items: center; }
-  .gomoku-status { display: block; }
+  .gomoku-status { display: block; position: relative; top: -2px; }
   .gomoku-actions button,
   .gomoku-confirm-actions button {
     min-height: 36px;

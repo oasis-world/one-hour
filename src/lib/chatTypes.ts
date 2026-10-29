@@ -47,6 +47,8 @@ export interface PresenceMember {
   avatarSeed: string | null
   /** Custom photo avatar URL; wins over the generated look. */
   avatarUrl: string | null
+  role?: string
+  profileExpiresAt?: number | null
   /** epoch ms — when this member entered the room (last track). */
   enteredAt: number
 }

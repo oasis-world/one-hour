@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { ChatEntry, ChatStatus, MessageReply } from '../lib/chatTypes'
+import type { ChatEntry, ChatStatus, MessageReply, PresenceMember } from '../lib/chatTypes'
 import { setPopoverOpen } from '../lib/popoverGuard'
 import {
   recordEmojiUse,
@@ -14,6 +14,7 @@ import { useChatScroll } from './useChatScroll'
 interface Props {
   entries: ChatEntry[]
   selfId: string | null
+  presence: PresenceMember[]
   status: ChatStatus
   layoutKey: boolean
   incomingMessageSequence: number
@@ -47,6 +48,7 @@ interface OpenMenu {
 export default function MessageList({
   entries,
   selfId,
+  presence,
   status,
   layoutKey,
   incomingMessageSequence,
@@ -250,6 +252,16 @@ export default function MessageList({
             key={entry.id}
             entry={entry}
             mine={entry.userId === selfId}
+            author={presence.find((member) => member.userId === entry.userId) ?? {
+              userId: entry.userId,
+              displayName: entry.displayName,
+              avatarStyle: entry.avatarStyle ?? null,
+              avatarSeed: entry.avatarSeed ?? null,
+              avatarUrl: entry.avatarUrl ?? null,
+              role: '',
+              profileExpiresAt: entry.at + 60 * 60 * 1000,
+              enteredAt: entry.at,
+            }}
             menuOpen={menu?.entry.id === entry.id}
             reactions={reactions[entry.id]}
             onImageClick={onImageClick}

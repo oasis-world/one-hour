@@ -1,7 +1,7 @@
 import type { AccountState } from './account'
 import { isSupabaseConfigured } from './supabaseConfig'
 import type { AvatarLook } from './avatar'
-import { loadUserProfile, preWelcomeProfile } from './userProfile'
+import { getProfileExpiresAt, loadUserProfile, preWelcomeProfile } from './userProfile'
 import { VAULT_KEYS, vaultGetSync, vaultRemove, vaultSet } from './vault'
 
 /** Room identity: every visitor gets one via anonymous sign-in. */
@@ -12,6 +12,8 @@ export interface ChatIdentity {
   avatar: AvatarLook | null
   /** Custom photo avatar URL; wins over the generated look. */
   avatarUrl: string | null
+  role: string
+  profileExpiresAt: number | null
 }
 
 const LOCAL_UID_KEY = 'one-hour-local-uid'
@@ -23,13 +25,15 @@ export function resolveChatIdentity(account: AccountState): ChatIdentity | null 
   const displayName = profile.nickname
   const avatar: AvatarLook | null = { style: profile.style, seed: profile.seed }
   const avatarUrl = profile.avatarUrl ?? null
+  const role = profile.role ?? ''
+  const profileExpiresAt = getProfileExpiresAt()
   if (account.userId) {
-    return { userId: account.userId, displayName, avatar, avatarUrl }
+    return { userId: account.userId, displayName, avatar, avatarUrl, role, profileExpiresAt }
   }
   // Supabase unconfigured: run as a purely local player so the room (and
   // its one-hour rule) works end-to-end without any backend.
   if (!isSupabaseConfigured()) {
-    return { userId: localUserId(), displayName, avatar, avatarUrl }
+    return { userId: localUserId(), displayName, avatar, avatarUrl, role, profileExpiresAt }
   }
   return null
 }

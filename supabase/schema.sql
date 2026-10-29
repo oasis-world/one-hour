@@ -243,7 +243,14 @@ security definer
 set search_path = public
 as $$
 begin
-  delete from public.chat_messages where expires_at <= now();
+  delete from public.chat_messages m
+  where m.expires_at <= now()
+     or exists (
+       select 1 from public.profiles p
+       where p.user_id = m.user_id
+         and p.expires_at is not null
+         and p.expires_at <= now()
+     );
   delete from public.gomoku_states where expires_at <= now();
 end;
 $$;
@@ -323,6 +330,29 @@ drop policy if exists "players may update their own profile"
 create policy "players may update their own profile"
   on public.profiles for update
   using (auth.uid() = user_id);
+
+drop policy if exists "players may delete their own profile"
+  on public.profiles;
+create policy "players may delete their own profile"
+  on public.profiles for delete
+  using (auth.uid() = user_id);
+
+create or replace function public.delete_profile_messages()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.chat_messages where user_id = old.user_id;
+  return old;
+end;
+$$;
+
+drop trigger if exists delete_profile_messages on public.profiles;
+create trigger delete_profile_messages
+  after delete on public.profiles
+  for each row execute function public.delete_profile_messages();
 
 -- ── Scheduled bucket sweep (Edge Function) ─────────────────────────────────
 --

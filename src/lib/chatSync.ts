@@ -66,6 +66,7 @@ export interface ChatApi {
   edit(id: string, content: string): void
   toggleReaction(messageId: string, emoji: string, active: boolean): Promise<boolean>
   updateIdentity(identity: ChatIdentity): void
+  expireUserMessages(userId: string): void
   leave(): void
 }
 
@@ -113,6 +114,12 @@ export function enterChat(
     if (url) {
       localUrls.delete(id)
       URL.revokeObjectURL(url)
+    }
+  }
+
+  const expireUserMessages = (userId: string) => {
+    for (const entry of [...entries]) {
+      if (entry.userId === userId) dropEntry(entry.id)
     }
   }
 
@@ -611,6 +618,7 @@ export function enterChat(
       currentIdentity = next
       handle?.track(next)
     },
+    expireUserMessages,
     leave() {
       closed = true
       if (retryTimer) clearTimeout(retryTimer)

@@ -914,6 +914,22 @@ button {
   padding-top: 0;
 }
 
+.msg-author-avatar-trigger,
+.msg-author-name-trigger {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.msg-author-avatar-trigger { display: block; border-radius: 50%; }
+.msg-author-avatar-trigger:focus-visible,
+.msg-author-name-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 .msg-avatar {
   width: 32px;
   height: 32px;
@@ -944,11 +960,15 @@ button {
 }
 
 .msg-head {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
+
+.author-pop-portal { position: fixed; z-index: 100; }
+.author-pop-portal .account-pop { position: static; width: min(272px, calc(100vw - 24px)); translate: none; text-align: left; }
 
 .msg-name {
   font-size: 13.5px;

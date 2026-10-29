@@ -23,7 +23,6 @@ import { useMobileKeyboard } from './lib/useMobileKeyboard'
 import './lib/settingsRuntime'
 import { fileToChatImage, looksLikeHeic } from './lib/imageBlob'
 import { withTimeout } from './lib/withTimeout'
-import { consumeFilePickerFlag } from './lib/filePickerGuard'
 import { popoverJustClosed } from './lib/popoverGuard'
 import { useLang, t } from './lib/i18n'
 import { pauseMessageMedia, resumeMessageMedia } from './lib/mediaPlayback'
@@ -62,7 +61,7 @@ export default function App() {
   const lang = useLang()
   const zh = lang === 'zh'
   const [fold, setFold] = useState<FoldState>('folded')
-  /** First remote (or fallback) background is ready — drives the 1.5s chat reveal. */
+  /** First remote (or fallback) background is ready — starts the chat reveal delay. */
   const [bgReady, setBgReady] = useState(false)
   /** Whether the initial choreography has completed (gates the reopen hint). */
   const [hasRevealed, setHasRevealed] = useState(false)
@@ -108,16 +107,6 @@ export default function App() {
       the second call would clobber the first mid-flight (its inner timer
       escapes cancellation) and the unfold animation plays twice. */
   const revealActive = useRef(false)
-  const pendingReveal = useRef(false)
-  const hiddenAt = useRef<number>(0)
-  const blurAt = useRef<number>(0)
-  // Live mirror of the fold state for the focus/visibility handlers (their
-  // closure would otherwise see a stale value).
-  const foldRef = useRef(fold)
-  useEffect(() => {
-    foldRef.current = fold
-  }, [fold])
-
   const cancelRevealTimers = useCallback(() => {
     if (revealTimer.current) {
       window.clearTimeout(revealTimer.current)
@@ -143,28 +132,11 @@ export default function App() {
         resumeMessageMedia()
         setHasRevealed(true)
       }, UNFOLD_MS)
-    }, 1500)
+    }, 2500)
   }, [cancelRevealTimers])
 
-  /** Away-return entry: coalesces the duplicate visibility+focus events
-      into a single choreography — but only when the chat is folded. An
-      open chat must stay put: replaying would unmount the composer and
-      wipe an unsent draft, then replay the unfold for no reason. */
-  const requestReveal = useCallback(() => {
-    if (revealActive.current) return
-    if (foldRef.current !== 'folded') return
-    if (bgReadyRef.current) scheduleReveal()
-    else pendingReveal.current = true
-  }, [scheduleReveal])
-
   const markBgReady = useCallback(() => {
-    if (bgReadyRef.current) {
-      if (pendingReveal.current) {
-        pendingReveal.current = false
-        scheduleReveal()
-      }
-      return
-    }
+    if (bgReadyRef.current) return
     bgReadyRef.current = true
     setBgReady(true)
     const splash = document.getElementById('splash')
@@ -175,11 +147,7 @@ export default function App() {
         window.setTimeout(() => splash.remove(), 450)
       }, delay)
     }
-    if (pendingReveal.current) {
-      pendingReveal.current = false
-      scheduleReveal()
-    }
-  }, [scheduleReveal])
+  }, [])
 
   // Signed-in players carry their profile in the cloud; guests stay local.
   useEffect(() => watchAccountForProfileSync(), [])
@@ -188,12 +156,15 @@ export default function App() {
   // purge the profile (local + cloud) and recreate the anonymous session,
   // which re-opens the welcome gate.
   const expiringRef = useRef(false)
+  const currentUserId = room.identity?.userId
+  const expireUserMessages = room.expireUserMessages
   useEffect(() => {
     const check = () => {
       const exp = getProfileExpiresAt()
       if (!exp || expiringRef.current) return
       if (Date.now() < exp) return
       expiringRef.current = true
+      if (currentUserId) expireUserMessages(currentUserId)
       void expireAnonymousProfile().finally(() => {
         expiringRef.current = false
       })
@@ -201,7 +172,7 @@ export default function App() {
     check()
     const id = window.setInterval(check, 1000)
     return () => window.clearInterval(id)
-  }, [])
+  }, [currentUserId, expireUserMessages])
 
   const systemTheme = (): ThemeName => {
     try {
@@ -253,13 +224,13 @@ export default function App() {
     document.title = t('一小时', 'One Hour')
   }, [zh, lang])
 
-  // First background ready → wait 1.5s, then unfold the chat from the
-  // bottom-left corner.
+  // Once the background is ready and the welcome gate is complete, let the
+  // scene sit for 2.5s before unfolding the chat from the bottom-left.
   useEffect(() => {
-    if (!bgReady) return
+    if (!bgReady || !profile) return
     const timer = window.setTimeout(scheduleReveal, 0)
     return () => window.clearTimeout(timer)
-  }, [bgReady, scheduleReveal])
+  }, [bgReady, profile, scheduleReveal])
 
   // Fallback: if no background arrives (offline / blocked), promote the
   // CSS blur backdrop after 4s so the app is never stuck on the splash.
@@ -269,40 +240,6 @@ export default function App() {
     }, 4000)
     return () => window.clearTimeout(timer)
   }, [markBgReady])
-
-  // If the tab/app returns while folded, replay the choreography after
-  // being away for a while. An open chat is deliberately left alone.
-  useEffect(() => {
-    if (!hiddenAt.current) hiddenAt.current = Date.now()
-    const onVisibility = () => {
-      if (document.hidden) {
-        hiddenAt.current = Date.now()
-      } else if (Date.now() - hiddenAt.current > 1000) {
-        // Returning from the native picker/camera is not "away" — and
-        // replaying here would unmount the composer before `change` fires.
-        if (consumeFilePickerFlag()) return
-        requestReveal()
-      }
-    }
-    const onBlur = () => {
-      blurAt.current = Date.now()
-    }
-    const onFocus = () => {
-      if (blurAt.current && Date.now() - blurAt.current > 1000) {
-        // Same picker guard as above (desktop file dialog path).
-        if (consumeFilePickerFlag()) return
-        requestReveal()
-      }
-    }
-    document.addEventListener('visibilitychange', onVisibility)
-    window.addEventListener('blur', onBlur)
-    window.addEventListener('focus', onFocus)
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibility)
-      window.removeEventListener('blur', onBlur)
-      window.removeEventListener('focus', onFocus)
-    }
-  }, [requestReveal])
 
   const showToast = (text: string) => {
     setToast(text)
@@ -559,6 +496,7 @@ export default function App() {
             <MessageList
               entries={room.entries}
               selfId={room.identity?.userId ?? null}
+              presence={room.presence}
               status={room.status}
               layoutKey={fold === 'unfolding'}
               incomingMessageSequence={room.incomingMessageSequence}

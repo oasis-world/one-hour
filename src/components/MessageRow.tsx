@@ -1,5 +1,6 @@
-import { useRef, type ReactNode } from 'react'
-import type { ChatEntry } from '../lib/chatTypes'
+import { useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import type { ChatEntry, PresenceMember } from '../lib/chatTypes'
 import { t } from '../lib/i18n'
 import type { RoomReactionMap } from '../lib/chatReactions'
 import { isAutoTravelerName } from '../lib/nickname'
@@ -13,10 +14,12 @@ import CountdownRing from './CountdownRing'
 import { TravelerGlyph } from './icons'
 import MsgHoverBar from './MsgHoverBar'
 import MsgReactions from './MsgReactions'
+import MessageAuthorCard from './MessageAuthorCard'
 
 interface Props {
   entry: ChatEntry
   mine: boolean
+  author: PresenceMember
   menuOpen: boolean
   reactions: RoomReactionMap | undefined
   onImageClick: (src: string) => void
@@ -94,6 +97,7 @@ function renderMessageContent(content: string): ReactNode {
 export default function MessageRow({
   entry,
   mine,
+  author,
   menuOpen,
   reactions,
   onImageClick,
@@ -107,6 +111,28 @@ export default function MessageRow({
   const messageMedia = findMessageMedia(entry.content)
   const displayContent = stripRenderedMediaMarkup(entry.content)
   const gameRef = parseGameRef(entry.content)
+  const [authorOpen, setAuthorOpen] = useState(false)
+  const [authorPosition, setAuthorPosition] = useState<{ left: number; top: number } | null>(null)
+  const authorCloseTimer = useRef<number | null>(null)
+  const positionAuthor = (target: HTMLElement) => {
+    const rect = target.getBoundingClientRect()
+    const left = Math.max(12, Math.min(rect.left, window.innerWidth - 284))
+    const top = window.innerHeight - rect.bottom > 130 ? rect.bottom + 8 : rect.top - 112
+    setAuthorPosition({ left, top })
+  }
+  const openAuthor = (event: MouseEvent<HTMLElement>) => {
+    if (authorCloseTimer.current) window.clearTimeout(authorCloseTimer.current)
+    positionAuthor(event.currentTarget)
+    setAuthorOpen(true)
+  }
+  const closeAuthorSoon = () => {
+    if (authorCloseTimer.current) window.clearTimeout(authorCloseTimer.current)
+    authorCloseTimer.current = window.setTimeout(() => setAuthorOpen(false), 120)
+  }
+  const toggleAuthor = (event: MouseEvent<HTMLElement>) => {
+    positionAuthor(event.currentTarget)
+    setAuthorOpen((open) => !open)
+  }
 
   // Mobile long-press → bottom sheet. Scrolling (pointermove / cancel)
   // aborts the press; interactive children opt out via the closest() guard.
@@ -183,7 +209,8 @@ export default function MessageRow({
       onPointerUp={endPress}
       onPointerCancel={endPress}
     >
-      <div className="msg-gutter" aria-hidden="true">
+      <div className="msg-gutter">
+        <button type="button" className="msg-author-avatar-trigger" aria-label={`Profile: ${entry.displayName}`} onClick={toggleAuthor} onMouseEnter={openAuthor} onMouseLeave={closeAuthorSoon}>
         {entry.avatarUrl || (entry.avatarStyle && entry.avatarSeed) ? (
           <AvatarBadge
             look={{
@@ -206,12 +233,13 @@ export default function MessageRow({
             )}
           </span>
         )}
+        </button>
       </div>
       <div className="msg-main">
         <div className="msg-head">
-          <span className="msg-name" style={{ color: userNameColor(entry.userId) }}>
+          <button type="button" className="msg-name msg-author-name-trigger" style={{ color: userNameColor(entry.userId) }} onClick={toggleAuthor} onMouseEnter={openAuthor} onMouseLeave={closeAuthorSoon}>
             {entry.displayName}
-          </span>
+          </button>
           <span className="msg-dot" aria-hidden="true" />
           <CountdownRing entry={entry} />
         </div>
@@ -291,6 +319,19 @@ export default function MessageRow({
           />
         )}
       </div>
+      {authorOpen && authorPosition && createPortal(
+        <div
+          className="author-pop-portal"
+          style={{ left: authorPosition.left, top: authorPosition.top }}
+          onMouseEnter={() => {
+            if (authorCloseTimer.current) window.clearTimeout(authorCloseTimer.current)
+          }}
+          onMouseLeave={closeAuthorSoon}
+        >
+          <MessageAuthorCard member={author} />
+        </div>,
+        document.body,
+      )}
     </div>
   )
 }

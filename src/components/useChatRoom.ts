@@ -67,12 +67,13 @@ export function useChatRoom(enabled: boolean) {
 
   const displayName = identity?.displayName
   const avatarUrl = identity?.avatarUrl ?? null
+  const profileDetails = `${identity?.role ?? ''}:${identity?.profileExpiresAt ?? ''}`
   const avatarKey = `${identity?.avatar ? `${identity.avatar.style}:${identity.avatar.seed}` : ''}|${avatarUrl ?? ''}`
   useEffect(() => {
     if (!identity || apiRef.current == null) return
     apiRef.current.updateIdentity(identity)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, displayName, avatarKey, avatarUrl])
+  }, [userId, displayName, avatarKey, avatarUrl, profileDetails])
 
   const send = useCallback((text: string, imageBlob?: Blob, replyTo?: MessageReply | null) => {
     apiRef.current?.send(text, imageBlob, replyTo)
@@ -111,6 +112,7 @@ export function useChatRoom(enabled: boolean) {
       apiRef.current?.loadOlder() ?? Promise.resolve({ loaded: 0, hasMore: false })
     )
   }, [])
+  const expireUserMessages = useCallback((id: string) => apiRef.current?.expireUserMessages(id), [])
 
   const active = enabled && identity !== null
   const reactions = useMemo(
@@ -129,6 +131,7 @@ export function useChatRoom(enabled: boolean) {
     toggleReaction,
     incomingMessageSequence,
     loadOlder,
+    expireUserMessages,
     identity,
   }
 }
