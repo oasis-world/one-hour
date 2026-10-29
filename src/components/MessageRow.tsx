@@ -1,7 +1,8 @@
-import { useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { ChatEntry, PresenceMember } from '../lib/chatTypes'
 import { t } from '../lib/i18n'
+import { setPopoverOpen, suppressNextClick } from '../lib/popoverGuard'
 import type { RoomReactionMap } from '../lib/chatReactions'
 import { isAutoTravelerName } from '../lib/nickname'
 import { findMessageMedia, stripRenderedMediaMarkup } from '../lib/messageMedia'
@@ -113,26 +114,39 @@ export default function MessageRow({
   const gameRef = parseGameRef(entry.content)
   const [authorOpen, setAuthorOpen] = useState(false)
   const [authorPosition, setAuthorPosition] = useState<{ left: number; top: number } | null>(null)
-  const authorCloseTimer = useRef<number | null>(null)
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null)
+  const avatarButtonRef = useRef<HTMLButtonElement>(null)
+  const authorPopoverRef = useRef<HTMLDivElement>(null)
   const positionAuthor = (target: HTMLElement) => {
     const rect = target.getBoundingClientRect()
     const left = Math.max(12, Math.min(rect.left, window.innerWidth - 284))
     const top = window.innerHeight - rect.bottom > 130 ? rect.bottom + 8 : rect.top - 112
     setAuthorPosition({ left, top })
   }
-  const openAuthor = (event: MouseEvent<HTMLElement>) => {
-    if (authorCloseTimer.current) window.clearTimeout(authorCloseTimer.current)
-    positionAuthor(event.currentTarget)
-    setAuthorOpen(true)
-  }
-  const closeAuthorSoon = () => {
-    if (authorCloseTimer.current) window.clearTimeout(authorCloseTimer.current)
-    authorCloseTimer.current = window.setTimeout(() => setAuthorOpen(false), 120)
-  }
   const toggleAuthor = (event: MouseEvent<HTMLElement>) => {
     positionAuthor(event.currentTarget)
+    setPortalRoot(event.currentTarget.closest<HTMLElement>('.app-shell'))
     setAuthorOpen((open) => !open)
   }
+
+  useEffect(() => {
+    if (!authorOpen) return
+    setPopoverOpen(true)
+    const dismissOutside = (event: PointerEvent) => {
+      const target = event.target as Node | null
+      if (avatarButtonRef.current?.contains(target) || authorPopoverRef.current?.contains(target)) return
+      suppressNextClick()
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation()
+      setAuthorOpen(false)
+    }
+    window.addEventListener('pointerdown', dismissOutside, true)
+    return () => {
+      setPopoverOpen(false)
+      window.removeEventListener('pointerdown', dismissOutside, true)
+    }
+  }, [authorOpen])
 
   // Mobile long-press → bottom sheet. Scrolling (pointermove / cancel)
   // aborts the press; interactive children opt out via the closest() guard.
@@ -210,7 +224,7 @@ export default function MessageRow({
       onPointerCancel={endPress}
     >
       <div className="msg-gutter">
-        <button type="button" className="msg-author-avatar-trigger" aria-label={`Profile: ${entry.displayName}`} onClick={toggleAuthor} onMouseEnter={openAuthor} onMouseLeave={closeAuthorSoon}>
+        <button ref={avatarButtonRef} type="button" className="msg-author-avatar-trigger" aria-label={`Profile: ${entry.displayName}`} onClick={toggleAuthor}>
         {entry.avatarUrl || (entry.avatarStyle && entry.avatarSeed) ? (
           <AvatarBadge
             look={{
@@ -218,13 +232,13 @@ export default function MessageRow({
               seed: entry.avatarSeed ?? '',
               url: entry.avatarUrl || null,
             }}
-            size={32}
+            size={TOUCH ? 37 : 35}
             className="msg-avatar-img"
           />
         ) : (
           <span
             className="msg-avatar"
-            style={{ background: userAvatarTint(entry.userId) }}
+            style={{ background: userAvatarTint(entry.userId), width: TOUCH ? 37 : 35, height: TOUCH ? 37 : 35 }}
           >
             {isAutoTravelerName(entry.displayName) ? (
               <TravelerGlyph size={19} />
@@ -237,9 +251,9 @@ export default function MessageRow({
       </div>
       <div className="msg-main">
         <div className="msg-head">
-          <button type="button" className="msg-name msg-author-name-trigger" style={{ color: userNameColor(entry.userId) }} onClick={toggleAuthor} onMouseEnter={openAuthor} onMouseLeave={closeAuthorSoon}>
+          <span className="msg-name" style={{ color: userNameColor(entry.userId) }}>
             {entry.displayName}
-          </button>
+          </span>
           <span className="msg-dot" aria-hidden="true" />
           <CountdownRing entry={entry} />
         </div>
@@ -321,16 +335,13 @@ export default function MessageRow({
       </div>
       {authorOpen && authorPosition && createPortal(
         <div
+          ref={authorPopoverRef}
           className="author-pop-portal"
           style={{ left: authorPosition.left, top: authorPosition.top }}
-          onMouseEnter={() => {
-            if (authorCloseTimer.current) window.clearTimeout(authorCloseTimer.current)
-          }}
-          onMouseLeave={closeAuthorSoon}
         >
           <MessageAuthorCard member={author} />
         </div>,
-        document.body,
+        portalRoot ?? document.body,
       )}
     </div>
   )

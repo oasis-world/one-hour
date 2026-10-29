@@ -9,6 +9,20 @@
 
 let openCount = 0
 let closedAt = 0
+let swallowClickUntil = 0
+
+export function suppressNextClick() {
+  swallowClickUntil = Date.now() + 700
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('click', (event) => {
+    if (Date.now() > swallowClickUntil) return
+    swallowClickUntil = 0
+    event.preventDefault()
+    event.stopImmediatePropagation()
+  }, true)
+}
 
 export function setPopoverOpen(open: boolean) {
   if (open) {

@@ -36,7 +36,7 @@
 }
 
 .msg-row:hover .msg-hoverbar,
-.msg-row:focus-within .msg-hoverbar,
+.msg-row:focus-within:not(:has(.msg-author-avatar-trigger:focus)) .msg-hoverbar,
 .msg-row.is-menu-open .msg-hoverbar {
   opacity: 1;
   pointer-events: auto;

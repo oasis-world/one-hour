@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import type { ChatEntry } from '../lib/chatTypes'
 import { t, useLang } from '../lib/i18n'
 import { REACTION_PALETTE, getQuickEmojis } from '../lib/chatReactions'
+import { suppressNextClick } from '../lib/popoverGuard'
 import { ChevronRightIcon, CopyIcon, EditIcon, ReactIcon, ReplyIcon, TrashIcon } from './icons'
 
 export interface MenuAnchor {
@@ -121,6 +122,10 @@ export default function MessageMenu({
   useLayoutEffect(() => {
     const onDown = (e: Event) => {
       if (ref.current?.contains(e.target as Node | null)) return
+      suppressNextClick()
+      e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation()
       closeRef.current()
     }
     const onKey = (e: KeyboardEvent) => {

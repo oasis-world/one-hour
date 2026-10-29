@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 're
 import type { ChatEntry, MessageReply } from '../lib/chatTypes'
 import { useLang, COMPOSER_PLACEHOLDER, t } from '../lib/i18n'
 import { useImeEnter } from '../lib/ime'
+import { setPopoverOpen, suppressNextClick } from '../lib/popoverGuard'
 import { markFilePickerOpened } from '../lib/filePickerGuard'
 import { CameraIcon, ChevronRightIcon, EmojiIcon, GameIcon, PlusIcon, SendIcon, ThinXIcon, UploadIcon } from './icons'
 import { PhotoIcon } from './userIcons'
@@ -134,17 +135,25 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
     if (!plusOpen && !emojiOpen) return
     const onDown = (e: PointerEvent) => {
       if (!rootRef.current?.contains(e.target as Node)) {
+        suppressNextClick()
+        e.preventDefault()
+        e.stopPropagation()
+        e.stopImmediatePropagation()
         setPlusOpen(false)
         setEmojiOpen(false)
         setGamesOpen(false)
       }
     }
-    document.addEventListener('pointerdown', onDown)
-    return () => document.removeEventListener('pointerdown', onDown)
+    document.addEventListener('pointerdown', onDown, true)
+    return () => document.removeEventListener('pointerdown', onDown, true)
   }, [plusOpen, emojiOpen])
 
   useEffect(() => {
-    onMenuOpenChange?.(plusOpen || emojiOpen)
+    const menuOpen = plusOpen || emojiOpen
+    onMenuOpenChange?.(menuOpen)
+    if (!menuOpen) return
+    setPopoverOpen(true)
+    return () => setPopoverOpen(false)
   }, [plusOpen, emojiOpen, onMenuOpenChange])
 
   // Warm the HEIC decoder while the user browses the plus menu, so a

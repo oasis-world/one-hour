@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { PresenceMember } from '../lib/chatTypes'
+import { fetchCloudProfile } from '../lib/profileCloud'
+import type { CloudProfileSnapshot } from '../lib/profileCloud'
 import AvatarBadge from './AvatarBadge'
 
 function countdown(ms: number): string {
@@ -9,6 +11,7 @@ function countdown(ms: number): string {
 
 export default function MessageAuthorCard({ member }: { member: PresenceMember }) {
   const [now, setNow] = useState<number | null>(null)
+  const [cloudProfile, setCloudProfile] = useState<CloudProfileSnapshot | null>(null)
   useEffect(() => {
     const firstTick = window.setTimeout(() => setNow(Date.now()), 0)
     const id = window.setInterval(() => setNow(Date.now()), 1000)
@@ -17,20 +20,35 @@ export default function MessageAuthorCard({ member }: { member: PresenceMember }
       window.clearInterval(id)
     }
   }, [])
-  const remaining = now == null ? 0 : Math.max(0, (member.profileExpiresAt ?? now) - now)
+  useEffect(() => {
+    let active = true
+    void fetchCloudProfile(member.userId).then((snapshot) => {
+      if (active && snapshot) setCloudProfile(snapshot)
+    })
+    return () => { active = false }
+  }, [member.userId])
+  const profile = cloudProfile?.profile ?? {
+    nickname: member.displayName,
+    role: member.role ?? '',
+    style: member.avatarStyle ?? 'lorelei',
+    seed: member.avatarSeed ?? '',
+    avatarUrl: member.avatarUrl,
+  }
+  const expiresAt = cloudProfile?.expiresAt ?? member.profileExpiresAt
+  const remaining = now == null ? 0 : Math.max(0, (expiresAt ?? now) - now)
   return (
     <div className="account-pop" role="status">
       <div className="account-pop-head">
         <div className="account-pop-avatar" style={{ ['--avatar-progress' as string]: String(remaining / 3_600_000) }}>
           <AvatarBadge
-            look={{ style: member.avatarStyle ?? 'lorelei', seed: member.avatarSeed ?? '', url: member.avatarUrl }}
+            look={profile}
             size={52}
             className="account-pop-avatar-img"
           />
         </div>
         <div className="account-pop-id">
-          <span className="account-pop-name">{member.displayName}</span>
-          <span className="account-pop-role">{member.role?.trim() || '—'}</span>
+          <span className="account-pop-name">{profile.nickname}</span>
+          <span className="account-pop-role">{profile.role?.trim() || '—'}</span>
           <span className="account-pop-countdown">{countdown(remaining)}</span>
         </div>
       </div>

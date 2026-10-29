@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { PresenceMember } from '../lib/chatTypes'
 import { t } from '../lib/i18n'
+import { suppressNextClick } from '../lib/popoverGuard'
 import { userAvatarTint, userNameColor } from '../lib/identity'
 import AvatarBadge from './AvatarBadge'
 
@@ -28,10 +29,14 @@ export default function OnlineList({
       const target = e.target as HTMLElement | null
       if (popRef.current?.contains(target)) return
       if (target?.closest?.('.top-bar') || target?.closest?.('.settings-bar')) return
+      suppressNextClick()
+      e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation()
       onClose()
     }
-    document.addEventListener('pointerdown', onDown)
-    return () => document.removeEventListener('pointerdown', onDown)
+    document.addEventListener('pointerdown', onDown, true)
+    return () => document.removeEventListener('pointerdown', onDown, true)
   }, [onClose])
 
   return (

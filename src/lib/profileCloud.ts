@@ -29,6 +29,46 @@ interface ProfileRow {
   expires_at: string | null
 }
 
+export interface CloudProfileSnapshot {
+  profile: UserProfile
+  expiresAt: number | null
+}
+
+/** Read any authenticated room member's profile for the message avatar card. */
+export async function fetchCloudProfile(userId: string): Promise<CloudProfileSnapshot | null> {
+  if (!isSupabaseConfigured()) return null
+  try {
+    const client = await getSupabaseClient()
+    const read = () => client.from(TABLE)
+      .select('nickname, avatar_style, avatar_seed, avatar_url, role, expires_at')
+      .eq('user_id', userId)
+      .maybeSingle()
+    let result = await read()
+    if (result.error && isMissingColumn(result.error)) {
+      result = await client.from(TABLE)
+        .select('nickname, avatar_style, avatar_seed')
+        .eq('user_id', userId)
+        .maybeSingle()
+    }
+    if (result.error || !result.data) return null
+    const row = result.data as ProfileRow
+    if (typeof row.nickname !== 'string' || !isKnownStyle(row.avatar_style) || typeof row.avatar_seed !== 'string') return null
+    const parsedExpiry = row.expires_at ? Date.parse(row.expires_at) : NaN
+    return {
+      profile: {
+        nickname: row.nickname,
+        role: row.role ?? '',
+        style: row.avatar_style,
+        seed: row.avatar_seed,
+        avatarUrl: row.avatar_url ?? null,
+      },
+      expiresAt: Number.isFinite(parsedExpiry) ? parsedExpiry : null,
+    }
+  } catch {
+    return null
+  }
+}
+
 /** Upsert the current local profile; fire-and-forget safe. */
 export async function pushProfileToCloud(): Promise<void> {
   const profile = loadUserProfile()

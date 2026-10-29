@@ -6,6 +6,7 @@ import { getProfileExpiresAt } from '../lib/userProfile'
 import { useLang } from '../lib/i18n'
 import type { Lang } from '../lib/i18n'
 import type { UserProfile } from '../lib/userProfile'
+import { suppressNextClick } from '../lib/popoverGuard'
 import AvatarBadge from './AvatarBadge'
 // EXPERIMENT: icon imports unused while actions disabled.
 // import { RefreshIcon, SignOutIcon, UserIcon } from './userIcons'
@@ -73,15 +74,19 @@ export default function AccountPopover({
       if (popRef.current?.contains(target)) return
       if (target?.closest?.('.top-bar')) return
       if (target?.closest?.('.chat-top-avatar')) return
+      suppressNextClick()
+      e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation()
       onClose()
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
-    document.addEventListener('pointerdown', onDown)
+    document.addEventListener('pointerdown', onDown, true)
     window.addEventListener('keydown', onKey)
     return () => {
-      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('pointerdown', onDown, true)
       window.removeEventListener('keydown', onKey)
     }
   }, [onClose])

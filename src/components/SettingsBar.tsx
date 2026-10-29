@@ -3,7 +3,7 @@ import type { PresenceMember } from '../lib/chatTypes'
 import type { ThemeName } from '../lib/settings'
 import { COUNTDOWN_ANIMATIONS, type CountdownAnimation } from '../lib/countdownAnimations'
 import { useLang, LANG_LABELS, t } from '../lib/i18n'
-import { setPopoverOpen } from '../lib/popoverGuard'
+import { setPopoverOpen, suppressNextClick } from '../lib/popoverGuard'
 import { ChevronRightIcon, MoonIcon, SunIcon } from './icons'
 import { AnimationIcon, GearIcon, GlobeIcon, RefreshIcon } from './userIcons'
 import CountdownAnimationPicker from './CountdownAnimationPicker'
@@ -52,6 +52,7 @@ export default function SettingsBar({
       const target = e.target as HTMLElement | null
       if (barRef.current?.contains(target)) return
       if (target?.closest?.('.online-pop')) return
+      suppressNextClick()
       e.preventDefault()
       e.stopPropagation()
       e.stopImmediatePropagation()
