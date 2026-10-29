@@ -29,3 +29,9 @@ export async function saveGomokuState(instanceId: string, state: GomokuState): P
   }, { onConflict: 'instance_id' })
   if (error) console.error('Could not save Gomoku state:', error.message)
 }
+
+export async function deleteGomokuState(instanceId: string): Promise<void> {
+  const client = await getSupabaseClient()
+  const { error } = await client.from('gomoku_states').delete().eq('instance_id', instanceId)
+  if (error) console.error('Could not delete Gomoku state:', error.message)
+}

@@ -103,8 +103,10 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
     departureTimersRef.current.forEach((timer) => window.clearTimeout(timer))
   }, [])
 
+  // Any signed-in client that holds the latest state persists it, so progress
+  // survives refreshes regardless of who hosts the room.
   useEffect(() => {
-    if (!channelReady || selfId !== state.hostId) return
+    if (!channelReady || !selfId) return
     persistQueueRef.current = persistQueueRef.current
       .catch(() => undefined)
       .then(() => saveGomokuState(instanceId, state))

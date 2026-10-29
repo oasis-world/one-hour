@@ -167,9 +167,10 @@ create policy "signed-in players may update game states"
   with check (auth.uid() is not null);
 
 drop policy if exists "expired game states may be removed by signed-in players" on public.gomoku_states;
-create policy "expired game states may be removed by signed-in players"
+drop policy if exists "signed-in players may delete game states" on public.gomoku_states;
+create policy "signed-in players may delete game states"
   on public.gomoku_states for delete
-  using (auth.uid() is not null and expires_at <= now());
+  using (auth.uid() is not null);
 
 grant select, insert, update, delete on public.gomoku_states to authenticated;
 revoke all on public.gomoku_states from anon;
@@ -252,6 +253,12 @@ begin
          and p.expires_at <= now()
      );
   delete from public.gomoku_states where expires_at <= now();
+  -- Drop game states whose card message is gone (expired or author vanished).
+  delete from public.gomoku_states gs
+  where not exists (
+    select 1 from public.chat_messages cm
+    where cm.content like '%' || gs.instance_id || '%'
+  );
 end;
 $$;
 

@@ -10,6 +10,8 @@ import MessageRow from './MessageRow'
 import MessageMenu, { type MenuAnchor } from './MessageMenu'
 import { HourglassIcon } from './icons'
 import { useChatScroll } from './useChatScroll'
+import { parseGameRef } from '../games/types'
+import { deleteGomokuState } from '../games/gomoku/cloudState'
 
 interface Props {
   entries: ChatEntry[]
@@ -85,6 +87,23 @@ export default function MessageList({
 
   const scroll = useChatScroll({ scrollRef: logRef, entries, incomingMessageSequence, layoutKey })
   const { jumpToEnd } = scroll
+  const seenGameIdsRef = useRef<Set<string> | null>(null)
+  useEffect(() => {
+    const currentIds = new Set<string>()
+    for (const entry of entries) {
+      const ref = parseGameRef(entry.content)
+      if (ref) currentIds.add(ref.instanceId)
+    }
+    if (seenGameIdsRef.current === null) {
+      seenGameIdsRef.current = currentIds
+      return
+    }
+    const prev = seenGameIdsRef.current
+    for (const id of prev) {
+      if (!currentIds.has(id)) void deleteGomokuState(id)
+    }
+    seenGameIdsRef.current = currentIds
+  }, [entries])
   const seenSentMessageRef = useRef(sentMessageSequence)
 
   useLayoutEffect(() => {
