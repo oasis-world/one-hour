@@ -121,15 +121,25 @@ button {
     linear-gradient(180deg, #f6e7c8 0%, #efe0bd 60%, #e9d6ac 100%);
 }
 
+.bg-edge {
+  position: absolute;
+  inset: 0;
+  filter: blur(48px) saturate(1.1);
+  transform: scale(1.15);
+  z-index: 0;
+  opacity: 0.9;
+}
+
 .bg-layer {
   position: absolute;
   inset: 0;
-  background-size: cover;
+  background-size: contain;
   background-position: center;
+  background-repeat: no-repeat;
   opacity: 0;
   transition: opacity 1.1s ease;
-  /* bleed past the edges so the stage blur never shows soft borders */
-  transform: scale(1.12);
+  /* show the whole photo instead of cropping it */
+  transform: none;
 }
 
 .bg-layer.is-live {

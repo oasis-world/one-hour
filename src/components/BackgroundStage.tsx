@@ -30,6 +30,7 @@ export default function BackgroundStage({
   // survive a reload, so a persisted value would paint a broken image.
   // Always start empty and fetch a fresh cloud photo when needed.
   const [cloudLive, setCloudLive] = useState<string | null>(null)
+  const [edgeColors, setEdgeColors] = useState<{ left: string; right: string } | null>(null)
   const [cloudPhoto, setCloudPhoto] = useState<BackgroundPhoto | null>(null)
   const [cloudSlotSince, setCloudSlotSince] = useState<number>(0)
 
@@ -148,10 +149,59 @@ export default function BackgroundStage({
     return () => clearTimeout(timer)
   }, [layers])
 
+  // Sample the left/right edge colours of the current photo so the blurred
+  // backdrop (shown in contain mode) stays close to the image.
+  useEffect(() => {
+    if (!live) {
+      const timer = window.setTimeout(() => setEdgeColors(null), 0)
+      return () => window.clearTimeout(timer)
+    }
+    let cancelled = false
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      if (cancelled) return
+      try {
+        const w = img.naturalWidth || img.width
+        const h = img.naturalHeight || img.height
+        if (!w || !h) return
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+        ctx.drawImage(img, 0, 0, w, h)
+        const sample = (x: number) => {
+          const col = ctx.getImageData(Math.max(0, Math.min(w - 1, x)), 0, 1, h).data
+          let r = 0, g = 0, b = 0, n = 0
+          for (let i = 0; i < col.length; i += 4) {
+            r += col[i]; g += col[i + 1]; b += col[i + 2]; n++
+          }
+          if (!n) return 'rgb(20,22,30)'
+          return `rgb(${Math.round(r / n)},${Math.round(g / n)},${Math.round(b / n)})`
+        }
+        const left = sample(0)
+        const right = sample(w - 1)
+        if (!cancelled) setEdgeColors({ left, right })
+      } catch {
+        if (!cancelled) setEdgeColors(null)
+      }
+    }
+    img.onerror = () => { if (!cancelled) setEdgeColors(null) }
+    img.src = live
+    return () => { cancelled = true }
+  }, [live])
+
   const cornerLink = isChat ? null : (cloudPhoto?.source ?? null)
 
   return (
     <div className="bg-stage" aria-hidden="true">
+      {edgeColors && (
+        <div
+          className="bg-edge"
+          style={{ background: `linear-gradient(90deg, ${edgeColors.left}, ${edgeColors.right})` }}
+        />
+      )}
       {layers.map((layer, index) => (
         <div
           key={layer.id}
