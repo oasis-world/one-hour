@@ -36,6 +36,61 @@
   flex-shrink: 0;
 }
 
+.account-pop-avatar {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.account-pop-avatar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from -90deg, #f6c453, #ff7a59, #a855f7, #3b82f6, #f6c453);
+  box-shadow: none;
+  -webkit-mask:
+    conic-gradient(from calc(0deg - var(--avatar-progress, 1) * 360deg), #000 0deg, #000 calc(var(--avatar-progress, 1) * 360deg), transparent calc(var(--avatar-progress, 1) * 360deg)),
+    radial-gradient(circle, transparent 26px, #000 28px, transparent 30px);
+  -webkit-mask-composite: source-in;
+  mask:
+    conic-gradient(from calc(0deg - var(--avatar-progress, 1) * 360deg), #000 0deg, #000 calc(var(--avatar-progress, 1) * 360deg), transparent calc(var(--avatar-progress, 1) * 360deg)),
+    radial-gradient(circle, transparent 26px, #000 28px, transparent 30px);
+  mask-composite: intersect;
+  pointer-events: none;
+  animation: account-pop-avatar-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes account-pop-avatar-breathe {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+.account-pop-avatar-img {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 0;
+}
+
+.account-pop-role {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+.account-pop-countdown {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-mute);
+  margin-top: 2px;
+}
+
 .account-pop-id {
   min-width: 0;
   display: flex;

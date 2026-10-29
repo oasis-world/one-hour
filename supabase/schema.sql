@@ -253,10 +253,14 @@ create table if not exists public.profiles (
   avatar_style text not null check (char_length(avatar_style) between 1 and 40),
   avatar_seed text not null check (char_length(avatar_seed) between 1 and 64),
   avatar_url text, -- custom photo avatar (public storage URL)
+  role text, -- free-text role/title
+  expires_at timestamptz, -- anonymous identity expiry (1 hour); synced on refresh
   updated_at timestamptz not null default now()
 );
 
 alter table public.profiles add column if not exists avatar_url text;
+alter table public.profiles add column if not exists role text;
+alter table public.profiles add column if not exists expires_at timestamptz;
 
 alter table public.profiles enable row level security;
 

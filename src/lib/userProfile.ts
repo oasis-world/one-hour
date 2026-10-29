@@ -11,12 +11,16 @@ import { isKnownStyle, randomAvatarLook, type AvatarLook } from './avatar'
 
 export interface UserProfile extends AvatarLook {
   nickname: string
+  /** Free-text role/title shown next to the nickname (e.g. student, engineer). */
+  role?: string
   /** Custom photo avatar (public storage URL); wins over style + seed. */
   avatarUrl?: string | null
 }
 
 /** Schema guardrail shared with the cloud table (char_length 1..40). */
 export const NICKNAME_MAX = 20
+export const ROLE_MAX = 20
+export const PROFILE_LIFETIME_MS = 60 * 60 * 1000
 
 const PROFILE_KEY = 'one-hour-user-profile'
 
@@ -44,6 +48,49 @@ export function saveUserProfile(profile: UserProfile): void {
   for (const fn of listeners) fn(profile)
 }
 
+export function clearUserProfile(): void {
+  cached = null
+  try {
+    globalThis.localStorage?.removeItem(PROFILE_KEY)
+  } catch {
+    // Private mode: nothing persisted.
+  }
+  for (const fn of listeners) fn(null)
+}
+
+export function resetPreWelcome(): void {
+  preWelcome = null
+}
+
+const PROFILE_EXPIRES_KEY = 'one-hour-profile-expires-at'
+
+export function setProfileExpiresAt(ts: number): void {
+  try {
+    globalThis.localStorage?.setItem(PROFILE_EXPIRES_KEY, String(ts))
+  } catch {
+    // Private mode: expiry lives for this session only.
+  }
+}
+
+export function getProfileExpiresAt(): number | null {
+  try {
+    const raw = globalThis.localStorage?.getItem(PROFILE_EXPIRES_KEY)
+    if (!raw) return null
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : null
+  } catch {
+    return null
+  }
+}
+
+export function clearProfileExpiresAt(): void {
+  try {
+    globalThis.localStorage?.removeItem(PROFILE_EXPIRES_KEY)
+  } catch {
+    // Private mode: nothing persisted.
+  }
+}
+
 export function subscribeProfile(fn: (p: UserProfile | null) => void): () => void {
   listeners.add(fn)
   return () => {
@@ -69,6 +116,7 @@ function parseProfile(raw: string): UserProfile | null {
     ) {
       return {
         nickname: data.nickname,
+        role: typeof data.role === 'string' ? data.role.slice(0, ROLE_MAX) : '',
         style: data.style,
         seed: data.seed,
         avatarUrl: typeof data.avatarUrl === 'string' && data.avatarUrl ? data.avatarUrl : null,
@@ -86,6 +134,11 @@ export function cleanNickname(input: string): string {
   return cleaned
 }
 
+export function cleanRole(input: string): string {
+  const cleaned = input.replace(/\s+/g, ' ').trim().slice(0, ROLE_MAX)
+  return cleaned
+}
+
 /** A whole new random identity — the welcome screen's refresh action. */
 export function randomProfile(
   previous?: UserProfile | null,
@@ -93,6 +146,7 @@ export function randomProfile(
 ): UserProfile {
   return {
     nickname: randomNickname(previous?.nickname, lang),
+    role: randomRole(previous?.role, lang),
     ...randomAvatarLook(previous),
     // A fresh generated identity drops any custom photo.
     avatarUrl: null,
@@ -110,6 +164,31 @@ let preWelcome: UserProfile | null = null
 export function preWelcomeProfile(): UserProfile {
   preWelcome ??= randomProfile(null)
   return preWelcome
+}
+
+/* ---- role catalog: 30 roles ---- */
+
+const ROLES_ZH = [
+  '学生', '工程师', '教师', '宇航员', '猎人', '医生', '艺术家', '作家',
+  '音乐家', '厨师', '飞行员', '科学家', '探险家', '骑士', '法师', '忍者',
+  '武士', '海盗', '侦探', '园丁', '建筑师', '程序员', '设计师', '摄影师',
+  '运动员', '舞者', '演员', '记者', '图书管理员', '消防员',
+]
+
+const ROLES_EN = [
+  'Student', 'Engineer', 'Teacher', 'Astronaut', 'Hunter', 'Doctor', 'Artist',
+  'Writer', 'Musician', 'Chef', 'Pilot', 'Scientist', 'Explorer', 'Knight',
+  'Mage', 'Ninja', 'Samurai', 'Pirate', 'Detective', 'Gardener', 'Architect',
+  'Programmer', 'Designer', 'Photographer', 'Athlete', 'Dancer', 'Actor',
+  'Journalist', 'Librarian', 'Firefighter',
+]
+
+export function randomRole(previous?: string | null, lang: Lang = getLang()): string {
+  const list = lang === 'zh' || lang === 'zh-TW' ? ROLES_ZH : ROLES_EN
+  const pick = () => list[Math.floor(Math.random() * list.length)]
+  let role = pick()
+  while (previous != null && previous !== '' && role === previous) role = pick()
+  return role
 }
 
 /* ---- random nicknames: a mood word + a wanderer noun ---- */
@@ -131,13 +210,19 @@ const NICK_EN_B = [
   'Sparrow', 'Beacon', 'Wanderer', 'Firefly', 'Curator', 'Pilgrim',
 ]
 
+/** Languages whose words are single characters — no space between parts. */
+function isCjkLang(lang: Lang): boolean {
+  return lang === 'zh' || lang === 'zh-TW' || lang === 'ja' || lang === 'ko'
+}
+
 export function randomNickname(previous?: string | null, lang: Lang = getLang()): string {
-  const a = lang === 'zh' ? NICK_ZH_A : NICK_EN_A
-  const b = lang === 'zh' ? NICK_ZH_B : NICK_EN_B
+  const a = lang === 'zh' || lang === 'zh-TW' ? NICK_ZH_A : NICK_EN_A
+  const b = lang === 'zh' || lang === 'zh-TW' ? NICK_ZH_B : NICK_EN_B
   const pick = <T,>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)]
-  let name = `${pick(a)}${pick(b)}`
+  const join = (x: string, y: string) => (isCjkLang(lang) ? `${x}${y}` : `${x} ${y}`)
+  let name = join(pick(a), pick(b))
   while (previous != null && previous !== '' && name === previous) {
-    name = `${pick(a)}${pick(b)}`
+    name = join(pick(a), pick(b))
   }
   return name
 }

@@ -196,6 +196,16 @@ export function ChatBubbleIcon({ size = 16 }: GlyphProps) {
   )
 }
 
+/** Briefcase glyph for an occupation, role, or persona field. */
+export function BriefcaseIcon({ size = 16 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+      <rect x="1.8" y="5" width="12.4" height="8.8" rx="2" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M5.5 5V3.8c0-.8.6-1.4 1.4-1.4h2.2c.8 0 1.4.6 1.4 1.4V5M2 8.2c3.8 2.1 8.2 2.1 12 0M8 8.7v1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 /** Chevron for the mobile toolbar toggle (rotates via CSS when open). */
 export function ChevronDownIcon({ size = 14 }: GlyphProps) {
   return (

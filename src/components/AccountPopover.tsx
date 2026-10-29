@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { signOutAccount, type AccountState } from '../lib/account'
+// EXPERIMENT: sign-in / sign-out disabled.
+// import { signOutAccount, type AccountState } from '../lib/account'
+import type { AccountState } from '../lib/account'
+import { getProfileExpiresAt } from '../lib/userProfile'
 import { useLang } from '../lib/i18n'
 import type { Lang } from '../lib/i18n'
 import type { UserProfile } from '../lib/userProfile'
 import AvatarBadge from './AvatarBadge'
-import { RefreshIcon, SignOutIcon, UserIcon } from './userIcons'
+// EXPERIMENT: icon imports unused while actions disabled.
+// import { RefreshIcon, SignOutIcon, UserIcon } from './userIcons'
 
 const STR: Record<string, Record<Lang, string>> = {
   account: { zh: '账号', 'zh-TW': '帳號', en: 'Account', ja: 'アカウント', fr: 'Compte', es: 'Cuenta', de: 'Konto', ko: '계정', it: 'Account', ar: 'الحساب' },
@@ -29,24 +33,38 @@ function L(lang: Lang, key: string): string {
  * and sign-out actions for signed-in players.
  */
 export default function AccountPopover({
-  account,
   profile,
   onClose,
-  onSignIn,
-  onOpenProfile,
-  onOpenWelcome,
 }: {
-  account: AccountState
+  account?: AccountState
   profile: UserProfile | null
   onClose: () => void
-  onSignIn: () => void
-  onOpenProfile: () => void
-  onOpenWelcome: () => void
+  // EXPERIMENT: sign-in / sign-out / profile edit disabled.
+  onSignIn?: () => void
+  onOpenProfile?: () => void
+  onOpenWelcome?: () => void
 }) {
   const lang = useLang()
   const popRef = useRef<HTMLDivElement>(null)
-  const signedIn = account.status === 'signedIn'
-  const [confirmingOut, setConfirmingOut] = useState(false)
+  const [remainingMs, setRemainingMs] = useState(0)
+  useEffect(() => {
+    const tick = () => {
+      const exp = getProfileExpiresAt()
+      setRemainingMs(exp ? Math.max(0, exp - Date.now()) : 0)
+    }
+    tick()
+    const id = window.setInterval(tick, 1000)
+    return () => window.clearInterval(id)
+  }, [profile])
+
+  const lifetime = 60 * 60 * 1000
+  const progress = remainingMs > 0 ? remainingMs / lifetime : 0
+  const formatCountdown = (ms: number) => {
+    const total = Math.ceil(ms / 1000)
+    const m = Math.floor(total / 60)
+    const s = total % 60
+    return `${m}:${s.toString().padStart(2, '0')}`
+  }
 
   useEffect(() => {
     // Clicks on the top bar itself belong to the avatar toggle.
@@ -54,6 +72,7 @@ export default function AccountPopover({
       const target = e.target as HTMLElement | null
       if (popRef.current?.contains(target)) return
       if (target?.closest?.('.top-bar')) return
+      if (target?.closest?.('.chat-top-avatar')) return
       onClose()
     }
     const onKey = (e: KeyboardEvent) => {
@@ -67,82 +86,43 @@ export default function AccountPopover({
     }
   }, [onClose])
 
-  const act = (fn: () => void) => () => {
-    onClose()
-    fn()
-  }
+  // EXPERIMENT: unused while actions disabled.
+  // const act = (fn: () => void) => () => {
+  //   onClose()
+  //   fn()
+  // }
 
-  const signOut = act(() => {
-    void signOutAccount()
-  })
+  // EXPERIMENT: sign-out disabled.
+  // const signOut = act(() => {
+  //   void signOutAccount()
+  // })
 
   return (
     <div className="account-pop" ref={popRef} role="menu" aria-label={L(lang, 'account')}>
       <div className="account-pop-head">
-        <AvatarBadge look={profile} size={52} />
+        <div
+          className="account-pop-avatar"
+          style={{ ['--avatar-progress' as string]: String(progress) }}
+        >
+          <AvatarBadge look={profile} size={52} className="account-pop-avatar-img" />
+        </div>
         <div className="account-pop-id">
           <span className="account-pop-name">
             {profile?.nickname ?? L(lang, 'traveler')}
           </span>
-          <span className="account-pop-sub">
-            {signedIn
-              ? `${account.email ?? ''} · ${L(lang, 'synced')}`
-              : L(lang, 'travelerLocal')}
+          <span className="account-pop-role">
+            {profile?.role && profile.role.trim() ? profile.role : '—'}
+          </span>
+          <span className="account-pop-countdown">
+            {formatCountdown(remainingMs)}
           </span>
         </div>
       </div>
 
+      {/* EXPERIMENT: sign-in / sign-out / profile edit / new avatar disabled.
       <div className="account-pop-actions">
-        {signedIn ? (
-          confirmingOut ? (
-            <>
-              <p className="account-pop-confirm">
-                {L(lang, 'signOutConfirm')}
-              </p>
-              <div className="account-pop-confirm-row">
-                <button
-                  type="button"
-                  className="account-pop-item"
-                  role="menuitem"
-                  onClick={() => setConfirmingOut(false)}
-                >
-                  {L(lang, 'cancel')}
-                </button>
-                <button
-                  type="button"
-                  className="account-pop-item is-danger"
-                  role="menuitem"
-                  onClick={signOut}
-                >
-                  {L(lang, 'signOut')}
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <button type="button" className="account-pop-item" role="menuitem" onClick={act(onOpenProfile)}>
-                <UserIcon size={15} />
-                {L(lang, 'profile')}
-              </button>
-              <button type="button" className="account-pop-item is-danger" role="menuitem" onClick={() => setConfirmingOut(true)}>
-                <SignOutIcon size={15} />
-                {L(lang, 'signOut')}
-              </button>
-            </>
-          )
-        ) : (
-          <>
-            <button type="button" className="account-pop-item" role="menuitem" onClick={act(onOpenWelcome)}>
-              <RefreshIcon size={15} />
-              {L(lang, 'newAvatar')}
-            </button>
-            <button type="button" className="account-pop-item" role="menuitem" onClick={act(onSignIn)}>
-              <UserIcon size={15} />
-              {L(lang, 'signIn')}
-            </button>
-          </>
-        )}
-      </div>
+        ... (disabled)
+      </div> */}
     </div>
   )
 }

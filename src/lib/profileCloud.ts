@@ -1,6 +1,12 @@
 import { isSupabaseConfigured, subscribeAccount, type AccountState } from './account'
 import { getSupabaseClient } from './supabaseClient'
-import { loadUserProfile, randomProfile, saveUserProfile } from './userProfile'
+import {
+  getProfileExpiresAt,
+  loadUserProfile,
+  randomProfile,
+  saveUserProfile,
+  setProfileExpiresAt,
+} from './userProfile'
 import { isKnownStyle } from './avatar'
 import type { UserProfile } from './userProfile'
 
@@ -19,6 +25,8 @@ interface ProfileRow {
   avatar_style: string
   avatar_seed: string
   avatar_url: string | null
+  role: string | null
+  expires_at: string | null
 }
 
 /** Upsert the current local profile; fire-and-forget safe. */
@@ -36,13 +44,16 @@ export async function pushProfileToCloud(): Promise<void> {
       avatar_style: profile.style,
       avatar_seed: profile.seed,
       avatar_url: profile.avatarUrl ?? null,
+      role: profile.role ?? null,
+      expires_at: getProfileExpiresAt() ? new Date(getProfileExpiresAt() as number).toISOString() : null,
       updated_at: new Date().toISOString(),
     }
     const { error } = await client.from(TABLE).upsert(row)
     if (error && isMissingColumn(error)) {
-      // Schema predates the avatar_url column — write what exists.
+      // Schema predates avatar_url / expires_at column — write what exists.
       const base: Record<string, unknown> = { ...row }
       delete base.avatar_url
+      delete base.expires_at
       await client.from(TABLE).upsert(base)
     }
   } catch {
@@ -58,10 +69,10 @@ export async function pullCloudProfile(): Promise<boolean> {
     const { data } = await client.auth.getSession()
     const uid = data.session?.user?.id
     if (!uid) return false
-    const query = () => client.from(TABLE).select('nickname, avatar_style, avatar_seed, avatar_url')
+    const query = () => client.from(TABLE).select('nickname, avatar_style, avatar_seed, avatar_url, role, expires_at')
     let res = await query().eq('user_id', uid).maybeSingle()
     if (res.error && isMissingColumn(res.error)) {
-      // Schema predates the avatar_url column — read what exists.
+      // Schema predates avatar_url / expires_at column — read what exists.
       res = await client
         .from(TABLE)
         .select('nickname, avatar_style, avatar_seed')
@@ -80,12 +91,19 @@ export async function pullCloudProfile(): Promise<boolean> {
     }
     const cloud: UserProfile = {
       nickname: row.nickname.slice(0, 20),
+      role: row.role ?? loadUserProfile()?.role ?? '',
       style: row.avatar_style,
       seed: row.avatar_seed,
       avatarUrl: row.avatar_url ?? null,
     }
     if (JSON.stringify(cloud) !== JSON.stringify(loadUserProfile())) {
       saveUserProfile(cloud)
+    }
+    if (row.expires_at) {
+      const ts = Date.parse(row.expires_at)
+      if (Number.isFinite(ts)) setProfileExpiresAt(ts)
+    } else if (getProfileExpiresAt() == null) {
+      setProfileExpiresAt(Date.now() + 60 * 60 * 1000)
     }
     return true
   } catch {
@@ -121,12 +139,17 @@ export function watchAccountForProfileSync(): void {
     const was = last
     last = state.status
 
-    if (state.status === 'signedIn') {
-      if (was === 'signedIn' || inflight) return
+    const isAccount = state.status === 'signedIn' || state.status === 'anonymous'
+    const wasAccount = was === 'signedIn' || was === 'anonymous'
+
+    if (isAccount) {
+      if (wasAccount || inflight) return
       inflight = pullCloudProfile()
         .then((found) => {
-          // Signed out while the pull was in the air: push nothing.
-          if (last === 'signedIn' && !found) return pushProfileToCloud()
+          // No cloud row yet: push the local look up.
+          if (last === 'signedIn' || last === 'anonymous') {
+            if (!found) return pushProfileToCloud()
+          }
         })
         .finally(() => {
           inflight = null
@@ -134,6 +157,8 @@ export function watchAccountForProfileSync(): void {
       return
     }
 
+    // Only email (signedIn) accounts reset to a fresh traveler on sign-out;
+    // anonymous expiry is handled separately and must not resurrect a profile.
     if (was !== 'signedIn') return
     const reset = () => {
       if (last === 'signedIn') return

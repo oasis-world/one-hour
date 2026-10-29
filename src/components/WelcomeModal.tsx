@@ -5,17 +5,21 @@ import { useAccount } from '../lib/useAccount'
 import { pushProfileToCloud } from '../lib/profileCloud'
 import {
   cleanNickname,
+  cleanRole,
   loadUserProfile,
   NICKNAME_MAX,
   preWelcomeProfile,
   randomNickname,
   randomProfile,
+  ROLE_MAX,
   saveUserProfile,
+  setProfileExpiresAt,
+  PROFILE_LIFETIME_MS,
   type UserProfile,
 } from '../lib/userProfile'
 import { randomAvatarSeed } from '../lib/avatar'
 import AvatarEditor from './AvatarEditor'
-import { HourglassIcon, ThinXIcon } from './icons'
+import { BriefcaseIcon, ChatBubbleIcon, HourglassIcon, ThinXIcon } from './icons'
 
 /**
  * The avatar + nickname picker, in two modes:
@@ -72,19 +76,31 @@ export default function WelcomeModal({
   const confirm = () => {
     const nickname =
       cleanNickname(draft.nickname) || randomNickname(draft.nickname, lang)
+    const role = cleanRole(draft.role ?? '')
     saveUserProfile({
       nickname,
+      role,
       style: draft.style,
       seed: draft.seed,
       avatarUrl: draft.avatarUrl ?? null,
     })
+    // Anonymous users also live for one hour: stamp the expiry now.
+    setProfileExpiresAt(Date.now() + PROFILE_LIFETIME_MS)
     // Returning player with a live session: the pick belongs in the cloud.
-    if (account.status === 'signedIn') void pushProfileToCloud()
+    // Anonymous users also persist their profile + expiry for refresh sync.
+    if (account.status === 'signedIn' || account.status === 'anonymous') void pushProfileToCloud()
     onClose?.()
   }
 
   const onNickEnter = (e: ReactKeyboardEvent<HTMLInputElement>) => {
     // An IME's Enter commits the candidates — never our business logic.
+    if (ime.imeConsumesEnter(e)) return
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    confirm()
+  }
+
+  const onRoleEnter = (e: ReactKeyboardEvent<HTMLInputElement>) => {
     if (ime.imeConsumesEnter(e)) return
     if (e.key !== 'Enter') return
     e.preventDefault()
@@ -127,43 +143,81 @@ export default function WelcomeModal({
 
         <AvatarEditor
           look={draft}
-          size={116}
+          size={106}
+          allowUpload
           rerollLabel={t('换一个头像和昵称', 'Reroll avatar and nickname')}
           onReroll={reroll}
           onPickStyle={pickStyle}
           onUploaded={(url) => setDraft((prev) => ({ ...prev, avatarUrl: url }))}
         />
 
-        <label className="field welcome-field">
-          <span>{t('我的昵称', 'My nickname')}</span>
-          <span className="field-input-wrap">
-            <input
-              ref={nicknameRef}
-              type="text"
-              value={draft.nickname}
-              maxLength={NICKNAME_MAX}
-              spellCheck={false}
-              autoComplete="off"
-              autoFocus={typeof window !== 'undefined' && !window.matchMedia('(pointer: coarse)').matches}
-              onChange={(e) => setDraft({ ...draft, nickname: e.target.value })}
-              onKeyDown={onNickEnter}
-              {...ime.imeProps}
-            />
-            {draft.nickname && (
-              <button
-                type="button"
-                className="field-clear"
-                aria-label={t('清空', 'Clear')}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  setDraft((prev) => ({ ...prev, nickname: '' }))
-                }}
-              >
-                ×
-              </button>
-            )}
-          </span>
-        </label>
+        <div className="welcome-fields">
+          <label className="field welcome-field">
+            <span className="field-input-wrap">
+              <span className="field-icon" aria-hidden="true">
+                <ChatBubbleIcon size={15} />
+              </span>
+              <input
+                ref={nicknameRef}
+                type="text"
+                value={draft.nickname}
+                maxLength={NICKNAME_MAX}
+                placeholder={t('昵称', 'Nickname')}
+                spellCheck={false}
+                autoComplete="off"
+                autoFocus={typeof window !== 'undefined' && !window.matchMedia('(pointer: coarse)').matches}
+                onChange={(e) => setDraft({ ...draft, nickname: e.target.value })}
+                onKeyDown={onNickEnter}
+                {...ime.imeProps}
+              />
+              {draft.nickname && (
+                <button
+                  type="button"
+                  className="field-clear"
+                  aria-label={t('清空', 'Clear')}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setDraft((prev) => ({ ...prev, nickname: '' }))
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </span>
+          </label>
+
+          <label className="field welcome-field">
+            <span className="field-input-wrap">
+              <span className="field-icon" aria-hidden="true">
+                <BriefcaseIcon size={15} />
+              </span>
+              <input
+                type="text"
+                value={draft.role ?? ''}
+                maxLength={ROLE_MAX}
+                placeholder={t('角色', 'Role')}
+                spellCheck={false}
+                autoComplete="off"
+                onChange={(e) => setDraft({ ...draft, role: e.target.value })}
+                onKeyDown={onRoleEnter}
+                {...ime.imeProps}
+              />
+              {draft.role && (
+                <button
+                  type="button"
+                  className="field-clear"
+                  aria-label={t('清空', 'Clear')}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setDraft((prev) => ({ ...prev, role: '' }))
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </span>
+          </label>
+        </div>
 
         <button type="button" className="btn-accent welcome-confirm" onClick={confirm}>
           {editing ? (t('保存', 'Save')) : t('开始聊天', 'Enter the room')}

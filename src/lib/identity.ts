@@ -33,6 +33,15 @@ export function resolveChatIdentity(account: AccountState): ChatIdentity | null 
   return null
 }
 
+/** Clear the persisted local uid so a fresh anonymous identity is minted. */
+export function resetLocalUserId(): void {
+  try {
+    globalThis.localStorage?.removeItem(LOCAL_UID_KEY)
+  } catch {
+    // Private mode: nothing persisted.
+  }
+}
+
 /** Stable per-browser id for the no-backend local mode. */
 function localUserId(): string {
   try {

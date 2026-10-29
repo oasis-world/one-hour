@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import AccountDialog from './components/AccountDialog'
+// EXPERIMENT: sign-in disabled.
+// import AccountDialog from './components/AccountDialog'
 import BackgroundStage from './components/BackgroundStage'
 import Composer from './components/Composer'
 import ImageViewer from './components/ImageViewer'
 import MessageList from './components/MessageList'
-import ProfilePage from './components/ProfilePage'
+// EXPERIMENT: profile page disabled.
+// import ProfilePage from './components/ProfilePage'
 import SettingsBar from './components/SettingsBar'
 import TopBar from './components/TopBar'
 import WelcomeModal from './components/WelcomeModal'
+import ChatTopAvatar from './components/ChatTopAvatar'
 import { ChatBubbleIcon, ThinXIcon } from './components/icons'
 import { useChatRoom } from './components/useChatRoom'
 import { useAccount } from './lib/useAccount'
 import { useUserProfile } from './lib/userProfile'
+import { setProfileExpiresAt } from './lib/userProfile'
+import { expireAnonymousProfile, getProfileExpiresAt } from './lib/profileLifetime'
 import { watchAccountForProfileSync } from './lib/profileCloud'
 import { useMobileKeyboard } from './lib/useMobileKeyboard'
 import './lib/settingsRuntime'
@@ -46,6 +51,13 @@ export default function App() {
   const account = useAccount()
   const profile = useUserProfile()
   const room = useChatRoom(true)
+
+  // Backfill an expiry for profiles created before the lifetime rule existed.
+  useEffect(() => {
+    if (profile && getProfileExpiresAt() == null) {
+      setProfileExpiresAt(Date.now() + 60 * 60 * 1000)
+    }
+  }, [profile])
   const lang = useLang()
   const zh = lang === 'zh'
   const [fold, setFold] = useState<FoldState>('folded')
@@ -55,9 +67,11 @@ export default function App() {
   const [hasRevealed, setHasRevealed] = useState(false)
   const backgroundMusic = useBackgroundMusic(lang, Boolean(profile))
   const { audioRef, muted: musicMuted, playing: musicPlaying, toggle: toggleMusic, ended: handleTrackEnded } = backgroundMusic
-  /** Which account dialog view is open, if any. */
-  const [accountView, setAccountView] = useState<'closed' | 'signin' | 'bind'>('closed')
-  const [profileOpen, setProfileOpen] = useState(false)
+  // EXPERIMENT: sign-in / sign-out (email account binding) disabled while
+  // testing the anonymous-only flow. Kept here (commented) for rollback.
+  // const [accountView, setAccountView] = useState<'closed' | 'signin' | 'bind'>('closed')
+  // EXPERIMENT: profile page disabled.
+  // const [profileOpen, setProfileOpen] = useState(false)
   const [welcomeOpen, setWelcomeOpen] = useState(false)
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   /** Composer popover open (plus/emoji) — mobile hides the gear meanwhile. */
@@ -168,6 +182,25 @@ export default function App() {
 
   // Signed-in players carry their profile in the cloud; guests stay local.
   useEffect(() => watchAccountForProfileSync(), [])
+
+  // Anonymous users live exactly one hour: when the countdown hits zero,
+  // purge the profile (local + cloud) and recreate the anonymous session,
+  // which re-opens the welcome gate.
+  const expiringRef = useRef(false)
+  useEffect(() => {
+    const check = () => {
+      const exp = getProfileExpiresAt()
+      if (!exp || expiringRef.current) return
+      if (Date.now() < exp) return
+      expiringRef.current = true
+      void expireAnonymousProfile().finally(() => {
+        expiringRef.current = false
+      })
+    }
+    check()
+    const id = window.setInterval(check, 1000)
+    return () => window.clearInterval(id)
+  }, [])
 
   const systemTheme = (): ThemeName => {
     try {
@@ -436,8 +469,9 @@ export default function App() {
       <TopBar
         account={account}
         profile={profile}
-        onSignIn={() => setAccountView('signin')}
-        onOpenProfile={() => setProfileOpen(true)}
+        // EXPERIMENT: sign-in disabled.
+        // onSignIn={() => setAccountView('signin')}
+        // onOpenProfile={() => setProfileOpen(true)}
         onOpenWelcome={() => setWelcomeOpen(true)}
       />
 
@@ -509,6 +543,9 @@ export default function App() {
               fold === 'folding' ? ' is-folded' : fold === 'folded' ? ' is-folded is-settled' : fold === 'unfolding' ? ' is-unfolding' : ''
             }`}
           >
+            <div className="chat-top-avatar-wrap">
+              <ChatTopAvatar account={account} profile={profile} />
+            </div>
             <MessageList
               entries={room.entries}
               selfId={room.identity?.userId ?? null}
@@ -584,6 +621,7 @@ export default function App() {
           onClose={() => setViewerIndex(null)}
         />
       )}
+      {/* EXPERIMENT: sign-in / account dialog disabled.
       {accountView !== 'closed' && (
         <AccountDialog
           account={account}
@@ -594,7 +632,8 @@ export default function App() {
             setProfileOpen(true)
           }}
         />
-      )}
+      )} */}
+      {/* EXPERIMENT: profile page (sign-in dependent) disabled.
       {profileOpen && (
         <ProfilePage
           account={account}
@@ -604,7 +643,7 @@ export default function App() {
             setAccountView('bind')
           }}
         />
-      )}
+      )} */}
       {(!profile || welcomeOpen) && (
         <WelcomeModal
           mode={profile ? 'edit' : 'welcome'}

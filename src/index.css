@@ -218,24 +218,209 @@ button {
   transition: transform 0.15s ease;
 }
 
-/* Amber ring, same language as the oasis profile avatar. */
+/* Countdown ring: a pretty conic gradient that depletes over one hour. */
 .top-avatar-btn::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  padding: 2px;
-  background: conic-gradient(from 210deg, #e8b84b, #2d8aad, #e8b84b, #5c3a1e, #e8b84b);
+  padding: 0;
+  background: conic-gradient(from -90deg, #f6c453, #ff7a59, #a855f7, #3b82f6, #f6c453);
   box-shadow: 0 3px 10px var(--shadow);
   -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
+    conic-gradient(from calc(0deg - var(--avatar-progress, 1) * 360deg), #000 0deg, #000 calc(var(--avatar-progress, 1) * 360deg), transparent calc(var(--avatar-progress, 1) * 360deg)),
+    radial-gradient(circle, transparent 20px, #000 22px);
+  -webkit-mask-composite: source-in;
   mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
+    conic-gradient(from calc(0deg - var(--avatar-progress, 1) * 360deg), #000 0deg, #000 calc(var(--avatar-progress, 1) * 360deg), transparent calc(var(--avatar-progress, 1) * 360deg)),
+    radial-gradient(circle, transparent 20px, #000 22px);
+  mask-composite: intersect;
   pointer-events: none;
+  transition: none;
+}
+
+.top-avatar-btn.is-critical::before {
+  animation: avatar-critical 1.4s ease-in-out infinite;
+}
+
+@keyframes avatar-critical {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(1.04); }
+}
+
+.top-avatar-btn.is-critical {
+  animation: avatar-critical-wrap 1.4s ease-in-out infinite;
+}
+
+@keyframes avatar-critical-wrap {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+.top-avatar-countdown {
+  position: absolute;
+  left: 52px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+  box-shadow: 0 2px 8px var(--shadow);
+  white-space: nowrap;
+}
+
+/* ---------- Chat-top centered avatar (desktop) ---------- */
+
+.chat-top-avatar-wrap {
+  display: none;
+}
+
+@media (min-width: 821px) {
+  .chat-top-avatar-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 10px 0 6px;
+    flex-shrink: 0;
+  }
+}
+
+.chat-top-avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-top-avatar-btn {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.chat-top-avatar-btn::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: conic-gradient(from -90deg, #f6c453, #ff7a59, #a855f7, #3b82f6, #f6c453);
+  box-shadow: none;
+  -webkit-mask:
+    conic-gradient(from calc(0deg - var(--avatar-progress, 1) * 360deg), #000 0deg, #000 calc(var(--avatar-progress, 1) * 360deg), transparent calc(var(--avatar-progress, 1) * 360deg)),
+    radial-gradient(circle, transparent 28px, #000 30px, transparent 32px);
+  -webkit-mask-composite: source-in;
+  mask:
+    conic-gradient(from calc(0deg - var(--avatar-progress, 1) * 360deg), #000 0deg, #000 calc(var(--avatar-progress, 1) * 360deg), transparent calc(var(--avatar-progress, 1) * 360deg)),
+    radial-gradient(circle, transparent 28px, #000 30px, transparent 32px);
+  mask-composite: intersect;
+  pointer-events: none;
+  animation: chat-top-avatar-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes chat-top-avatar-breathe {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+.chat-top-avatar-btn.is-critical::before {
+  animation: chat-top-avatar-breathe 1.2s ease-in-out infinite;
+}
+
+.chat-top-avatar-btn:hover {
+  transform: scale(1.06);
+}
+
+.chat-top-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  border: 2px solid rgba(14, 16, 20, 0.55);
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.chat-top-avatar-countdown {
+  position: absolute;
+  left: 67px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+  box-shadow: 0 2px 8px var(--shadow);
+  white-space: nowrap;
+}
+
+.chat-top-avatar-countdown.is-critical {
+  animation: countdown-pulse 2s ease-in-out infinite;
+}
+
+/* Hide the top-left avatar on desktop (centered chat avatar replaces it). */
+@media (min-width: 821px) {
+  .top-bar {
+    display: none;
+  }
+}
+
+/* Overlay the centered avatar on the chat content instead of pushing it. */
+.chat-top-avatar-wrap {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: none;
+  pointer-events: auto;
+}
+
+@media (min-width: 821px) {
+  .chat-top-avatar-wrap {
+    display: block;
+  }
+}
+
+.chat-top-avatar-btn {
+  width: 60px;
+  height: 60px;
+  position: relative;
+}
+
+.chat-top-avatar-img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  border: 0;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+/* AccountPopover anchored to the centered chat avatar. */
+.chat-top-avatar .account-pop {
+  left: 50%;
+  top: calc(100% + 10px);
+  transform: translateX(-50%);
+  transform-origin: top center;
 }
 
 .top-avatar-btn:hover {
@@ -636,7 +821,7 @@ button {
   color: var(--ink-mute);
   font-size: 11px;
   line-height: 1.4;
-  text-align: center;
+  text-align: left;
   user-select: none;
 }
 
