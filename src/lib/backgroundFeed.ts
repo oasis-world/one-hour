@@ -19,18 +19,35 @@ export interface BackgroundPhoto {
   source: string | null
 }
 
+function isNarrowScreen(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return (
+      window.innerWidth < 768 ||
+      window.matchMedia?.('(orientation: portrait)').matches === true
+    )
+  } catch {
+    return window.innerWidth < 768
+  }
+}
+
 async function pickFeedUrl(): Promise<string> {
+  const narrow = isNarrowScreen()
   if (UNSPLASH_KEY) {
     try {
+      const orientation = narrow ? 'portrait' : 'landscape'
       const res = await fetch(
-        `https://api.unsplash.com/photos/random?orientation=landscape&client_id=${encodeURIComponent(UNSPLASH_KEY)}`,
+        `https://api.unsplash.com/photos/random?orientation=${orientation}&client_id=${encodeURIComponent(UNSPLASH_KEY)}`,
       )
       if (res.ok) {
         const data = (await res.json()) as {
           urls?: { raw?: string; regular?: string; full?: string }
         }
         const raw = data.urls?.raw
-        if (raw) return `${raw}&w=1920&q=80&fm=jpg`
+        if (raw) {
+          const w = narrow ? 1080 : 1920
+          return `${raw}&w=${w}&q=80&fm=jpg`
+        }
         if (data.urls?.regular) return data.urls.regular
         if (data.urls?.full) return data.urls.full
       }
@@ -39,7 +56,9 @@ async function pickFeedUrl(): Promise<string> {
     }
   }
   const seed = Math.random().toString(36).slice(2, 10)
-  return `https://picsum.photos/1920/1080?random=${seed}`
+  return narrow
+    ? `https://picsum.photos/1080/1920?random=${seed}`
+    : `https://picsum.photos/1920/1080?random=${seed}`
 }
 
 export async function fetchRandomBackground(): Promise<BackgroundPhoto | null> {
