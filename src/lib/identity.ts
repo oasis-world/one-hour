@@ -2,6 +2,7 @@ import type { AccountState } from './account'
 import { isSupabaseConfigured } from './supabaseConfig'
 import type { AvatarLook } from './avatar'
 import { loadUserProfile, preWelcomeProfile } from './userProfile'
+import { VAULT_KEYS, vaultGetSync, vaultRemove, vaultSet } from './vault'
 
 /** Room identity: every visitor gets one via anonymous sign-in. */
 export interface ChatIdentity {
@@ -35,20 +36,24 @@ export function resolveChatIdentity(account: AccountState): ChatIdentity | null 
 
 /** Clear the persisted local uid so a fresh anonymous identity is minted. */
 export function resetLocalUserId(): void {
-  try {
-    globalThis.localStorage?.removeItem(LOCAL_UID_KEY)
-  } catch {
-    // Private mode: nothing persisted.
-  }
+  vaultRemove(LOCAL_UID_KEY)
+  vaultRemove(VAULT_KEYS.localUid)
 }
 
 /** Stable per-browser id for the no-backend local mode. */
 function localUserId(): string {
   try {
-    const stored = globalThis.localStorage?.getItem(LOCAL_UID_KEY)
-    if (stored) return stored
+    const stored =
+      globalThis.localStorage?.getItem(LOCAL_UID_KEY) ??
+      vaultGetSync(VAULT_KEYS.localUid)
+    if (stored) {
+      vaultSet(LOCAL_UID_KEY, stored)
+      vaultSet(VAULT_KEYS.localUid, stored)
+      return stored
+    }
     const generated = `local-${Math.random().toString(36).slice(2, 10)}`
-    globalThis.localStorage?.setItem(LOCAL_UID_KEY, generated)
+    vaultSet(LOCAL_UID_KEY, generated)
+    vaultSet(VAULT_KEYS.localUid, generated)
     return generated
   } catch {
     return `local-session-${Math.random().toString(36).slice(2, 10)}`

@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js'
 import { isSupabaseConfigured } from './supabaseConfig'
 import { getSupabaseClient } from './supabaseClient'
+import { VAULT_KEYS, vaultGet, vaultRemove, vaultSet } from './vault'
 
 export { isSupabaseConfigured }
 
@@ -62,12 +63,27 @@ function applySession(session: Session | null) {
   const user = session?.user ?? null
   if (!user) {
     setState({ status: 'guest', userId: null, email: null })
+    vaultRemove(VAULT_KEYS.session)
     return
   }
   if (user.is_anonymous) {
     setState({ status: 'anonymous', userId: user.id, email: null })
   } else {
     setState({ status: 'signedIn', userId: user.id, email: user.email ?? null })
+  }
+  // Mirror the refresh token so a localStorage wipe can be recovered.
+  if (session) {
+    try {
+      vaultSet(
+        VAULT_KEYS.session,
+        JSON.stringify({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        }),
+      )
+    } catch {
+      // best effort
+    }
   }
 }
 
@@ -89,10 +105,37 @@ async function restoreOrCreateSession(
 ): Promise<void> {
   try {
     const { data } = await client.auth.getSession()
-    if (data.session) return
+    if (data.session) {
+      // Keep the mirror fresh.
+      applySession(data.session)
+      return
+    }
   } catch {
-    // Fall through and try to create an anonymous identity.
+    // Fall through and try the vault / create an anonymous identity.
   }
+
+  // localStorage may have been wiped; try the mirrored session first so we
+  // don't mint a brand-new anonymous user while the 1-hour window is live.
+  try {
+    const raw = await vaultGet(VAULT_KEYS.session)
+    if (raw) {
+      const parsed = JSON.parse(raw) as { access_token?: string; refresh_token?: string }
+      if (parsed.access_token && parsed.refresh_token) {
+        const { data, error } = await client.auth.setSession({
+          access_token: parsed.access_token,
+          refresh_token: parsed.refresh_token,
+        })
+        if (!error && data.session) {
+          applySession(data.session)
+          return
+        }
+      }
+    }
+  } catch {
+    // Fall through.
+  }
+  vaultRemove(VAULT_KEYS.session)
+
   await createAnonymousIdentity(client)
 }
 

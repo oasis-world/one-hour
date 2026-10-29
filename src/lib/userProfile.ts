@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getLang, type Lang } from './i18n'
 import { isKnownStyle, randomAvatarLook, type AvatarLook } from './avatar'
+import { VAULT_KEYS, vaultGetSync, vaultRemove, vaultSet } from './vault'
 
 /**
  * Local player profile: the nickname + DiceBear look confirmed in the
@@ -30,8 +31,19 @@ const listeners = new Set<(p: UserProfile | null) => void>()
 export function loadUserProfile(): UserProfile | null {
   if (cached !== undefined) return cached
   try {
-    const raw = globalThis.localStorage?.getItem(PROFILE_KEY)
-    cached = raw ? parseProfile(raw) : null
+    let raw = globalThis.localStorage?.getItem(PROFILE_KEY)
+    if (!raw) raw = vaultGetSync(VAULT_KEYS.profile)
+    if (raw) {
+      // Heal the primary store if it was wiped.
+      try {
+        globalThis.localStorage?.setItem(PROFILE_KEY, raw)
+      } catch {
+        // best effort
+      }
+      cached = parseProfile(raw)
+    } else {
+      cached = null
+    }
   } catch {
     cached = null
   }
@@ -40,11 +52,13 @@ export function loadUserProfile(): UserProfile | null {
 
 export function saveUserProfile(profile: UserProfile): void {
   cached = profile
+  const raw = JSON.stringify(profile)
   try {
-    globalThis.localStorage?.setItem(PROFILE_KEY, JSON.stringify(profile))
+    globalThis.localStorage?.setItem(PROFILE_KEY, raw)
   } catch {
     // Private mode: profile lives for this session only.
   }
+  vaultSet(VAULT_KEYS.profile, raw)
   for (const fn of listeners) fn(profile)
 }
 
@@ -55,6 +69,7 @@ export function clearUserProfile(): void {
   } catch {
     // Private mode: nothing persisted.
   }
+  vaultRemove(VAULT_KEYS.profile)
   for (const fn of listeners) fn(null)
 }
 
@@ -65,19 +80,31 @@ export function resetPreWelcome(): void {
 const PROFILE_EXPIRES_KEY = 'one-hour-profile-expires-at'
 
 export function setProfileExpiresAt(ts: number): void {
+  const raw = String(ts)
   try {
-    globalThis.localStorage?.setItem(PROFILE_EXPIRES_KEY, String(ts))
+    globalThis.localStorage?.setItem(PROFILE_EXPIRES_KEY, raw)
   } catch {
     // Private mode: expiry lives for this session only.
   }
+  vaultSet(VAULT_KEYS.expiry, raw)
 }
 
 export function getProfileExpiresAt(): number | null {
   try {
-    const raw = globalThis.localStorage?.getItem(PROFILE_EXPIRES_KEY)
+    let raw = globalThis.localStorage?.getItem(PROFILE_EXPIRES_KEY)
+    if (!raw) raw = vaultGetSync(VAULT_KEYS.expiry)
     if (!raw) return null
     const n = Number(raw)
-    return Number.isFinite(n) ? n : null
+    if (Number.isFinite(n)) {
+      // Heal primary store.
+      try {
+        globalThis.localStorage?.setItem(PROFILE_EXPIRES_KEY, raw)
+      } catch {
+        // best effort
+      }
+      return n
+    }
+    return null
   } catch {
     return null
   }
@@ -89,6 +116,7 @@ export function clearProfileExpiresAt(): void {
   } catch {
     // Private mode: nothing persisted.
   }
+  vaultRemove(VAULT_KEYS.expiry)
 }
 
 export function subscribeProfile(fn: (p: UserProfile | null) => void): () => void {
