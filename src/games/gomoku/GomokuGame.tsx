@@ -7,7 +7,11 @@ import { resolveChatIdentity } from '../../lib/identity'
 import { t, useLang } from '../../lib/i18n'
 import { chooseAiMove } from './ai'
 import { loadGomokuState, saveGomokuState } from './cloudState'
+import { PaletteIcon } from '../../components/icons'
 import './GomokuGame.css'
+
+const BOARD_STYLES = ['classic', 'minimal', 'dark', 'neon', 'ocean', 'sakura', 'forest', 'retro'] as const
+type BoardStyle = (typeof BOARD_STYLES)[number]
 import {
   addAiOpponent,
   colorOfPlayer,
@@ -36,6 +40,28 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
 
   const [state, setState] = useState<GomokuState>(() => createInitialState(instanceId, hostUserId))
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false)
+  const [boardStyle, setBoardStyle] = useState<BoardStyle>(() => {
+    try {
+      const saved = window.localStorage.getItem('gomoku-board-style')
+      if (saved && (BOARD_STYLES as readonly string[]).includes(saved)) return saved as BoardStyle
+    } catch {
+      // ignore
+    }
+    return 'classic'
+  })
+  const randomizeBoardStyle = useCallback(() => {
+    setBoardStyle((prev) => {
+      if (BOARD_STYLES.length <= 1) return prev
+      let next = prev
+      while (next === prev) next = BOARD_STYLES[Math.floor(Math.random() * BOARD_STYLES.length)]
+      try {
+        window.localStorage.setItem('gomoku-board-style', next)
+      } catch {
+        // ignore
+      }
+      return next
+    })
+  }, [])
   const [readyChannelKey, setReadyChannelKey] = useState('')
   const channelKey = `${instanceId}:${selfId ?? ''}:${displayName}:${avatarUrl ?? ''}`
   const channelReady = readyChannelKey === channelKey
@@ -417,6 +443,15 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
       <div className="gomoku-head">
         <div className="gomoku-heading">
           <span className="gomoku-title">{t('五子棋', 'Gomoku')}</span>
+          <button
+            type="button"
+            className="gomoku-style-random"
+            onClick={randomizeBoardStyle}
+            aria-label={t('随机切换棋盘风格', 'Randomize board style')}
+            title={t('随机切换棋盘风格', 'Randomize board style')}
+          >
+            <PaletteIcon size={16} />
+          </button>
           {statusHint && <span className="gomoku-status">{statusHint}</span>}
         </div>
         <span className="gomoku-meta">
@@ -439,7 +474,7 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
         <div className="gomoku-result">{resultText()}</div>
       )}
 
-      <div className="gomoku-board" role="grid" aria-label={t('五子棋棋盘', 'Gomoku board')}>
+      <div className={`gomoku-board gomoku-board--${boardStyle}`} role="grid" aria-label={t('五子棋棋盘', 'Gomoku board')}>
         <span className="gomoku-grid-lines" aria-hidden="true" />
         <span className="gomoku-frame" aria-hidden="true" />
         {state.board.map((row, r) =>

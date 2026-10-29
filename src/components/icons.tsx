@@ -465,3 +465,51 @@ export function MoonIcon({ size = 16 }: GlyphProps) {
     </svg>
   )
 }
+
+/** Four colored dots glyph: a 2x2 grid of distinct colors. */
+export function PaletteIcon({ size = 16 }: GlyphProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle cx="4" cy="4" r="3" fill="#ef4444" />
+      <circle cx="12" cy="4" r="3" fill="#f59e0b" />
+      <circle cx="4" cy="12" r="3" fill="#22c55e" />
+      <circle cx="12" cy="12" r="3" fill="#3b82f6" />
+    </svg>
+  )
+}
+
+/** Shuffle / randomize glyph: two crossing arrows. */
+export function ShuffleIcon({ size = 16 }: GlyphProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M2 4.5h3.2l3.6 7M10.8 4.5h3.2M2 11.5h3.2l3.6-7M10.8 11.5h3.2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12.4 3l1.6 1.5-1.6 1.5M12.4 10l1.6 1.5-1.6 1.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}

@@ -85,16 +85,19 @@ export function useChatScroll(opts: {
   }, [scrollRef])
 
   // Keep the bottom reader pinned. Never yank someone away from history.
+  const previousEntriesRef = useRef(entries)
   const previousNewestIdRef = useRef(entries[entries.length - 1]?.id)
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
     const newestId = entries[entries.length - 1]?.id
     const newestChanged = newestId != null && newestId !== previousNewestIdRef.current
+    const entriesChanged = entries !== previousEntriesRef.current
+    previousEntriesRef.current = entries
     previousNewestIdRef.current = newestId
-    if (!newestChanged) return
+    if (!entriesChanged) return
     if (atBottomRef.current) scrollToEnd()
-    else setShowJumpEnd(true)
+    else if (newestChanged) setShowJumpEnd(true)
   }, [entries, scrollRef, scrollToEnd])
 
   // This sequence is raised only for new Realtime messages from other users;
@@ -126,6 +129,28 @@ export function useChatScroll(opts: {
     if (!el || atBottomRef.current) return
     scrollTo(el.scrollTop)
   }, [layoutKey, scrollRef, scrollTo])
+
+  // Late layout growth (game cards, images, async content): keep a
+  // bottom-anchored reader pinned even when the DOM changes after the
+  // initial scroll. Never yank someone browsing history.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || typeof MutationObserver === 'undefined') return
+    let raf = 0
+    const schedule = () => {
+      if (raf) return
+      raf = window.requestAnimationFrame(() => {
+        raf = 0
+        if (atBottomRef.current) scrollTo(el.scrollHeight)
+      })
+    }
+    const mo = new MutationObserver(schedule)
+    mo.observe(el, { childList: true, subtree: true, characterData: true })
+    return () => {
+      mo.disconnect()
+      if (raf) window.cancelAnimationFrame(raf)
+    }
+  }, [scrollRef, scrollTo])
 
   /**
    * Content grew without new entries (chat photos decoding in after the
