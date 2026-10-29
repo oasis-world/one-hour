@@ -415,9 +415,11 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
   return (
     <div className="gomoku-card">
       <div className="gomoku-head">
-        <span className="gomoku-title">🎯 {t('五子棋', 'Gomoku')}</span>
+        <div className="gomoku-heading">
+          <span className="gomoku-title">🎯 {t('五子棋', 'Gomoku')}</span>
+          {statusHint && <span className="gomoku-status">{statusHint}</span>}
+        </div>
         <span className="gomoku-meta">
-          {statusHint && <span>{statusHint} ·</span>}
           <span>{state.players.length}/2 {t('玩家', 'players')}</span>
         </span>
       </div>

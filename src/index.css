@@ -2277,6 +2277,26 @@ button {
   .chat-log-wrap {
     padding: 26px 0 92px;
   }
+
+  /* Keep the sender row intact, then let the game itself use the full chat
+     width below it instead of inheriting the regular message indent. */
+  .msg-row:has(.gomoku-card) {
+    grid-template-columns: 34px minmax(0, 1fr);
+    padding-inline: 8px;
+  }
+  .msg-row:has(.gomoku-card) .msg-main {
+    display: contents;
+  }
+  .msg-row:has(.gomoku-card) .msg-head {
+    grid-column: 2;
+  }
+  .msg-row:has(.gomoku-card) .msg-body {
+    grid-column: 1 / -1;
+  }
+  .msg-row:has(.gomoku-card) .msg-reactions {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
   .chat-column:has(.composer.is-multiline) .chat-log-wrap {
     padding-bottom: 160px;
   }

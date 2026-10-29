@@ -211,8 +211,26 @@ const ROLES_EN = [
   'Journalist', 'Librarian', 'Firefighter',
 ]
 
+const ROLES_JA = [
+  '学生', 'エンジニア', '教師', '宇宙飛行士', 'ハンター', '医師', '芸術家', '作家',
+  '音楽家', 'シェフ', 'パイロット', '科学者', '探検家', '騎士', '魔法使い', '忍者',
+  '侍', '海賊', '探偵', '庭師', '建築家', 'プログラマー', 'デザイナー', '写真家',
+  'アスリート', 'ダンサー', '俳優', '記者', '司書', '消防士',
+]
+const ROLES_FR = ['Étudiant', 'Ingénieur', 'Professeur', 'Astronaute', 'Chasseur', 'Médecin', 'Artiste', 'Écrivain', 'Musicien', 'Chef', 'Pilote', 'Scientifique', 'Explorateur', 'Chevalier', 'Mage', 'Ninja', 'Samouraï', 'Pirate', 'Détective', 'Jardinier', 'Architecte', 'Programmeur', 'Designer', 'Photographe', 'Athlète', 'Danseur', 'Acteur', 'Journaliste', 'Bibliothécaire', 'Pompier']
+const ROLES_ES = ['Estudiante', 'Ingeniero', 'Profesor', 'Astronauta', 'Cazador', 'Médico', 'Artista', 'Escritor', 'Músico', 'Chef', 'Piloto', 'Científico', 'Explorador', 'Caballero', 'Mago', 'Ninja', 'Samurái', 'Pirata', 'Detective', 'Jardinero', 'Arquitecto', 'Programador', 'Diseñador', 'Fotógrafo', 'Atleta', 'Bailarín', 'Actor', 'Periodista', 'Bibliotecario', 'Bombero']
+const ROLES_DE = ['Student', 'Ingenieur', 'Lehrer', 'Astronaut', 'Jäger', 'Arzt', 'Künstler', 'Autor', 'Musiker', 'Koch', 'Pilot', 'Forscher', 'Entdecker', 'Ritter', 'Magier', 'Ninja', 'Samurai', 'Pirat', 'Detektiv', 'Gärtner', 'Architekt', 'Programmierer', 'Designer', 'Fotograf', 'Sportler', 'Tänzer', 'Schauspieler', 'Journalist', 'Bibliothekar', 'Feuerwehrmann']
+const ROLES_KO = ['학생', '엔지니어', '교사', '우주비행사', '사냥꾼', '의사', '예술가', '작가', '음악가', '요리사', '조종사', '과학자', '탐험가', '기사', '마법사', '닌자', '사무라이', '해적', '탐정', '정원사', '건축가', '프로그래머', '디자이너', '사진작가', '운동선수', '무용수', '배우', '기자', '사서', '소방관']
+const ROLES_IT = ['Studente', 'Ingegnere', 'Insegnante', 'Astronauta', 'Cacciatore', 'Medico', 'Artista', 'Scrittore', 'Musicista', 'Cuoco', 'Pilota', 'Scienziato', 'Esploratore', 'Cavaliere', 'Mago', 'Ninja', 'Samurai', 'Pirata', 'Detective', 'Giardiniere', 'Architetto', 'Programmatore', 'Designer', 'Fotografo', 'Atleta', 'Ballerino', 'Attore', 'Giornalista', 'Bibliotecario', 'Pompiere']
+const ROLES_AR = ['طالب', 'مهندس', 'معلم', 'رائد فضاء', 'صياد', 'طبيب', 'فنان', 'كاتب', 'موسيقي', 'طاهٍ', 'طيار', 'عالِم', 'مستكشف', 'فارس', 'ساحر', 'نينجا', 'ساموراي', 'قرصان', 'محقق', 'بستاني', 'معماري', 'مبرمج', 'مصمم', 'مصور', 'رياضي', 'راقص', 'ممثل', 'صحفي', 'أمين مكتبة', 'رجل إطفاء']
+
+const ROLES_BY_LANG: Partial<Record<Lang, readonly string[]>> = {
+  zh: ROLES_ZH, 'zh-TW': ROLES_ZH, ja: ROLES_JA, en: ROLES_EN,
+  fr: ROLES_FR, es: ROLES_ES, de: ROLES_DE, ko: ROLES_KO, it: ROLES_IT, ar: ROLES_AR,
+}
+
 export function randomRole(previous?: string | null, lang: Lang = getLang()): string {
-  const list = lang === 'zh' || lang === 'zh-TW' ? ROLES_ZH : ROLES_EN
+  const list = ROLES_BY_LANG[lang] ?? ROLES_EN
   const pick = () => list[Math.floor(Math.random() * list.length)]
   let role = pick()
   while (previous != null && previous !== '' && role === previous) role = pick()
@@ -237,6 +255,33 @@ const NICK_EN_B = [
   'Traveler', 'Crane', 'Whale', 'Lantern', 'Comet', 'Fox',
   'Sparrow', 'Beacon', 'Wanderer', 'Firefly', 'Curator', 'Pilgrim',
 ]
+const NICK_JA_A = ['夕風', '星明かり', 'ほのかな光', '雲間', '遠い山', '初雪', '潮騒', '銀河', '薄霧', '朝日', 'オーロラ', '夜航']
+const NICK_JA_B = ['旅人', '渡り鳥', '灯台', '星の軌跡', '星見', '貝拾い', '放浪者', '蛍', '使者', '鯨', '猫', '郵便屋']
+const NICK_FR_A = ['Ambré', 'Brumeux', 'Étoilé', 'Lunaire', 'Paisible', 'Rêveur', 'Velours', 'Cobalt', 'Neigeux', 'Ardent', 'Aurore', 'Minuit']
+const NICK_FR_B = ['Voyageur', 'Grue', 'Baleine', 'Lanterne', 'Comète', 'Renard', 'Moineau', 'Phare', 'Nomade', 'Luciole', 'Collectionneur', 'Pèlerin']
+const NICK_ES_A = ['Ámbar', 'Brumoso', 'Estelar', 'Lunar', 'Tranquilo', 'Errante', 'Aterciopelado', 'Cobalto', 'Nevado', 'Brasas', 'Aurora', 'Medianoche']
+const NICK_ES_B = ['Viajero', 'Grulla', 'Ballena', 'Farol', 'Cometa', 'Zorro', 'Gorrión', 'Faro', 'Nómada', 'Luciérnaga', 'Coleccionista', 'Peregrino']
+const NICK_DE_A = ['Bernstein', 'Neblig', 'Sternenklar', 'Mondhell', 'Still', 'Treibend', 'Samtig', 'Kobaltblau', 'Schneeleicht', 'Glühend', 'Morgenrot', 'Mitternacht']
+const NICK_DE_B = ['Reisender', 'Kranich', 'Wal', 'Laterne', 'Komet', 'Fuchs', 'Spatz', 'Leuchtturm', 'Wanderer', 'Glühwürmchen', 'Sammler', 'Pilger']
+const NICK_KO_A = ['노을빛', '안개', '별빛', '달빛', '고요한', '흐르는', '벨벳', '코발트', '눈꽃', '불씨', '오로라', '한밤']
+const NICK_KO_B = ['여행자', '두루미', '고래', '등불', '혜성', '여우', '참새', '등대', '방랑자', '반딧불이', '수집가', '순례자']
+const NICK_IT_A = ['Ambra', 'Nebbia', 'Stellare', 'Lunare', 'Quieto', 'Errante', 'Velluto', 'Cobalto', 'Nevoso', 'Ardente', 'Aurora', 'Mezzanotte']
+const NICK_IT_B = ['Viaggiatore', 'Gru', 'Balena', 'Lanterna', 'Cometa', 'Volpe', 'Passero', 'Faro', 'Vagabondo', 'Lucciola', 'Collezionista', 'Pellegrino']
+const NICK_AR_A = ['كهرماني', 'ضبابي', 'نجمي', 'قمري', 'هادئ', 'تائه', 'مخملي', 'كوبالتي', 'ثلجي', 'متوهج', 'فجر', 'منتصف الليل']
+const NICK_AR_B = ['مسافر', 'كركي', 'حوت', 'فانوس', 'مذنب', 'ثعلب', 'عصفور', 'منارة', 'جوال', 'يراعة', 'جامع', 'حاج']
+
+const NICKNAMES_BY_LANG: Record<Lang, { a: readonly string[]; b: readonly string[] }> = {
+  zh: { a: NICK_ZH_A, b: NICK_ZH_B },
+  'zh-TW': { a: NICK_ZH_A, b: NICK_ZH_B },
+  ja: { a: NICK_JA_A, b: NICK_JA_B },
+  en: { a: NICK_EN_A, b: NICK_EN_B },
+  fr: { a: NICK_FR_A, b: NICK_FR_B },
+  es: { a: NICK_ES_A, b: NICK_ES_B },
+  de: { a: NICK_DE_A, b: NICK_DE_B },
+  ko: { a: NICK_KO_A, b: NICK_KO_B },
+  it: { a: NICK_IT_A, b: NICK_IT_B },
+  ar: { a: NICK_AR_A, b: NICK_AR_B },
+}
 
 /** Languages whose words are single characters — no space between parts. */
 function isCjkLang(lang: Lang): boolean {
@@ -244,8 +289,7 @@ function isCjkLang(lang: Lang): boolean {
 }
 
 export function randomNickname(previous?: string | null, lang: Lang = getLang()): string {
-  const a = lang === 'zh' || lang === 'zh-TW' ? NICK_ZH_A : NICK_EN_A
-  const b = lang === 'zh' || lang === 'zh-TW' ? NICK_ZH_B : NICK_EN_B
+  const { a, b } = NICKNAMES_BY_LANG[lang]
   const pick = <T,>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)]
   const join = (x: string, y: string) => (isCjkLang(lang) ? `${x}${y}` : `${x} ${y}`)
   let name = join(pick(a), pick(b))
