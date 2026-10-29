@@ -577,8 +577,30 @@ button {
   }
 
   .top-avatar-btn {
-    width: 40px;
-    height: 40px;
+    width: 60px;
+    height: 60px;
+  }
+  .top-avatar-btn::before {
+    -webkit-mask:
+      conic-gradient(from calc(0deg - var(--avatar-progress, 1) * 360deg), #000 0deg, #000 calc(var(--avatar-progress, 1) * 360deg), transparent calc(var(--avatar-progress, 1) * 360deg)),
+      radial-gradient(circle, transparent 26px, #000 28px, transparent 30px);
+    -webkit-mask-composite: source-in;
+    mask:
+      conic-gradient(from calc(0deg - var(--avatar-progress, 1) * 360deg), #000 0deg, #000 calc(var(--avatar-progress, 1) * 360deg), transparent calc(var(--avatar-progress, 1) * 360deg)),
+      radial-gradient(circle, transparent 26px, #000 28px, transparent 30px);
+    mask-composite: intersect;
+  }
+  .top-avatar-img {
+    position: absolute;
+    top: 5.5px;
+    left: 5.5px;
+    width: 49px;
+    height: 49px;
+    box-sizing: border-box;
+    border: 0;
+  }
+  .top-avatar-countdown {
+    left: 67px;
   }
 }
 
@@ -2369,15 +2391,22 @@ button {
 
 }
 
-/* Games submenu in the plus menu */
+/* Games submenu follows the settings menu row and disclosure styling. */
 .plus-menu-group { display: flex; flex-direction: column; }
+.plus-games-row { margin-top: 2px; }
 .plus-menu-sub {
   display: flex;
   flex-direction: column;
-  margin-left: 8px;
-  padding-left: 8px;
-  border-left: 2px solid rgba(255,255,255,0.12);
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
 }
-.plus-menu-subitem { font-size: 13px; }
-.plus-menu-chevron { margin-left: auto; opacity: 0.6; font-size: 12px; }
-.plus-menu-game-icon { margin-right: 6px; }
+.plus-menu-chevron {
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+  color: var(--ink-mute);
+  opacity: 0.8;
+  transition: transform 0.18s ease;
+}
+.plus-menu-chevron.is-open { transform: rotate(90deg); }

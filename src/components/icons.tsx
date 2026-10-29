@@ -377,10 +377,11 @@ export function GameIcon({ size = 17 }: GlyphProps) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M6 12h4M8 10v4" />
-      <circle cx="15" cy="11" r="1" fill="currentColor" stroke="none" />
-      <circle cx="18" cy="13" r="1" fill="currentColor" stroke="none" />
-      <path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8z" />
+      <path d="M7.3 7h9.4a4.4 4.4 0 0 1 4.3 5.2l-.6 2.8a2.7 2.7 0 0 1-4.5 1.4l-1.7-1.6h-4.4l-1.7 1.6a2.7 2.7 0 0 1-4.5-1.4L3 12.2A4.4 4.4 0 0 1 7.3 7z" />
+      <path d="M7 9.8v4M5 11.8h4" />
+      <circle cx="15.7" cy="10.7" r=".8" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="12.7" r=".8" fill="currentColor" stroke="none" />
+      <path d="m18.2 4 .5 1.4 1.4.5-1.4.5-.5 1.4-.5-1.4-1.4-.5 1.4-.5.5-1.4Z" strokeWidth="1.2" />
     </svg>
   )
 }

@@ -3,7 +3,7 @@ import type { ChatEntry, MessageReply } from '../lib/chatTypes'
 import { useLang, COMPOSER_PLACEHOLDER, t } from '../lib/i18n'
 import { useImeEnter } from '../lib/ime'
 import { markFilePickerOpened } from '../lib/filePickerGuard'
-import { CameraIcon, EmojiIcon, GameIcon, PlusIcon, SendIcon, ThinXIcon, UploadIcon } from './icons'
+import { CameraIcon, ChevronRightIcon, EmojiIcon, GameIcon, PlusIcon, SendIcon, ThinXIcon, UploadIcon } from './icons'
 import { PhotoIcon } from './userIcons'
 import EmojiPanel from './EmojiPanel'
 import { getGameList } from '../games/registry'
@@ -289,16 +289,18 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
                 <div className="plus-menu-group">
                   <button
                     type="button"
-                    className="plus-menu-item"
+                    className="plus-menu-item plus-games-row"
                     role="menuitem"
                     aria-expanded={gamesOpen}
                     onMouseDown={keepFocus}
                     onPointerDown={keepFocus}
                     onClick={() => setGamesOpen((v) => !v)}
                   >
-                    <GameIcon />
+                    <GameIcon size={17} />
                     {t('游戏', 'Games')}
-                    <span className="plus-menu-chevron">{gamesOpen ? '▾' : '▸'}</span>
+                    <span className={`plus-menu-chevron${gamesOpen ? ' is-open' : ''}`}>
+                      <ChevronRightIcon size={14} />
+                    </span>
                   </button>
                   {gamesOpen && (
                     <div className="plus-menu-sub">
@@ -316,7 +318,6 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
                             onStartGame(game.id)
                           }}
                         >
-                          <span className="plus-menu-game-icon">{game.icon}</span>
                           {t(game.name, game.nameEn)}
                         </button>
                       ))}

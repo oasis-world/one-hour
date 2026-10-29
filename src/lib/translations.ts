@@ -4,6 +4,16 @@ export type TranslationDict = Partial<Record<Lang, Record<string, string>>>
 
 export const TRANSLATIONS: TranslationDict = {
   'zh-TW': {
+    'Games': '遊戲', 'Gomoku': '五子棋',
+    'Games require an online connection': '遊戲需要網路連線',
+    'Waiting for player': '等待玩家', "You're welcome to join": '歡迎加入',
+    'Your turn': '輪到你了', 'Waiting for opponent': '等待對手', 'Spectating': '觀戰中',
+    'Winner: ': '獲勝：', 'Draw': '平手', 'players': '位玩家',
+    'Gomoku board': '五子棋棋盤', 'Join game': '加入遊戲',
+    'Connecting…': '連線中…', 'Play vs AI': '與 AI 對戰', 'Restart': '重新開始',
+    'Leave room': '離開房間', 'Leave this game?': '要離開這場對局嗎？',
+    'The board will reset when you leave. You can join again later.': '離開後棋盤會重置，你之後可以再次加入。',
+    'Stay': '繼續遊戲',
     ' · avatar & nickname synced to cloud': ' · 頭像與暱稱已同步雲端',
     'One Hour': 'One Hour',
     'the one-hour room': '一小时聊天室',
@@ -114,6 +124,16 @@ export const TRANSLATIONS: TranslationDict = {
     'retry': '重試',
   },
   ja: {
+    'Games': 'ゲーム', 'Gomoku': '五目並べ',
+    'Games require an online connection': 'ゲームにはインターネット接続が必要です',
+    'Waiting for player': 'プレイヤーを待っています', "You're welcome to join": '参加できます',
+    'Your turn': 'あなたの番です', 'Waiting for opponent': '相手を待っています',
+    'Spectating': '観戦中', 'Winner: ': '勝者：', 'Draw': '引き分け', 'players': '人',
+    'Gomoku board': '五目並べの盤面', 'Join game': 'ゲームに参加',
+    'Connecting…': '接続中…', 'Play vs AI': 'AIと対戦', 'Restart': '再スタート',
+    'Leave room': 'ルームを退出', 'Leave this game?': 'この対局を退出しますか？',
+    'The board will reset when you leave. You can join again later.': '退出すると盤面がリセットされます。後から再参加できます。',
+    'Stay': '続ける',
     ' · avatar & nickname synced to cloud': ' · アバターと名前をクラウドに同期済み',
     'One Hour': 'One Hour',
     'the one-hour room': '1時間チャットルーム',

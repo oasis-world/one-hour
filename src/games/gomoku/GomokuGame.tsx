@@ -395,7 +395,7 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
     ? state.players.length === 0
       ? t('等待玩家加入', 'Waiting for player')
       : isPlayer
-        ? t('等待另一个玩家', 'Waiting for another player')
+        ? t('等待玩家', 'Waiting for player')
         : t('欢迎你加入', "You're welcome to join")
     : state.status === 'playing'
       ? isPlayer
@@ -416,10 +416,11 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
     <div className="gomoku-card">
       <div className="gomoku-head">
         <div className="gomoku-heading">
-          <span className="gomoku-title">🎯 {t('五子棋', 'Gomoku')}</span>
+          <span className="gomoku-title">{t('五子棋', 'Gomoku')}</span>
           {statusHint && <span className="gomoku-status">{statusHint}</span>}
         </div>
         <span className="gomoku-meta">
+          {statusHint && <span className="gomoku-status-dot" aria-hidden="true" />}
           <span>{state.players.length}/2 {t('玩家', 'players')}</span>
         </span>
       </div>

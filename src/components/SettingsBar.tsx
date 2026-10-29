@@ -52,6 +52,9 @@ export default function SettingsBar({
       const target = e.target as HTMLElement | null
       if (barRef.current?.contains(target)) return
       if (target?.closest?.('.online-pop')) return
+      e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation()
       setOpen(false)
       setListOpen(false)
       setSubview(null)
@@ -63,15 +66,27 @@ export default function SettingsBar({
         setSubview(null)
       }
     }
-    document.addEventListener('pointerdown', onDown)
+    document.addEventListener('pointerdown', onDown, true)
     window.addEventListener('keydown', onKey)
     return () => {
-      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('pointerdown', onDown, true)
       window.removeEventListener('keydown', onKey)
     }
   }, [anyOpen])
 
   return (
+    <>
+    {anyOpen && (
+      <div
+        className="settings-dismiss-layer"
+        aria-hidden="true"
+        onPointerDown={() => {
+          setOpen(false)
+          setListOpen(false)
+          setSubview(null)
+        }}
+      />
+    )}
     <div
       className={`settings-bar${suppressed ? ' is-suppressed' : ''}`}
       ref={barRef}
@@ -185,5 +200,6 @@ export default function SettingsBar({
         />
       )}
     </div>
+    </>
   )
 }

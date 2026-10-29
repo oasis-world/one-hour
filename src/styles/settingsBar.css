@@ -14,6 +14,13 @@
   gap: 6px;
 }
 
+.settings-dismiss-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: transparent;
+}
+
 .settings-btn {
   position: relative;
   width: 32px;
