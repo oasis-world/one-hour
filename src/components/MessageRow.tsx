@@ -5,6 +5,8 @@ import type { RoomReactionMap } from '../lib/chatReactions'
 import { isAutoTravelerName } from '../lib/nickname'
 import { findMessageMedia, stripRenderedMediaMarkup } from '../lib/messageMedia'
 import MessageMediaEmbed from './MessageMediaEmbed'
+import GameMessage from '../games/GameMessage'
+import { parseGameRef } from '../games/types'
 import { userAvatarTint, userNameColor } from '../lib/identity'
 import AvatarBadge from './AvatarBadge'
 import CountdownRing from './CountdownRing'
@@ -104,6 +106,7 @@ export default function MessageRow({
   const imageSrc = entry.imageUrl ?? entry.localImage ?? null
   const messageMedia = findMessageMedia(entry.content)
   const displayContent = stripRenderedMediaMarkup(entry.content)
+  const gameRef = parseGameRef(entry.content)
 
   // Mobile long-press → bottom sheet. Scrolling (pointermove / cancel)
   // aborts the press; interactive children opt out via the closest() guard.
@@ -227,7 +230,11 @@ export default function MessageRow({
           </button>
         )}
         <div className="msg-body">
-          {renderMessageContent(displayContent)}
+          {gameRef ? (
+            <GameMessage content={entry.content} hostUserId={entry.userId} />
+          ) : (
+            renderMessageContent(displayContent)
+          )}
           {entry.editedAt && (
             <span className="msg-edited">{t('（已编辑）', ' (edited)')}</span>
           )}

@@ -260,7 +260,8 @@ export default function MessageList({
             onReact={reactEntry}
             onCopy={copyEntry}
             onJumpToReply={jumpToReply}
-          />        ))}
+          />
+        ))}
         {status === 'offline' && (
           <p className="chat-offline-note">
             {t(

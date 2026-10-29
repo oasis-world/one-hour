@@ -17,6 +17,7 @@ import { useAccount } from './lib/useAccount'
 import { useUserProfile } from './lib/userProfile'
 import { setProfileExpiresAt } from './lib/userProfile'
 import { expireAnonymousProfile, getProfileExpiresAt } from './lib/profileLifetime'
+import { getGameById } from './games/registry'
 import { watchAccountForProfileSync } from './lib/profileCloud'
 import { useMobileKeyboard } from './lib/useMobileKeyboard'
 import './lib/settingsRuntime'
@@ -338,6 +339,15 @@ export default function App() {
     setReplyTo(null)
   }
 
+  const handleStartGame = (gameId: string) => {
+    const instanceId = (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2))
+    const game = getGameById(gameId)
+    const title = game ? t(game.name, game.nameEn) : gameId
+    room.send(`🎮 ${title}\n__GAME__:${gameId}:${instanceId}`, undefined, replyTo)
+    setSentMessageSequence((sequence) => sequence + 1)
+    setReplyTo(null)
+  }
+
   const handleStartEdit = (entry: ChatEntry) => {
     setEditingMessage(entry)
     setReplyTo(null)
@@ -576,6 +586,7 @@ export default function App() {
                 onImagePicked={handleImagePicked}
                 onImagesPicked={handleImagesPicked}
                 onMenuOpenChange={handleMenuOpenChange}
+                onStartGame={handleStartGame}
               />
             ) : (
               <div className="composer-dock">

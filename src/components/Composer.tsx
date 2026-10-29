@@ -3,9 +3,10 @@ import type { ChatEntry, MessageReply } from '../lib/chatTypes'
 import { useLang, COMPOSER_PLACEHOLDER, t } from '../lib/i18n'
 import { useImeEnter } from '../lib/ime'
 import { markFilePickerOpened } from '../lib/filePickerGuard'
-import { CameraIcon, EmojiIcon, PlusIcon, SendIcon, ThinXIcon, UploadIcon } from './icons'
+import { CameraIcon, EmojiIcon, GameIcon, PlusIcon, SendIcon, ThinXIcon, UploadIcon } from './icons'
 import { PhotoIcon } from './userIcons'
 import EmojiPanel from './EmojiPanel'
+import { getGameList } from '../games/registry'
 
 interface Props {
   onSend: (text: string, replyTo?: MessageReply | null) => void
@@ -19,6 +20,8 @@ interface Props {
   onImagePicked: (file: File) => void
   /** Photos from the library — up to 5, sent as independent messages. */
   onImagesPicked: (files: File[]) => void
+  /** Start a game message for the given game id. */
+  onStartGame?: (gameId: string) => void
   /** Notifies the shell while a popover is up (mobile hides the gear). */
   onMenuOpenChange?: (open: boolean) => void
 }
@@ -54,11 +57,12 @@ function useMobileFormFactor(): boolean {
  * or emoji button toggles its popover (a click outside closes it); there
  * is no hover-to-open.
  */
-export default function Composer({ onSend, replyTo, onClearReply, editing, onClearEditing, onEdit, onImagePicked, onImagesPicked, onMenuOpenChange }: Props) {
+export default function Composer({ onSend, replyTo, onClearReply, editing, onClearEditing, onEdit, onImagePicked, onImagesPicked, onMenuOpenChange, onStartGame }: Props) {
   const lang = useLang()
   const [draft, setDraft] = useState(editing?.content ?? '')
   const [plusOpen, setPlusOpen] = useState(false)
   const [emojiOpen, setEmojiOpen] = useState(false)
+  const [gamesOpen, setGamesOpen] = useState(false)
   const [multiline, setMultiline] = useState(false)
   const coarse = isCoarsePointer()
   const mobileForm = useMobileFormFactor()
@@ -132,6 +136,7 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
       if (!rootRef.current?.contains(e.target as Node)) {
         setPlusOpen(false)
         setEmojiOpen(false)
+        setGamesOpen(false)
       }
     }
     document.addEventListener('pointerdown', onDown)
@@ -231,6 +236,7 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
             onClick={() => {
               setPlusOpen((v) => !v)
               setEmojiOpen(false)
+              setGamesOpen(false)
               // Leave the keyboard exactly as it is: no focus() call here.
               // The pointerdown preventDefault above already keeps an open
               // keyboard up, and a closed one stays down.
@@ -278,6 +284,45 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
                   <UploadIcon size={17} />
                   {t('上传图片', 'Upload image')}
                 </button>
+              )}
+              {onStartGame && (
+                <div className="plus-menu-group">
+                  <button
+                    type="button"
+                    className="plus-menu-item"
+                    role="menuitem"
+                    aria-expanded={gamesOpen}
+                    onMouseDown={keepFocus}
+                    onPointerDown={keepFocus}
+                    onClick={() => setGamesOpen((v) => !v)}
+                  >
+                    <GameIcon />
+                    {t('游戏', 'Games')}
+                    <span className="plus-menu-chevron">{gamesOpen ? '▾' : '▸'}</span>
+                  </button>
+                  {gamesOpen && (
+                    <div className="plus-menu-sub">
+                      {getGameList().map((game) => (
+                        <button
+                          key={game.id}
+                          type="button"
+                          className="plus-menu-item plus-menu-subitem"
+                          role="menuitem"
+                          onMouseDown={keepFocus}
+                          onPointerDown={keepFocus}
+                          onClick={() => {
+                            setPlusOpen(false)
+                            setGamesOpen(false)
+                            onStartGame(game.id)
+                          }}
+                        >
+                          <span className="plus-menu-game-icon">{game.icon}</span>
+                          {t(game.name, game.nameEn)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}

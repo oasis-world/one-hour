@@ -138,6 +138,42 @@ exception
   when duplicate_object then null;
 end $$;
 
+-- ── Gomoku game state ──────────────────────────────────────────────────────
+-- Broadcasts keep an active board in sync; this row restores it after refresh.
+-- Saved state expires one hour after its most recent move or player change.
+
+create table if not exists public.gomoku_states (
+  instance_id text primary key,
+  state jsonb not null check (jsonb_typeof(state) = 'object'),
+  updated_at timestamptz not null default now(),
+  expires_at timestamptz not null default (now() + interval '1 hour')
+);
+
+create index if not exists gomoku_states_expiry on public.gomoku_states (expires_at);
+alter table public.gomoku_states enable row level security;
+
+drop policy if exists "game states are readable by signed-in players" on public.gomoku_states;
+create policy "game states are readable by signed-in players"
+  on public.gomoku_states for select using (auth.uid() is not null);
+
+drop policy if exists "signed-in players may create game states" on public.gomoku_states;
+create policy "signed-in players may create game states"
+  on public.gomoku_states for insert with check (auth.uid() is not null);
+
+drop policy if exists "signed-in players may update game states" on public.gomoku_states;
+create policy "signed-in players may update game states"
+  on public.gomoku_states for update
+  using (auth.uid() is not null)
+  with check (auth.uid() is not null);
+
+drop policy if exists "expired game states may be removed by signed-in players" on public.gomoku_states;
+create policy "expired game states may be removed by signed-in players"
+  on public.gomoku_states for delete
+  using (auth.uid() is not null and expires_at <= now());
+
+grant select, insert, update, delete on public.gomoku_states to authenticated;
+revoke all on public.gomoku_states from anon;
+
 -- ── Chat image bucket ───────────────────────────────────────────────────────
 
 insert into storage.buckets (id, name, public)
@@ -208,6 +244,7 @@ set search_path = public
 as $$
 begin
   delete from public.chat_messages where expires_at <= now();
+  delete from public.gomoku_states where expires_at <= now();
 end;
 $$;
 

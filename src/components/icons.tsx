@@ -364,6 +364,27 @@ export function ReactIcon({ size = 20 }: GlyphProps) {
   )
 }
 
+export function GameIcon({ size = 17 }: GlyphProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M6 12h4M8 10v4" />
+      <circle cx="15" cy="11" r="1" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="13" r="1" fill="currentColor" stroke="none" />
+      <path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8z" />
+    </svg>
+  )
+}
+
 export function ChevronRightIcon({ size = 16 }: GlyphProps) {
   return (
     <svg
