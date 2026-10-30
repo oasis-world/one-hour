@@ -256,6 +256,7 @@ export default function MessageList({
             key={entry.id}
             entry={entry}
             mine={entry.userId === selfId}
+            onlineMembers={presence}
             author={presence.find((member) => member.userId === entry.userId) ?? {
               userId: entry.userId,
               displayName: entry.displayName,

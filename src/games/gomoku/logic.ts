@@ -5,6 +5,8 @@ export interface GomokuPlayer {
   userId: string
   displayName: string
   avatarUrl: string | null
+  avatarStyle?: string | null
+  avatarSeed?: string | null
   color: 1 | 2
   score: number
   joinedAt: number
@@ -84,10 +86,19 @@ export function removeGomokuPlayer(state: GomokuState, userId: string): GomokuSt
   const players = state.players.some((player) => player.isAI)
     ? []
     : state.players.filter((player) => player.userId !== userId)
+  const round = players.length === 0
+    ? 1
+    : state.round + (state.status === 'playing' || state.status === 'result' ? 1 : 0)
   return {
     ...state,
     players,
+    board: emptyBoard(),
+    turn: round % 2 === 1 ? 1 : 2,
     status: players.length === 2 ? 'playing' : 'waiting',
+    winnerId: null,
+    winningLine: null,
+    lastMove: null,
+    round,
   }
 }
 

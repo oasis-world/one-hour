@@ -15,10 +15,18 @@ export default function OnlineList({
   members,
   onClose,
   placement = 'top',
+  title,
+  emptyText,
+  ownerSelector,
+  className = '',
 }: {
   members: PresenceMember[]
   onClose: () => void
   placement?: 'top' | 'bottom'
+  title?: string
+  emptyText?: string
+  ownerSelector?: string
+  className?: string
 }) {
   const popRef = useRef<HTMLDivElement>(null)
 
@@ -29,6 +37,7 @@ export default function OnlineList({
       const target = e.target as HTMLElement | null
       if (popRef.current?.contains(target)) return
       if (target?.closest?.('.top-bar') || target?.closest?.('.settings-bar')) return
+      if (ownerSelector && target?.closest?.(ownerSelector)) return
       suppressNextClick()
       e.preventDefault()
       e.stopPropagation()
@@ -37,17 +46,17 @@ export default function OnlineList({
     }
     document.addEventListener('pointerdown', onDown, true)
     return () => document.removeEventListener('pointerdown', onDown, true)
-  }, [onClose])
+  }, [onClose, ownerSelector])
 
   return (
     <div
-      className={`online-pop${placement === 'bottom' ? ' is-bottom' : ''}`}
+      className={`online-pop${placement === 'bottom' ? ' is-bottom' : ''}${className ? ` ${className}` : ''}`}
       ref={popRef}
       role="dialog"
       aria-label={t('在线列表', 'Online members')}
     >
       <header className="online-pop-head">
-        <span>{`${t('在线', 'Online')} · ${members.length}`}</span>
+        <span>{`${title ?? t('在线', 'Online')} · ${members.length}`}</span>
       </header>
       <ul className="online-pop-list">
         {members.map((member) => (
@@ -76,7 +85,7 @@ export default function OnlineList({
           </li>
         ))}
         {members.length === 0 && (
-          <li className="online-pop-empty">{t('现在没有其他玩家在线', 'Nobody else is here')}</li>
+          <li className="online-pop-empty">{emptyText ?? t('现在没有其他玩家在线', 'Nobody else is here')}</li>
         )}
       </ul>
     </div>

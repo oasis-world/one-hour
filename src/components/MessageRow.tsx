@@ -21,6 +21,7 @@ interface Props {
   entry: ChatEntry
   mine: boolean
   author: PresenceMember
+  onlineMembers: PresenceMember[]
   menuOpen: boolean
   reactions: RoomReactionMap | undefined
   onImageClick: (src: string) => void
@@ -99,6 +100,7 @@ export default function MessageRow({
   entry,
   mine,
   author,
+  onlineMembers,
   menuOpen,
   reactions,
   onImageClick,
@@ -273,7 +275,7 @@ export default function MessageRow({
         )}
         <div className="msg-body">
           {gameRef ? (
-            <GameMessage content={entry.content} hostUserId={entry.userId} />
+            <GameMessage content={entry.content} hostUserId={entry.userId} onlineMembers={onlineMembers} />
           ) : (
             renderMessageContent(displayContent)
           )}

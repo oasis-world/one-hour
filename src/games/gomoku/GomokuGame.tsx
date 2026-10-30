@@ -2,9 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { getSupabaseClient } from '../../lib/supabaseClient'
 import { isSupabaseConfigured } from '../../lib/supabaseConfig'
 import { useAccount } from '../../lib/useAccount'
+import { fetchCloudProfile } from '../../lib/profileCloud'
 import { loadUserProfile } from '../../lib/userProfile'
 import { resolveChatIdentity } from '../../lib/identity'
 import { t, useLang } from '../../lib/i18n'
+import AvatarBadge from '../../components/AvatarBadge'
+import OnlineList from '../../components/OnlineList'
+import type { PresenceMember } from '../../lib/chatTypes'
+import { setPopoverOpen } from '../../lib/popoverGuard'
 import { chooseAiMove } from './ai'
 import { loadGomokuState, saveGomokuState } from './cloudState'
 import { PaletteIcon } from '../../components/icons'
@@ -27,19 +32,29 @@ import {
 interface Props {
   instanceId: string
   hostUserId: string
+  onlineMembers?: PresenceMember[]
 }
 
-export default function GomokuGame({ instanceId, hostUserId }: Props) {
+export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] }: Props) {
   useLang()
   const account = useAccount()
   const identity = resolveChatIdentity(account)
   const profile = loadUserProfile()
   const displayName = profile?.nickname ?? identity?.displayName ?? 'Player'
   const avatarUrl = profile?.avatarUrl ?? identity?.avatarUrl ?? null
+  const avatarStyle = profile?.style ?? identity?.avatar?.style ?? null
+  const avatarSeed = profile?.seed ?? identity?.avatar?.seed ?? null
   const selfId = identity?.userId ?? null
 
   const [state, setState] = useState<GomokuState>(() => createInitialState(instanceId, hostUserId))
+  const [profileLooks, setProfileLooks] = useState<Record<string, { style: string; seed: string; url: string | null }>>({})
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false)
+  const [spectatorsOpen, setSpectatorsOpen] = useState(false)
+  useEffect(() => {
+    if (!spectatorsOpen) return
+    setPopoverOpen(true)
+    return () => setPopoverOpen(false)
+  }, [spectatorsOpen])
   const [boardStyle, setBoardStyle] = useState<BoardStyle>(() => {
     try {
       const saved = window.localStorage.getItem('gomoku-board-style')
@@ -63,7 +78,7 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
     })
   }, [])
   const [readyChannelKey, setReadyChannelKey] = useState('')
-  const channelKey = `${instanceId}:${selfId ?? ''}:${displayName}:${avatarUrl ?? ''}`
+  const channelKey = `${instanceId}:${selfId ?? ''}:${displayName}:${avatarUrl ?? ''}:${avatarStyle ?? ''}:${avatarSeed ?? ''}`
   const channelReady = readyChannelKey === channelKey
   const channelRef = useRef<ReturnType<Awaited<ReturnType<typeof getSupabaseClient>>['channel']> | null>(null)
   const stateRef = useRef(state)
@@ -71,12 +86,30 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve())
   const aiTimerRef = useRef<number | null>(null)
   const selfIdRef = useRef(selfId)
+  const profileLookRequestsRef = useRef(new Set<string>())
   useEffect(() => {
     stateRef.current = state
   }, [state])
   useEffect(() => {
     selfIdRef.current = selfId
   }, [selfId])
+  useEffect(() => {
+    for (const player of state.players) {
+      if (player.isAI || (player.avatarStyle && player.avatarSeed) || profileLookRequestsRef.current.has(player.userId)) continue
+      profileLookRequestsRef.current.add(player.userId)
+      void fetchCloudProfile(player.userId).then((snapshot) => {
+        if (!snapshot) return
+        setProfileLooks((current) => ({
+          ...current,
+          [player.userId]: {
+            style: snapshot.profile.style,
+            seed: snapshot.profile.seed,
+            url: snapshot.profile.avatarUrl ?? null,
+          },
+        }))
+      })
+    }
+  }, [state.players])
 
   const publishState = useCallback((next: GomokuState) => {
     stateRef.current = next
@@ -192,7 +225,7 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
       })
       channel.on('broadcast', { event: 'join' }, ({ payload }) => {
         if (selfIdRef.current !== stateRef.current.hostId) return
-        const p = payload as { userId?: string; displayName?: string; avatarUrl?: string | null }
+        const p = payload as { userId?: string; displayName?: string; avatarUrl?: string | null; avatarStyle?: string | null; avatarSeed?: string | null }
         if (!p?.userId) return
         const cur = stateRef.current
         if (cur.players.some((pl) => pl.userId === p.userId)) {
@@ -212,6 +245,8 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
           userId: p.userId,
           displayName: p.displayName ?? 'Player',
           avatarUrl: p.avatarUrl ?? null,
+          avatarStyle: p.avatarStyle ?? null,
+          avatarSeed: p.avatarSeed ?? null,
           color,
           score: existingScore,
           joinedAt: Date.now(),
@@ -257,6 +292,18 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
       })
 
       const reconcilePresence = () => {
+        const activeLooks: Record<string, { style: string; seed: string; url: string | null }> = {}
+        for (const metas of Object.values(channel?.presenceState() ?? {})) {
+          for (const meta of metas as Array<Record<string, unknown>>) {
+            if (typeof meta.userId !== 'string') continue
+            activeLooks[meta.userId] = {
+              style: typeof meta.avatarStyle === 'string' ? meta.avatarStyle : '',
+              seed: typeof meta.avatarSeed === 'string' ? meta.avatarSeed : '',
+              url: typeof meta.avatarUrl === 'string' ? meta.avatarUrl : null,
+            }
+          }
+        }
+        setProfileLooks((current) => ({ ...activeLooks, ...current }))
         if (!stateLoadedRef.current) {
           initializeIfNeeded()
           return
@@ -282,7 +329,7 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
 
       await channel.subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          await channel?.track({ userId: selfId, displayName, avatarUrl })
+          await channel?.track({ userId: selfId, displayName, avatarUrl, avatarStyle, avatarSeed })
           const loaded = await loadGomokuState(instanceId)
           if (cancelled) return
           // A failed read is not an empty game. Do not replace a saved board.
@@ -321,7 +368,7 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
       if (channel) void channel.unsubscribe()
       channelRef.current = null
     }
-  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, channelKey, publishState, scheduleAiTurn])
+  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, publishState, scheduleAiTurn])
 
   const sendMove = (r: number, c: number) => {
     if (!selfId) return
@@ -373,6 +420,8 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
         userId: selfId as string,
         displayName,
         avatarUrl,
+        avatarStyle,
+        avatarSeed,
         color,
         score: 0,
         joinedAt: Date.now(),
@@ -391,7 +440,7 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
       publishState(next)
       return
     }
-    channelRef.current.send({ type: 'broadcast', event: 'join', payload: { userId: selfId, displayName, avatarUrl } })
+      channelRef.current.send({ type: 'broadcast', event: 'join', payload: { userId: selfId, displayName, avatarUrl, avatarStyle, avatarSeed } })
   }
 
   const sendAiJoin = () => {
@@ -416,6 +465,7 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
   }
 
   const isPlayer = myColor !== null
+  const spectators = onlineMembers.filter((member) => !state.players.some((player) => player.userId === member.userId))
   const canJoin = !isPlayer && state.players.length < 2 && (state.status === 'waiting' || state.status === 'result')
   const canJoinAI = isPlayer && state.players.length === 1 && state.status === 'waiting'
   const hasAiOpponent = state.players.some((player) => player.isAI)
@@ -462,7 +512,31 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
           >
             <PaletteIcon size={16} />
           </button>
-          {statusHint && <span className="gomoku-status">{statusHint}</span>}
+          {statusHint && (state.status === 'playing' && !isPlayer ? (
+            <span className="gomoku-spectator-control">
+              <button
+                type="button"
+                className="gomoku-status gomoku-spectator-trigger"
+                aria-haspopup="dialog"
+                aria-expanded={spectatorsOpen}
+                onClick={() => setSpectatorsOpen((open) => !open)}
+              >
+                <span>{statusHint}</span>
+                <span className="gomoku-spectator-count">{spectators.length}</span>
+              </button>
+              {spectatorsOpen && (
+                <OnlineList
+                  members={spectators}
+                  placement="bottom"
+                  className="gomoku-spectator-pop"
+                  title={t('观战玩家', 'Spectators')}
+                  emptyText={t('暂无观战玩家', 'No spectators currently')}
+                  ownerSelector=".gomoku-spectator-control"
+                  onClose={() => setSpectatorsOpen(false)}
+                />
+              )}
+            </span>
+          ) : <span className="gomoku-status">{statusHint}</span>)}
         </div>
         <span className="gomoku-meta">
           {statusHint && <span className="gomoku-status-dot" aria-hidden="true" />}
@@ -472,10 +546,30 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
 
       <div className="gomoku-players">
         {state.players.map((p) => (
-          <div key={p.userId} className={`gomoku-player${p.userId === selfId ? ' is-self' : ''}${state.turn === p.color && state.status === 'playing' ? ' is-turn' : ''}`}>
-            <span className="gomoku-stone" data-color={p.color} />
-            <span className="gomoku-player-name">{p.displayName}</span>
-            <span className="gomoku-player-score">{p.score}</span>
+          <div key={p.userId} className="gomoku-player-slot">
+            {p.isAI ? (
+              <span className="gomoku-ai-avatar" aria-label="AI">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 3v3M9 3h6M7 8h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3Z" />
+                  <path d="M8.5 13h.01M15.5 13h.01M9 17h6" />
+                </svg>
+              </span>
+            ) : (
+              <AvatarBadge
+                className="gomoku-player-avatar"
+                size={30}
+                look={{
+                  style: p.avatarStyle || profileLooks[p.userId]?.style || 'thumbs',
+                  seed: p.avatarSeed || profileLooks[p.userId]?.seed || p.userId,
+                  url: p.avatarUrl ?? profileLooks[p.userId]?.url,
+                }}
+              />
+            )}
+            <div className={`gomoku-player${p.userId === selfId ? ' is-self' : ''}${state.turn === p.color && state.status === 'playing' ? ' is-turn' : ''}`}>
+              <span className="gomoku-stone" data-color={p.color} />
+              <span className="gomoku-player-name" title={p.displayName}>{p.displayName}</span>
+              <span className="gomoku-player-score">{p.score}</span>
+            </div>
           </div>
         ))}
       </div>

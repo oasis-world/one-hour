@@ -1,8 +1,10 @@
 import type { ComponentType } from 'react'
+import type { PresenceMember } from '../lib/chatTypes'
 
 export interface GameComponentProps {
   instanceId: string
   hostUserId: string
+  onlineMembers?: PresenceMember[]
 }
 
 export interface GameDefinition {
