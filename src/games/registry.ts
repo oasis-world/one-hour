@@ -1,5 +1,6 @@
 import type { GameDefinition } from './types'
 import GomokuGame from './gomoku/GomokuGame'
+import XiangqiGame from './xiangqi/XiangqiGame'
 
 export const GAMES: GameDefinition[] = [
   {
@@ -10,6 +11,15 @@ export const GAMES: GameDefinition[] = [
     minPlayers: 1,
     maxPlayers: 2,
     Component: GomokuGame,
+  },
+  {
+    id: 'xiangqi',
+    name: '中国象棋',
+    nameEn: 'Chinese Chess',
+    icon: '♟',
+    minPlayers: 1,
+    maxPlayers: 2,
+    Component: XiangqiGame,
   },
 ]
 

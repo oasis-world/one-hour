@@ -175,6 +175,40 @@ create policy "signed-in players may delete game states"
 grant select, insert, update, delete on public.gomoku_states to authenticated;
 revoke all on public.gomoku_states from anon;
 
+-- ── Xiangqi game state ──────────────────────────────────────────────────────
+
+create table if not exists public.xiangqi_states (
+  instance_id text primary key,
+  state jsonb not null check (jsonb_typeof(state) = 'object'),
+  updated_at timestamptz not null default now(),
+  expires_at timestamptz not null default (now() + interval '1 hour')
+);
+
+create index if not exists xiangqi_states_expiry on public.xiangqi_states (expires_at);
+alter table public.xiangqi_states enable row level security;
+
+drop policy if exists "xiangqi states are readable by signed-in players" on public.xiangqi_states;
+create policy "xiangqi states are readable by signed-in players"
+  on public.xiangqi_states for select using (auth.uid() is not null);
+
+drop policy if exists "signed-in players may create xiangqi states" on public.xiangqi_states;
+create policy "signed-in players may create xiangqi states"
+  on public.xiangqi_states for insert with check (auth.uid() is not null);
+
+drop policy if exists "signed-in players may update xiangqi states" on public.xiangqi_states;
+create policy "signed-in players may update xiangqi states"
+  on public.xiangqi_states for update
+  using (auth.uid() is not null)
+  with check (auth.uid() is not null);
+
+drop policy if exists "signed-in players may delete xiangqi states" on public.xiangqi_states;
+create policy "signed-in players may delete xiangqi states"
+  on public.xiangqi_states for delete
+  using (auth.uid() is not null);
+
+grant select, insert, update, delete on public.xiangqi_states to authenticated;
+revoke all on public.xiangqi_states from anon;
+
 -- ── Chat image bucket ───────────────────────────────────────────────────────
 
 insert into storage.buckets (id, name, public)
@@ -253,11 +287,17 @@ begin
          and p.expires_at <= now()
      );
   delete from public.gomoku_states where expires_at <= now();
+  delete from public.xiangqi_states where expires_at <= now();
   -- Drop game states whose card message is gone (expired or author vanished).
   delete from public.gomoku_states gs
   where not exists (
     select 1 from public.chat_messages cm
     where cm.content like '%' || gs.instance_id || '%'
+  );
+  delete from public.xiangqi_states xs
+  where not exists (
+    select 1 from public.chat_messages cm
+    where cm.content like '%' || xs.instance_id || '%'
   );
 end;
 $$;

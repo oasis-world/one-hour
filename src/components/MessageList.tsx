@@ -12,6 +12,7 @@ import { HourglassIcon } from './icons'
 import { useChatScroll } from './useChatScroll'
 import { parseGameRef } from '../games/types'
 import { deleteGomokuState } from '../games/gomoku/cloudState'
+import { deleteXiangqiState } from '../games/xiangqi/cloudState'
 
 interface Props {
   entries: ChatEntry[]
@@ -176,7 +177,8 @@ export default function MessageList({
     // only offers Delete on the player's own messages).
     if (entry.userId !== selfId) return
     const gameRef = parseGameRef(entry.content)
-    if (gameRef) void deleteGomokuState(gameRef.instanceId)
+    if (gameRef?.type === 'gomoku') void deleteGomokuState(gameRef.instanceId)
+    if (gameRef?.type === 'xiangqi') void deleteXiangqiState(gameRef.instanceId)
     onRemove(entry.id)
   }
 
