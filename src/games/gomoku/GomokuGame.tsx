@@ -70,7 +70,6 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
   const stateLoadedRef = useRef(false)
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve())
   const aiTimerRef = useRef<number | null>(null)
-  const departureTimersRef = useRef(new Map<string, number>())
   const selfIdRef = useRef(selfId)
   useEffect(() => {
     stateRef.current = state
@@ -100,17 +99,45 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
 
   useEffect(() => () => {
     if (aiTimerRef.current !== null) window.clearTimeout(aiTimerRef.current)
-    departureTimersRef.current.forEach((timer) => window.clearTimeout(timer))
   }, [])
 
-  // Any signed-in client that holds the latest state persists it, so progress
-  // survives refreshes regardless of who hosts the room.
+  // Only the active host writes the canonical state. Spectators and stale tabs
+  // must not overwrite a newer board with an old snapshot.
   useEffect(() => {
-    if (!channelReady || !selfId) return
+    if (!channelReady || !selfId || selfId !== state.hostId) return
     persistQueueRef.current = persistQueueRef.current
       .catch(() => undefined)
       .then(() => saveGomokuState(instanceId, state))
   }, [channelReady, instanceId, selfId, state])
+
+  // Browsers may suspend Realtime while the app is backgrounded. Reload the
+  // durable snapshot on return so spectators and players catch up immediately.
+  useEffect(() => {
+    if (!channelReady) return
+    let cancelled = false
+    const refresh = async () => {
+      const loaded = await loadGomokuState(instanceId)
+      if (cancelled || !loaded.ok || !loaded.state) return
+      stateRef.current = loaded.state
+      setState(loaded.state)
+      if (selfIdRef.current === loaded.state.hostId) {
+        channelRef.current?.send({ type: 'broadcast', event: 'state', payload: loaded.state })
+        scheduleAiTurn(loaded.state)
+      }
+    }
+    const onVisible = () => {
+      if (!document.hidden) void refresh()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('pageshow', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('pageshow', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [channelReady, instanceId, scheduleAiTurn])
 
   const myColor = selfId ? colorOfPlayer(state, selfId) : null
   const isMyTurn = myColor !== null && state.turn === myColor && state.status === 'playing'
@@ -176,7 +203,7 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
           channel?.send({ type: 'broadcast', event: 'state', payload: cur })
           return
         }
-        const restarting = cur.status === 'result' || cur.status === 'waiting'
+        const restarting = cur.status === 'result'
         const round = cur.round + (cur.status === 'result' ? 1 : 0)
         const basePlayers = cur.players
         const color: 1 | 2 = cur.players.some((pl) => pl.color === 1) ? 2 : 1
@@ -193,7 +220,7 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
         const next: GomokuState = {
           ...cur,
           board: restarting ? emptyBoard() : cur.board,
-          turn: round % 2 === 1 ? 1 : 2,
+          turn: restarting ? (round % 2 === 1 ? 1 : 2) : cur.turn,
           winnerId: restarting ? null : cur.winnerId,
           winningLine: restarting ? null : cur.winningLine,
           lastMove: restarting ? null : cur.lastMove,
@@ -216,9 +243,6 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
         if (selfIdRef.current !== stateRef.current.hostId) return
         const p = payload as { userId?: string }
         if (!p?.userId) return
-        const timer = departureTimersRef.current.get(p.userId)
-        if (timer !== undefined) window.clearTimeout(timer)
-        departureTimersRef.current.delete(p.userId)
         const next = removeGomokuPlayer(stateRef.current, p.userId)
         if (next) publishState(next)
       })
@@ -252,25 +276,6 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
         if (selfIdRef.current === cur.hostId) {
           // Host re-broadcasts state so late joiners / spectators catch up.
           channel?.send({ type: 'broadcast', event: 'state', payload: cur })
-          for (const player of cur.players) {
-            if (player.isAI) continue
-            const pending = departureTimersRef.current.get(player.userId)
-            if (userIds.includes(player.userId)) {
-              if (pending !== undefined) window.clearTimeout(pending)
-              departureTimersRef.current.delete(player.userId)
-              continue
-            }
-            if (pending !== undefined) continue
-            const timer = window.setTimeout(() => {
-              departureTimersRef.current.delete(player.userId)
-              const current = stateRef.current
-              const stillPresent = Object.keys(channel?.presenceState() ?? {}).includes(player.userId)
-              if (selfIdRef.current !== current.hostId || stillPresent) return
-              const next = removeGomokuPlayer(current, player.userId)
-              if (next) publishState(next)
-            }, 2000)
-            departureTimersRef.current.set(player.userId, timer)
-          }
         }
       }
       channel.on('presence', { event: 'sync' }, reconcilePresence)
@@ -278,8 +283,11 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
       await channel.subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           await channel?.track({ userId: selfId, displayName, avatarUrl })
-          const saved = await loadGomokuState(instanceId)
+          const loaded = await loadGomokuState(instanceId)
           if (cancelled) return
+          // A failed read is not an empty game. Do not replace a saved board.
+          if (!loaded.ok) return
+          const saved = loaded.state
           if (saved) {
             cloudStateChecked = true
             stateLoadedRef.current = true
@@ -359,7 +367,7 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
       if (cur.players.some((pl) => pl.userId === selfId)) return
       if (cur.players.length >= 2) return
       const color: 1 | 2 = cur.players.some((player) => player.color === 1) ? 2 : 1
-      const restarting = cur.status === 'result' || cur.status === 'waiting'
+      const restarting = cur.status === 'result'
       const round = cur.round + (cur.status === 'result' ? 1 : 0)
       const newPlayer = {
         userId: selfId as string,
@@ -372,7 +380,7 @@ export default function GomokuGame({ instanceId, hostUserId }: Props) {
       const next: GomokuState = {
         ...cur,
         board: restarting ? emptyBoard() : cur.board,
-        turn: round % 2 === 1 ? 1 : 2,
+        turn: restarting ? (round % 2 === 1 ? 1 : 2) : cur.turn,
         winnerId: restarting ? null : cur.winnerId,
         winningLine: restarting ? null : cur.winningLine,
         lastMove: restarting ? null : cur.lastMove,

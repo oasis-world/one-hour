@@ -3,7 +3,7 @@ import { isGomokuState, type GomokuState } from './logic'
 
 const STATE_TTL_MS = 60 * 60 * 1000
 
-export async function loadGomokuState(instanceId: string): Promise<GomokuState | null> {
+export async function loadGomokuState(instanceId: string): Promise<{ state: GomokuState | null; ok: boolean }> {
   const client = await getSupabaseClient()
   const { data, error } = await client
     .from('gomoku_states')
@@ -13,13 +13,29 @@ export async function loadGomokuState(instanceId: string): Promise<GomokuState |
     .maybeSingle()
   if (error) {
     console.error('Could not load Gomoku state:', error.message)
-    return null
+    return { state: null, ok: false }
   }
-  return isGomokuState(data?.state, instanceId) ? data.state : null
+  return { state: isGomokuState(data?.state, instanceId) ? data.state : null, ok: true }
 }
 
 export async function saveGomokuState(instanceId: string, state: GomokuState): Promise<void> {
   const client = await getSupabaseClient()
+  const marker = `__GAME__:gomoku:${instanceId}`
+  const { data: card, error: cardError } = await client
+    .from('chat_messages')
+    .select('id')
+    .like('content', `%${marker}%`)
+    .gt('expires_at', new Date().toISOString())
+    .limit(1)
+    .maybeSingle()
+  if (cardError) {
+    console.error('Could not verify Gomoku card before save:', cardError.message)
+    return
+  }
+  if (!card) {
+    await deleteGomokuState(instanceId)
+    return
+  }
   const now = Date.now()
   const { error } = await client.from('gomoku_states').upsert({
     instance_id: instanceId,
