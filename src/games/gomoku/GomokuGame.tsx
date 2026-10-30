@@ -14,8 +14,9 @@ import { chooseAiMove } from './ai'
 import { loadGomokuState, saveGomokuState } from './cloudState'
 import { PaletteIcon } from '../../components/icons'
 import './GomokuGame.css'
+import './GomokuBoardStyles.css'
 
-const BOARD_STYLES = ['classic', 'minimal', 'dark', 'neon', 'ocean', 'sakura', 'forest', 'retro'] as const
+const BOARD_STYLES = ['classic', 'minimal', 'dark', 'neon', 'ocean', 'sakura', 'forest', 'retro', 'glass'] as const
 type BoardStyle = (typeof BOARD_STYLES)[number]
 import {
   addAiOpponent,
@@ -55,25 +56,12 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
     setPopoverOpen(true)
     return () => setPopoverOpen(false)
   }, [spectatorsOpen])
-  const [boardStyle, setBoardStyle] = useState<BoardStyle>(() => {
-    try {
-      const saved = window.localStorage.getItem('gomoku-board-style')
-      if (saved && (BOARD_STYLES as readonly string[]).includes(saved)) return saved as BoardStyle
-    } catch {
-      // ignore
-    }
-    return 'classic'
-  })
+  const [boardStyle, setBoardStyle] = useState<BoardStyle>('classic')
   const randomizeBoardStyle = useCallback(() => {
     setBoardStyle((prev) => {
       if (BOARD_STYLES.length <= 1) return prev
       let next = prev
       while (next === prev) next = BOARD_STYLES[Math.floor(Math.random() * BOARD_STYLES.length)]
-      try {
-        window.localStorage.setItem('gomoku-board-style', next)
-      } catch {
-        // ignore
-      }
       return next
     })
   }, [])

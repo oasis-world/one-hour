@@ -1,0 +1,133 @@
+/* Four clean color gradients and four softly blurred glass treatments.
+   The classic wood board intentionally keeps its original appearance. */
+.gomoku-board--minimal,
+.gomoku-board--dark,
+.gomoku-board--sakura,
+.gomoku-board--retro {
+  border-radius: 16px;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.48), inset 0 -18px 34px rgba(23,29,55,.12), 0 8px 22px rgba(0,0,0,.22);
+}
+
+/* Modern coral into warm rose. */
+.gomoku-board--minimal {
+  background-color: #ec9c91;
+  background-image: linear-gradient(138deg, #ffd0b8 0%, #f3a19a 44%, #dc7ca5 100%);
+}
+.gomoku-board--minimal .gomoku-grid-lines { background-image: linear-gradient(to right, rgba(110,57,68,.36) 0 1px, transparent 1px), linear-gradient(to bottom, rgba(110,57,68,.36) 0 1px, transparent 1px); }
+.gomoku-board--minimal .gomoku-frame { border-color: rgba(103,54,65,.54); box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); }
+.gomoku-board--minimal .gomoku-cell:not(:disabled):hover::after { background: rgba(93,45,62,.14); }
+
+/* Midnight indigo into deep teal. */
+.gomoku-board--dark {
+  background-color: #253c68;
+  background-image: linear-gradient(135deg, #465ea0 0%, #303e77 48%, #176b74 100%);
+}
+.gomoku-board--dark .gomoku-grid-lines { background-image: linear-gradient(to right, rgba(231,239,255,.48) 0 1px, transparent 1px), linear-gradient(to bottom, rgba(231,239,255,.48) 0 1px, transparent 1px); }
+.gomoku-board--dark .gomoku-frame { border-color: rgba(224,236,255,.68); box-shadow: inset 0 0 0 1px rgba(8,23,54,.2); }
+.gomoku-board--dark .gomoku-cell:not(:disabled):hover::after { background: rgba(240,248,255,.18); }
+
+/* Soft lavender into saturated lilac. */
+.gomoku-board--sakura {
+  background-color: #b69ae5;
+  background-image: linear-gradient(135deg, #ecd8ff 0%, #c5a6f2 48%, #987de2 100%);
+}
+.gomoku-board--sakura .gomoku-grid-lines { background-image: linear-gradient(to right, rgba(76,56,117,.39) 0 1px, transparent 1px), linear-gradient(to bottom, rgba(76,56,117,.39) 0 1px, transparent 1px); }
+.gomoku-board--sakura .gomoku-frame { border-color: rgba(76,56,117,.58); box-shadow: inset 0 0 0 1px rgba(255,255,255,.24); }
+.gomoku-board--sakura .gomoku-cell:not(:disabled):hover::after { background: rgba(67,46,108,.14); }
+
+/* Fresh mint into soft sage. */
+.gomoku-board--retro {
+  background-color: #9cceb5;
+  background-image: linear-gradient(135deg, #d4f0d6 0%, #a6d8c1 48%, #79b9ac 100%);
+}
+.gomoku-board--retro .gomoku-grid-lines { background-image: linear-gradient(to right, rgba(42,85,75,.38) 0 1px, transparent 1px), linear-gradient(to bottom, rgba(42,85,75,.38) 0 1px, transparent 1px); }
+.gomoku-board--retro .gomoku-frame { border-color: rgba(42,85,75,.56); box-shadow: inset 0 0 0 1px rgba(255,255,255,.26); }
+.gomoku-board--retro .gomoku-cell:not(:disabled):hover::after { background: rgba(39,79,68,.14); }
+
+/* Frosted glass base: blurred color fields, a translucent sheen, and no grain. */
+.gomoku-board--neon,
+.gomoku-board--ocean,
+.gomoku-board--forest,
+.gomoku-board--glass {
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 18px;
+  background-color: #7b83b5;
+  background-image: linear-gradient(135deg, rgba(255,255,255,.17), rgba(255,255,255,0) 52%, rgba(15,25,68,.14));
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.62), inset 0 -1px 1px rgba(32,39,75,.2), 0 10px 26px rgba(0,0,0,.24);
+}
+.gomoku-board--neon::before,
+.gomoku-board--ocean::before,
+.gomoku-board--forest::before,
+.gomoku-board--glass::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: -16%;
+  pointer-events: none;
+  filter: blur(28px);
+  transform: scale(1.08);
+  background: radial-gradient(ellipse at 22% 25%, rgba(255,255,255,.66), transparent 38%), radial-gradient(ellipse at 76% 74%, rgba(255,255,255,.38), transparent 36%);
+}
+.gomoku-board--neon .gomoku-cell,
+.gomoku-board--ocean .gomoku-cell,
+.gomoku-board--forest .gomoku-cell,
+.gomoku-board--glass .gomoku-cell { z-index: 1; }
+.gomoku-board--neon .gomoku-grid-lines,
+.gomoku-board--ocean .gomoku-grid-lines,
+.gomoku-board--forest .gomoku-grid-lines,
+.gomoku-board--glass .gomoku-grid-lines,
+.gomoku-board--neon .gomoku-frame,
+.gomoku-board--ocean .gomoku-frame,
+.gomoku-board--forest .gomoku-frame,
+.gomoku-board--glass .gomoku-frame { z-index: 1; }
+
+/* Ice blue and lilac glass. */
+.gomoku-board--neon { background-color: #8884c2; background-image: linear-gradient(132deg, rgba(91,183,220,.56), rgba(168,139,222,.72) 55%, rgba(245,199,227,.54)); }
+.gomoku-board--neon::before { background: radial-gradient(ellipse at 18% 24%, rgba(232,251,255,.95), transparent 42%), radial-gradient(ellipse at 80% 73%, rgba(220,185,255,.82), transparent 43%); }
+.gomoku-board--neon .gomoku-grid-lines { background-image: linear-gradient(to right, rgba(52,62,116,.42) 0 1px, transparent 1px), linear-gradient(to bottom, rgba(52,62,116,.42) 0 1px, transparent 1px); }
+.gomoku-board--neon .gomoku-frame { border-color: rgba(255,255,255,.78); box-shadow: 0 0 0 1px rgba(90,87,148,.24), inset 0 0 0 1px rgba(255,255,255,.25); }
+.gomoku-board--neon .gomoku-cell:not(:disabled):hover::after { background: rgba(63,74,127,.15); }
+
+/* Sea-glass teal and aqua. */
+.gomoku-board--ocean { background-color: #56a8a5; background-image: linear-gradient(135deg, rgba(42,174,175,.65), rgba(111,207,194,.76) 52%, rgba(91,141,184,.6)); }
+.gomoku-board--ocean::before { background: radial-gradient(ellipse at 24% 19%, rgba(224,255,243,.92), transparent 40%), radial-gradient(ellipse at 78% 76%, rgba(112,205,226,.84), transparent 44%); }
+.gomoku-board--ocean .gomoku-grid-lines { background-image: linear-gradient(to right, rgba(25,82,91,.4) 0 1px, transparent 1px), linear-gradient(to bottom, rgba(25,82,91,.4) 0 1px, transparent 1px); }
+.gomoku-board--ocean .gomoku-frame { border-color: rgba(237,255,246,.8); box-shadow: 0 0 0 1px rgba(36,104,111,.2), inset 0 0 0 1px rgba(255,255,255,.22); }
+.gomoku-board--ocean .gomoku-cell:not(:disabled):hover::after { background: rgba(20,78,82,.14); }
+
+/* Sage glass with a warm citron highlight. */
+.gomoku-board--forest { background-color: #829d75; background-image: linear-gradient(135deg, rgba(163,196,139,.68), rgba(108,158,133,.72) 52%, rgba(203,204,145,.58)); }
+.gomoku-board--forest::before { background: radial-gradient(ellipse at 20% 20%, rgba(241,255,204,.9), transparent 42%), radial-gradient(ellipse at 76% 77%, rgba(155,220,193,.8), transparent 44%); }
+.gomoku-board--forest .gomoku-grid-lines { background-image: linear-gradient(to right, rgba(52,83,65,.4) 0 1px, transparent 1px), linear-gradient(to bottom, rgba(52,83,65,.4) 0 1px, transparent 1px); }
+.gomoku-board--forest .gomoku-frame { border-color: rgba(243,255,215,.72); box-shadow: 0 0 0 1px rgba(48,81,60,.2), inset 0 0 0 1px rgba(255,255,255,.22); }
+.gomoku-board--forest .gomoku-cell:not(:disabled):hover::after { background: rgba(48,81,60,.15); }
+
+/* Pearl-pink glass with a cool blue edge. */
+.gomoku-board--glass { background-color: #b9a7c6; background-image: linear-gradient(135deg, rgba(238,197,218,.72), rgba(192,170,213,.7) 52%, rgba(151,195,218,.58)); }
+.gomoku-board--glass::before { background: radial-gradient(ellipse at 24% 22%, rgba(255,244,246,.94), transparent 42%), radial-gradient(ellipse at 79% 78%, rgba(153,214,239,.84), transparent 44%); }
+.gomoku-board--glass .gomoku-grid-lines { background-image: linear-gradient(to right, rgba(77,69,107,.4) 0 1px, transparent 1px), linear-gradient(to bottom, rgba(77,69,107,.4) 0 1px, transparent 1px); }
+.gomoku-board--glass .gomoku-frame { border-color: rgba(255,255,255,.78); box-shadow: 0 0 0 1px rgba(90,78,116,.2), inset 0 0 0 1px rgba(255,255,255,.2); }
+.gomoku-board--glass .gomoku-cell:not(:disabled):hover::after { background: rgba(74,66,102,.14); }
+
+/* Reuse the original wood-frame treatment: a fine light rim, a 1px dark
+   groove, and a subtle inner edge. */
+.gomoku-board .gomoku-grid-lines {
+  background-image:
+    linear-gradient(to right,
+      rgba(255,224,166,.42) 0 .5px,
+      rgba(65,38,18,.9) .5px 1.5px,
+      rgba(76,43,20,.12) 1.5px 2px,
+      transparent 2px),
+    linear-gradient(to bottom,
+      rgba(255,224,166,.42) 0 .5px,
+      rgba(65,38,18,.9) .5px 1.5px,
+      rgba(76,43,20,.12) 1.5px 2px,
+      transparent 2px);
+}
+
+/* Restore the original inset perimeter treatment on the wood frame. */
+.gomoku-board.gomoku-board--classic .gomoku-frame {
+  border-color: rgba(65,38,18,.9);
+  box-shadow: 0 0 0 1px rgba(255,224,166,.42), inset 0 0 0 1px rgba(76,43,20,.12);
+}
