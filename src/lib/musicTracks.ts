@@ -92,4 +92,10 @@ export const MUSIC_TRACKS: Record<string, string[]> = {
     'https://upload.wikimedia.org/wikipedia/commons/transcoded/4/4a/Josh_Woodward_-_25_-_Orbit.ogg/Josh_Woodward_-_25_-_Orbit.ogg.mp3',
     'https://upload.wikimedia.org/wikipedia/commons/transcoded/3/33/Josh_Woodward_-_27_-_Show_Me.ogg/Josh_Woodward_-_27_-_Show_Me.ogg.mp3',
   ],
+
+  light: [
+    // Light / ambient pieces from Wikimedia Commons
+    'https://upload.wikimedia.org/wikipedia/commons/e/ed/Dewdrop_Fantasy_%28ISRC_USUAN1700001%29.mp3',
+    'https://upload.wikimedia.org/wikipedia/commons/3/36/SolusLunes_-_Solus-_Endless_Space_%28cc-by-3.0%29.mp3',
+  ],
 }

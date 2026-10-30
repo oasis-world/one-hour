@@ -16,7 +16,9 @@ export function useBackgroundMusic(language: string, hasIdentity: boolean) {
   useEffect(() => { languageRef.current = language }, [language])
 
   const pickTrack = useCallback(() => {
-    const tracks = MUSIC_TRACKS[languageRef.current.startsWith('zh') ? 'zh' : 'en'] ?? MUSIC_TRACKS.en
+    // All tracks share one pool now: the UI language no longer affects
+    // which music can be picked.
+    const tracks = Object.values(MUSIC_TRACKS).flat()
     if (!tracks.length) return ''
     let index = Math.floor(Math.random() * tracks.length)
     if (tracks.length > 1 && index === lastTrackRef.current) index = (index + 1) % tracks.length
