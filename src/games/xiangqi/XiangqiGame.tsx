@@ -35,7 +35,7 @@ interface Props {
   onlineMembers?: PresenceMember[]
 }
 
-const BOARD_STYLES = ['wood', 'classic', 'concave', 'walnut', 'jade'] as const
+const BOARD_STYLES = ['wood', 'classic', 'concave', 'jade'] as const
 type BoardStyle = (typeof BOARD_STYLES)[number]
 
 const PIECE_GLYPH: Record<number, string> = {
