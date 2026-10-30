@@ -513,3 +513,20 @@ export function ShuffleIcon({ size = 16 }: GlyphProps) {
     </svg>
   )
 }
+
+export function GomokuIcon({ size = 17 }: GlyphProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle cx="4" cy="4" r="3" fill="#111" />
+      <circle cx="12" cy="4" r="3" fill="#fff" stroke="#999" strokeWidth="0.5" />
+      <circle cx="4" cy="12" r="3" fill="#fff" stroke="#999" strokeWidth="0.5" />
+      <circle cx="12" cy="12" r="3" fill="#111" />
+    </svg>
+  )
+}

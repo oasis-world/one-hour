@@ -79,20 +79,9 @@
   white-space: nowrap;
 }
 .gomoku-status.gomoku-spectator-trigger { display: inline-flex; }
-.gomoku-spectator-count {
-  display: grid;
-  place-items: center;
-  flex: 0 0 15px;
-  width: 15px;
-  height: 15px;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-  opacity: 0.9;
-}
-.gomoku-spectator-pop { background: #181a20; }
+.gomoku-spectator-trigger {
+  position: relative;
+}.gomoku-spectator-pop { background: #181a20; }
 .app-shell.theme-warm .gomoku-spectator-pop { background: #fcf3dc; }
 .gomoku-meta {
   display: flex;

@@ -4,7 +4,7 @@ import { useLang, COMPOSER_PLACEHOLDER, t } from '../lib/i18n'
 import { useImeEnter } from '../lib/ime'
 import { setPopoverOpen, suppressNextClick } from '../lib/popoverGuard'
 import { markFilePickerOpened } from '../lib/filePickerGuard'
-import { CameraIcon, ChevronRightIcon, EmojiIcon, GameIcon, PlusIcon, SendIcon, ThinXIcon, UploadIcon } from './icons'
+import { CameraIcon, ChevronRightIcon, EmojiIcon, GameIcon, GomokuIcon, PlusIcon, SendIcon, ThinXIcon, UploadIcon } from './icons'
 import { PhotoIcon } from './userIcons'
 import EmojiPanel from './EmojiPanel'
 import { getGameList } from '../games/registry'
@@ -327,6 +327,7 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
                             onStartGame(game.id)
                           }}
                         >
+                          {game.id === 'gomoku' ? <GomokuIcon size={17} /> : game.icon}
                           {t(game.name, game.nameEn)}
                         </button>
                       ))}

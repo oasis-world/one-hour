@@ -541,8 +541,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
                 aria-expanded={spectatorsOpen}
                 onClick={() => setSpectatorsOpen((open) => !open)}
               >
-                <span>{statusHint}</span>
-                <span className="gomoku-spectator-count">{spectators.length}</span>
+                <span>{statusHint}{spectators.length > 0 ? ` (${spectators.length > 99 ? '99+' : spectators.length})` : ''}</span>
               </button>
               {spectatorsOpen && (
                 <OnlineList

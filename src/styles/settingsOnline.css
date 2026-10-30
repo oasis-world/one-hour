@@ -22,8 +22,8 @@
   padding: 0 3px;
   border: 1px solid var(--surface-raised);
   border-radius: 999px;
-  background: var(--surface-strong);
-  color: var(--ink);
+  background: #ff7a59;
+  color: #fff;
   font-size: 8px;
   font-weight: 800;
   line-height: 1;
