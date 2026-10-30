@@ -9,7 +9,6 @@ import {
   loadUserProfile,
   NICKNAME_MAX,
   preWelcomeProfile,
-  randomNickname,
   randomProfile,
   ROLE_MAX,
   saveUserProfile,
@@ -47,6 +46,8 @@ export default function WelcomeModal({
   )
   const ime = useImeEnter()
   const nicknameRef = useRef<HTMLInputElement>(null)
+  const roleRef = useRef<HTMLInputElement>(null)
+  const [error, setError] = useState<string | null>(null)
 
   // Edit mode is dismissable; the first-visit gate is not.
   useEffect(() => {
@@ -74,9 +75,29 @@ export default function WelcomeModal({
   }
 
   const confirm = () => {
-    const nickname =
-      cleanNickname(draft.nickname) || randomNickname(draft.nickname, lang)
+    const nickname = cleanNickname(draft.nickname)
     const role = cleanRole(draft.role ?? '')
+    if (!nickname) {
+      setError(t('请输入昵称', 'Nickname is required'))
+      nicknameRef.current?.focus()
+      return
+    }
+    if (nickname.length < 2) {
+      setError(t('昵称至少 2 个字符', 'Nickname must be at least 2 characters'))
+      nicknameRef.current?.focus()
+      return
+    }
+    if (!role) {
+      setError(t('请输入角色', 'Role is required'))
+      roleRef.current?.focus()
+      return
+    }
+    if (role.length < 2) {
+      setError(t('角色至少 2 个字符', 'Role must be at least 2 characters'))
+      roleRef.current?.focus()
+      return
+    }
+    setError(null)
     saveUserProfile({
       nickname,
       role,
@@ -166,7 +187,10 @@ export default function WelcomeModal({
                 spellCheck={false}
                 autoComplete="off"
                 autoFocus={typeof window !== 'undefined' && !window.matchMedia('(pointer: coarse)').matches}
-                onChange={(e) => setDraft({ ...draft, nickname: e.target.value })}
+                onChange={(e) => {
+                  setDraft({ ...draft, nickname: e.target.value })
+                  setError(null)
+                }}
                 onKeyDown={onNickEnter}
                 {...ime.imeProps}
               />
@@ -192,13 +216,17 @@ export default function WelcomeModal({
                 <BriefcaseIcon size={15} />
               </span>
               <input
+                ref={roleRef}
                 type="text"
                 value={draft.role ?? ''}
                 maxLength={ROLE_MAX}
                 placeholder={t('角色', 'Role')}
                 spellCheck={false}
                 autoComplete="off"
-                onChange={(e) => setDraft({ ...draft, role: e.target.value })}
+                onChange={(e) => {
+                  setDraft({ ...draft, role: e.target.value })
+                  setError(null)
+                }}
                 onKeyDown={onRoleEnter}
                 {...ime.imeProps}
               />
@@ -219,6 +247,7 @@ export default function WelcomeModal({
           </label>
         </div>
 
+        {error && <p className="welcome-error" role="alert">{error}</p>}
         <button type="button" className="btn-accent welcome-confirm" onClick={confirm}>
           {editing ? (t('保存', 'Save')) : t('开始聊天', 'Enter the room')}
         </button>

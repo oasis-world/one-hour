@@ -191,6 +191,12 @@
   width: 100%;
   margin-top: 12px;
 }
+.welcome-error {
+  margin: 8px 0 0;
+  color: #ef4444;
+  font-size: 13px;
+  text-align: center;
+}
 
 /* ---------- Profile page (modal, account-dialog chrome) ---------- */
 

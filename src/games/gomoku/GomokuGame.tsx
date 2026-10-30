@@ -51,6 +51,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   const [profileLooks, setProfileLooks] = useState<Record<string, { style: string; seed: string; url: string | null }>>({})
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false)
   const [spectatorsOpen, setSpectatorsOpen] = useState(false)
+  const [joinStatus, setJoinStatus] = useState<'idle' | 'joining' | 'retry'>('idle')
   useEffect(() => {
     if (!spectatorsOpen) return
     setPopoverOpen(true)
@@ -73,6 +74,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   const stateLoadedRef = useRef(false)
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve())
   const aiTimerRef = useRef<number | null>(null)
+  const joinTimeoutRef = useRef<number | null>(null)
   const selfIdRef = useRef(selfId)
   const profileLookRequestsRef = useRef(new Set<string>())
   useEffect(() => {
@@ -81,6 +83,16 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   useEffect(() => {
     selfIdRef.current = selfId
   }, [selfId])
+  useEffect(() => {
+    if (!selfId || !state.players.some((player) => player.userId === selfId)) return
+    if (joinTimeoutRef.current !== null) window.clearTimeout(joinTimeoutRef.current)
+    joinTimeoutRef.current = null
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setJoinStatus('idle')
+  }, [selfId, state.players])
+  useEffect(() => () => {
+    if (joinTimeoutRef.current !== null) window.clearTimeout(joinTimeoutRef.current)
+  }, [])
   useEffect(() => {
     for (const player of state.players) {
       if (player.isAI || (player.avatarStyle && player.avatarSeed) || profileLookRequestsRef.current.has(player.userId)) continue
@@ -395,12 +407,19 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
     }
   }
   const sendJoin = () => {
-    if (!selfId || !channelReady || !channelRef.current) return
+    if (!selfId || !channelReady || !channelRef.current || joinStatus === 'joining') return
+    setJoinStatus('joining')
     if (selfId === stateRef.current.hostId) {
       // The host does not receive its own broadcast, so apply locally.
       const cur = stateRef.current
-      if (cur.players.some((pl) => pl.userId === selfId)) return
-      if (cur.players.length >= 2) return
+      if (cur.players.some((pl) => pl.userId === selfId)) {
+        setJoinStatus('idle')
+        return
+      }
+      if (cur.players.length >= 2) {
+        setJoinStatus('retry')
+        return
+      }
       const color: 1 | 2 = cur.players.some((player) => player.color === 1) ? 2 : 1
       const restarting = cur.status === 'result'
       const round = cur.round + (cur.status === 'result' ? 1 : 0)
@@ -428,7 +447,20 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
       publishState(next)
       return
     }
-      channelRef.current.send({ type: 'broadcast', event: 'join', payload: { userId: selfId, displayName, avatarUrl, avatarStyle, avatarSeed } })
+    const failJoin = () => {
+      if (stateRef.current.players.some((player) => player.userId === selfId)) return
+      if (joinTimeoutRef.current !== null) window.clearTimeout(joinTimeoutRef.current)
+      joinTimeoutRef.current = null
+      setJoinStatus('retry')
+    }
+    joinTimeoutRef.current = window.setTimeout(failJoin, 10000)
+    void channelRef.current.send({
+      type: 'broadcast',
+      event: 'join',
+      payload: { userId: selfId, displayName, avatarUrl, avatarStyle, avatarSeed },
+    }).then((status) => {
+      if (status !== 'ok') failJoin()
+    }, failJoin)
   }
 
   const sendAiJoin = () => {
@@ -591,8 +623,20 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
 
       <div className="gomoku-actions">
         {canJoin && (
-          <button type="button" className="btn-accent" disabled={!channelReady || !selfId} onClick={sendJoin}>
-            {channelReady && selfId ? t('加入游戏', 'Join game') : t('连接游戏中…', 'Connecting…')}
+          <button
+            type="button"
+            className="btn-accent"
+            disabled={!channelReady || !selfId || joinStatus === 'joining'}
+            aria-busy={joinStatus === 'joining'}
+            onClick={sendJoin}
+          >
+            {!channelReady || !selfId
+              ? t('连接游戏中…', 'Connecting…')
+              : joinStatus === 'joining'
+                ? t('正在加入…', 'Joining…')
+                : joinStatus === 'retry'
+                  ? t('加入较慢，点击重试', 'Taking longer; tap to retry')
+                  : t('加入游戏', 'Join game')}
           </button>
         )}
         {canJoinAI && (

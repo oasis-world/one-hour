@@ -1,5 +1,6 @@
 import {
   fetchChatPage,
+  fetchExistingMessageIds,
   joinChatRoom,
   purgeExpiredRemote,
   type ChatCursor,
@@ -119,7 +120,11 @@ export function enterChat(
 
   const expireUserMessages = (userId: string) => {
     for (const entry of [...entries]) {
-      if (entry.userId === userId) dropEntry(entry.id)
+      if (entry.userId !== userId) continue
+      // Best-effort cloud delete so other clients see the farewell even when
+      // the profile trigger / purge RPC is unavailable.
+      if (!entry.state) void handle?.deleteMessage(entry.id, imagePathOf(entry.imageUrl))
+      dropEntry(entry.id)
     }
   }
 
@@ -349,9 +354,24 @@ export function enterChat(
 
   // ---- startup: cache first, outbox previews, then the network ----
   void (async () => {
+    // Sweep expired rows (incl. vanished authors) before reading the cache,
+    // so a stale local copy cannot resurrect a message the cloud forgot.
+    await purgeExpiredRemote()
+    if (closed) return
     const [cached, outbox] = await Promise.all([loadChatCache(), readOutbox()])
     if (closed) return
-    const live = cached.filter((entry) => !isExpired(entry)).slice(-INITIAL_PAGE)
+    // Drop cached rows the cloud no longer has (profile expiry / purge).
+    const cachedIds = cached.filter((entry) => !entry.state).map((entry) => entry.id)
+    const existing = await fetchExistingMessageIds(cachedIds)
+    let validCached = cached
+    if (existing) {
+      const staleIds = cachedIds.filter((id) => !existing.has(id))
+      if (staleIds.length > 0) {
+        await Promise.all(staleIds.map((id) => removeChatCacheEntry(id)))
+      }
+      validCached = cached.filter((entry) => entry.state || existing.has(entry.id))
+    }
+    const live = validCached.filter((entry) => !isExpired(entry)).slice(-INITIAL_PAGE)
     // Unsent drafts come back as pending entries with their photo preview.
     const pending: ChatEntry[] = []
     for (const item of outbox) {
@@ -381,34 +401,48 @@ export function enterChat(
     void pruneChatCache()
   })()
 
-  const syncFromServer = () => {
+  const syncFromServer = async () => {
     if (closed) return
-    void fetchChatPage().then((page) => {
-      if (closed || !page) return
-      hasMoreOlder = page.hasMore
-      if (page.messages.length > 0) {
-        serverCursor = {
-          createdAt: page.messages[0].serverCreatedAt!,
-          id: page.messages[0].id,
+    await purgeExpiredRemote()
+    if (closed) return
+    // Drop entries the cloud no longer has (vanished authors / purge) so a
+    // refresh cannot keep showing a message the server already forgot.
+    const confirmedIds = entries.filter((entry) => !entry.state && !entry.expiring).map((entry) => entry.id)
+    const existing = await fetchExistingMessageIds(confirmedIds)
+    if (existing && !closed) {
+      for (const id of confirmedIds) {
+        if (!existing.has(id)) {
+          const entry = entries.find((e) => e.id === id)
+          if (entry && !entry.expiring) dropEntry(id)
         }
       }
-      // Merge the authoritative page over whatever cache/outbox restored:
-      // confirmed rows win, cached-but-older rows survive beneath the page.
-      const byId = new Map(entries.map((entry) => [entry.id, entry]))
-      for (const message of page.messages) {
-        byId.set(message.id, mergeIntoEntry(message, byId.get(message.id)))
+    }
+    if (closed) return
+    const page = await fetchChatPage()
+    if (closed || !page) return
+    hasMoreOlder = page.hasMore
+    if (page.messages.length > 0) {
+      serverCursor = {
+        createdAt: page.messages[0].serverCreatedAt!,
+        id: page.messages[0].id,
       }
-      entries = [...byId.values()]
-        .filter((entry) => entry.state || !isExpired(entry))
-        .sort(compareEntries)
-        .slice(-MEMORY_CAP)
-      callbacks.onSnapshot(entries)
-      void saveChatCache(entries)
-    })
+    }
+    // Merge the authoritative page over whatever cache/outbox restored:
+    // confirmed rows win, cached-but-older rows survive beneath the page.
+    const byId = new Map(entries.map((entry) => [entry.id, entry]))
+    for (const message of page.messages) {
+      byId.set(message.id, mergeIntoEntry(message, byId.get(message.id)))
+    }
+    entries = [...byId.values()]
+      .filter((entry) => entry.state || !isExpired(entry))
+      .sort(compareEntries)
+      .slice(-MEMORY_CAP)
+    callbacks.onSnapshot(entries)
+    void saveChatCache(entries)
   }
 
   // Initial authoritative fetch.
-  syncFromServer()
+  void syncFromServer()
 
   // Catch-up after the tab/app was backgrounded or the realtime socket
   // dropped silently: browsers throttle/suspend background tabs, so the

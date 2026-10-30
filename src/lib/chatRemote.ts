@@ -185,6 +185,22 @@ export async function fetchChatPage(before?: ChatCursor): Promise<ChatPage | nul
   }
 }
 
+/** Which of the given message ids still exist in the cloud (not expired /
+ *  purged). Returns null when offline so callers can skip pruning instead of
+ *  treating every row as gone. */
+export async function fetchExistingMessageIds(ids: string[]): Promise<Set<string> | null> {
+  const ctx = await chatContext()
+  if (!ctx) return null
+  if (ids.length === 0) return new Set()
+  try {
+    const { data, error } = await ctx.from(MESSAGES_TABLE).select('id').in('id', ids)
+    if (error) return null
+    return new Set(((data ?? []) as Array<{ id: string }>).map((row) => row.id))
+  } catch {
+    return null
+  }
+}
+
 export async function joinChatRoom(options: {
   presenceKey: string
   onMessage: RoomCallbacks['onMessage']
