@@ -10,6 +10,7 @@ import AvatarBadge from '../../components/AvatarBadge'
 import OnlineList from '../../components/OnlineList'
 import type { PresenceMember } from '../../lib/chatTypes'
 import { setPopoverOpen } from '../../lib/popoverGuard'
+import { withTimeout } from '../../lib/withTimeout'
 import { chooseAiMove } from './ai'
 import { loadGomokuState, saveGomokuState } from './cloudState'
 import { PaletteIcon } from '../../components/icons'
@@ -69,6 +70,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
     })
   }, [])
   const [readyChannelKey, setReadyChannelKey] = useState('')
+  const [channelAttempt, setChannelAttempt] = useState(0)
   const channelKey = `${instanceId}:${selfId ?? ''}:${displayName}:${avatarUrl ?? ''}:${avatarStyle ?? ''}:${avatarSeed ?? ''}`
   const channelReady = readyChannelKey === channelKey
   const channelRef = useRef<ReturnType<Awaited<ReturnType<typeof getSupabaseClient>>['channel']> | null>(null)
@@ -78,6 +80,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   const aiTimerRef = useRef<number | null>(null)
   const joinTimeoutRef = useRef<number | null>(null)
   const selfIdRef = useRef(selfId)
+  const channelRetryCountRef = useRef(0)
   const profileLookRequestsRef = useRef(new Set<string>())
   const winnerToastKeyRef = useRef('')
   useEffect(() => {
@@ -195,12 +198,29 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   useEffect(() => {
     if (!isSupabaseConfigured() || !selfId) return
     let cancelled = false
+    let stateSyncTimer: number | null = null
+    let reconnectTimer: number | null = null
     let cloudStateChecked = false
     let channel: ReturnType<Awaited<ReturnType<typeof getSupabaseClient>>['channel']> | null = null
+    const retryChannel = (reason: string, error?: unknown) => {
+      if (cancelled || reconnectTimer !== null) return
+      console.error(`Gomoku channel ${reason}:`, error)
+      setReadyChannelKey('')
+      const delays = [1000, 2000, 5000, 10000]
+      const delay = delays[Math.min(channelRetryCountRef.current, delays.length - 1)]
+      channelRetryCountRef.current++
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null
+        if (!cancelled) setChannelAttempt((attempt) => attempt + 1)
+      }, delay)
+    }
 
     void (async () => {
-      const client = await getSupabaseClient()
-      if (cancelled) return
+      const client = await getSupabaseClient().catch((error: unknown) => {
+        retryChannel('client initialization failed', error)
+        return null
+      })
+      if (!client || cancelled) return
       channel = client.channel(`game:gomoku:${instanceId}`, {
         config: { presence: { key: selfId } },
       })
@@ -215,6 +235,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         if (expectedHost !== selfId) return
         const init = createInitialState(instanceId, selfId)
         stateLoadedRef.current = true
+        channelRetryCountRef.current = 0
         stateRef.current = init
         setState(init)
         setReadyChannelKey(channelKey)
@@ -223,12 +244,20 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
 
       channel.on('broadcast', { event: 'state' }, ({ payload }) => {
         if (isGomokuState(payload, instanceId)) {
+          if (stateSyncTimer !== null) window.clearInterval(stateSyncTimer)
+          stateSyncTimer = null
           stateLoadedRef.current = true
+          channelRetryCountRef.current = 0
           stateRef.current = payload
           setState(payload)
           setReadyChannelKey(channelKey)
           if (selfIdRef.current === payload.hostId) scheduleAiTurn(payload)
           reconcilePresence()
+        }
+      })
+      channel.on('broadcast', { event: 'state-request' }, () => {
+        if (selfIdRef.current === stateRef.current.hostId && stateLoadedRef.current) {
+          channel?.send({ type: 'broadcast', event: 'state', payload: stateRef.current })
         }
       })
       channel.on('broadcast', { event: 'move' }, ({ payload }) => {
@@ -344,48 +373,99 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
       }
       channel.on('presence', { event: 'sync' }, reconcilePresence)
 
-      await channel.subscribe(async (status) => {
+      let stateLoading = false
+      let statePolling = false
+      await channel.subscribe(async (status, error) => {
         if (status === 'SUBSCRIBED') {
-          await channel?.track({ userId: selfId, displayName, avatarUrl, avatarStyle, avatarSeed })
-          const loaded = await loadGomokuState(instanceId)
-          if (cancelled) return
-          // A failed read is not an empty game. Do not replace a saved board.
-          if (!loaded.ok) return
-          const saved = loaded.state
-          if (saved) {
-            cloudStateChecked = true
-            stateLoadedRef.current = true
-            stateRef.current = saved
-            setState(saved)
-            if (selfId === saved.hostId) {
-              channel?.send({ type: 'broadcast', event: 'state', payload: saved })
-              scheduleAiTurn(saved)
+          if (reconnectTimer !== null) window.clearTimeout(reconnectTimer)
+          reconnectTimer = null
+          if (stateLoading) return
+          stateLoading = true
+          try {
+            const trackStatus = await withTimeout(channel!.track({ userId: selfId, displayName, avatarUrl, avatarStyle, avatarSeed }), 8000)
+            if (trackStatus !== 'ok') throw new Error(`presence track returned ${trackStatus}`)
+            channel?.send({ type: 'broadcast', event: 'state-request', payload: {} })
+            if (stateSyncTimer === null) {
+              stateSyncTimer = window.setInterval(() => {
+                if (stateLoadedRef.current) {
+                  if (stateSyncTimer !== null) window.clearInterval(stateSyncTimer)
+                  stateSyncTimer = null
+                  return
+                }
+                channel?.send({ type: 'broadcast', event: 'state-request', payload: {} })
+                if (statePolling) return
+                statePolling = true
+                void withTimeout(loadGomokuState(instanceId), 5000)
+                  .then(({ state: saved, ok }) => {
+                    if (cancelled || !ok || !saved || stateLoadedRef.current) return
+                    cloudStateChecked = true
+                    stateLoadedRef.current = true
+                    channelRetryCountRef.current = 0
+                    stateRef.current = saved
+                    setState(saved)
+                    setReadyChannelKey(channelKey)
+                    if (selfIdRef.current === saved.hostId) {
+                      channel?.send({ type: 'broadcast', event: 'state', payload: saved })
+                      scheduleAiTurn(saved)
+                    }
+                  })
+                  .catch(() => undefined)
+                  .finally(() => { statePolling = false })
+              }, 1800)
             }
-            setReadyChannelKey(channelKey)
-          } else if (stateLoadedRef.current) {
-            if (selfId === stateRef.current.hostId) {
-              channel?.send({ type: 'broadcast', event: 'state', payload: stateRef.current })
+            let loaded: Awaited<ReturnType<typeof loadGomokuState>> | null = null
+            for (let attempt = 0; attempt < 4 && !cancelled; attempt++) {
+              try { loaded = await withTimeout(loadGomokuState(instanceId), 8000) } catch { loaded = null }
+              if (loaded?.ok) break
+              await new Promise((resolve) => window.setTimeout(resolve, 500 * (attempt + 1)))
             }
-            setReadyChannelKey(channelKey)
-          } else {
-            cloudStateChecked = true
+            if (cancelled) return
+            if (!loaded?.ok) throw new Error('could not load the game state after retries')
+            const saved = loaded.state
+            if (saved && !stateLoadedRef.current) {
+              cloudStateChecked = true
+              stateLoadedRef.current = true
+              channelRetryCountRef.current = 0
+              stateRef.current = saved
+              setState(saved)
+              if (selfId === saved.hostId) {
+                channel?.send({ type: 'broadcast', event: 'state', payload: saved })
+                scheduleAiTurn(saved)
+              }
+              setReadyChannelKey(channelKey)
+            } else if (stateLoadedRef.current) {
+              if (selfId === stateRef.current.hostId) {
+                channel?.send({ type: 'broadcast', event: 'state', payload: stateRef.current })
+              }
+              setReadyChannelKey(channelKey)
+            } else {
+              cloudStateChecked = true
+            }
+            reconcilePresence()
+            // Players join only by clicking "Join game" — never auto-join.
+          } catch (error) {
+            retryChannel('initialization failed', error)
+          } finally {
+            stateLoading = false
           }
-          reconcilePresence()
-          // Players join only by clicking "Join game" — never auto-join.
         } else {
           setReadyChannelKey('')
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            retryChannel(status, error)
+          }
         }
       })
     })()
 
     return () => {
       cancelled = true
-      stateLoadedRef.current = false
+      if (stateSyncTimer !== null) window.clearInterval(stateSyncTimer)
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer)
       if (aiTimerRef.current !== null) window.clearTimeout(aiTimerRef.current)
       if (channel) void channel.unsubscribe()
       channelRef.current = null
     }
-  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, publishState, scheduleAiTurn])
+  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, channelAttempt, publishState, scheduleAiTurn])
 
   const sendMove = (r: number, c: number) => {
     if (!selfId) return

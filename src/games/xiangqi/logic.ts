@@ -312,28 +312,36 @@ export function tryMove(state: XiangqiState, userId: string, fromR: number, from
 
 export function addAiOpponent(state: XiangqiState): XiangqiState | null {
   if (state.status !== 'waiting' || state.players.length !== 1 || state.players[0].isAI) return null
-  const human = state.players[0]
+  const human = { ...state.players[0], color: 1 as const }
   const ai: XiangqiPlayer = {
     userId: `xiangqi-ai:${state.instanceId}`,
     displayName: 'AI',
     avatarUrl: null,
-    color: human.color === 1 ? 2 : 1,
+    color: 2,
     score: 0,
     joinedAt: Date.now(),
     isAI: true,
   }
   return {
     ...state,
-    players: [...state.players, ai],
+    players: [human, ai],
     turn: 1,
     status: 'playing',
+  }
+}
+
+export function normalizeAiColors(state: XiangqiState): XiangqiState {
+  if (!state.players.some((player) => player.isAI)) return state
+  return {
+    ...state,
+    players: state.players.map((player) => ({ ...player, color: player.isAI ? 2 : 1 })),
   }
 }
 
 export function restartXiangqiRound(state: XiangqiState): XiangqiState {
   const round = state.round + (state.status === 'playing' || state.status === 'result' ? 1 : 0)
   return {
-    ...state,
+    ...normalizeAiColors(state),
     board: initialBoard(),
     turn: round % 2 === 1 ? 1 : 2,
     status: state.players.length === 2 ? 'playing' : 'waiting',

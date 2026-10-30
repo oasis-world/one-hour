@@ -148,6 +148,23 @@
 }
 .xiangqi-player.is-turn { box-shadow: 0 0 0 2px rgba(250,204,21,0.6); }
 .xiangqi-player.is-self { font-weight: 600; }
+.xiangqi-side-indicator {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 9px;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.xiangqi-side-indicator.is-red {
+  background: #d93636;
+  border: 1px solid #a91f28;
+  box-shadow: 0 0 0 1px rgba(217,54,54,0.18);
+}
+.xiangqi-side-indicator.is-black {
+  background: #242321;
+  border: 1px solid #a9a49a;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.2);
+}
 .xiangqi-player-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .xiangqi-player-score { font-weight: 700; opacity: 0.8; }
 .xiangqi-empty { font-size: 12px; opacity: 0.6; }
@@ -167,6 +184,33 @@
   aspect-ratio: 8 / 9;
   box-sizing: border-box;
   touch-action: manipulation;
+}
+.xiangqi-board--flipped {
+  direction: rtl;
+  transform: scaleY(-1);
+}
+.xiangqi-board--flipped > .xiangqi-cell {
+  z-index: 2;
+  transform: scaleY(-1);
+}
+.xiangqi-board--flipped .xiangqi-river { transform: translateY(-50%) scaleY(-1); }
+.xiangqi-board--flipped .xiangqi-capture-toast {
+  transform: translate(-50%, -50%) scaleY(-1);
+  animation-name: xiangqi-toast-enter-flipped;
+}
+.xiangqi-board--flipped .xiangqi-capture-toast.is-check { animation-name: xiangqi-check-alert-flipped; }
+.xiangqi-board--flipped .xiangqi-capture-toast.is-winner { animation-name: xiangqi-winner-glow-flipped; }
+@keyframes xiangqi-toast-enter-flipped {
+  from { opacity: 0; transform: translate(-50%, -46%) scaleY(-1); }
+  to { opacity: 1; transform: translate(-50%, -50%) scaleY(-1); }
+}
+@keyframes xiangqi-check-alert-flipped {
+  from { transform: translate(-50%, -50%) scaleY(-1); box-shadow: 0 0 0 3px rgba(169,31,36,0.16), 0 8px 24px rgba(91,8,12,0.4); }
+  to { transform: translate(-50%, -50%) scaleY(-1); box-shadow: 0 0 0 8px rgba(255,74,63,0.3), 0 8px 30px rgba(91,8,12,0.62); }
+}
+@keyframes xiangqi-winner-glow-flipped {
+  0%, 100% { transform: translate(-50%, -50%) scaleY(-1); box-shadow: 0 0 0 3px rgba(196,147,50,0.16), 0 8px 24px rgba(62,39,7,0.35); }
+  50% { transform: translate(-50%, -50%) scaleY(-1); box-shadow: 0 0 0 8px rgba(255,213,100,0.28), 0 8px 30px rgba(62,39,7,0.52); }
 }
 .xiangqi-board--wood {
   gap: 0;
