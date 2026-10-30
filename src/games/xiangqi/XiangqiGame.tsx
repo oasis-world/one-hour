@@ -43,8 +43,8 @@ const BOARD_STYLES = ['wood', 'classic', 'concave', 'jade'] as const
 type BoardStyle = (typeof BOARD_STYLES)[number]
 
 const PIECE_GLYPH: Record<number, string> = {
-  1: '帅', 2: '仕', 3: '相', 4: '马', 5: '车', 6: '炮', 7: '兵',
-  [-1]: '将', [-2]: '士', [-3]: '象', [-4]: '马', [-5]: '车', [-6]: '炮', [-7]: '卒',
+  1: '帥', 2: '仕', 3: '相', 4: '馬', 5: '車', 6: '砲', 7: '兵',
+  [-1]: '將', [-2]: '士', [-3]: '象', [-4]: '馬', [-5]: '車', [-6]: '炮', [-7]: '卒',
 }
 const currentTimestamp = () => Date.now()
 
