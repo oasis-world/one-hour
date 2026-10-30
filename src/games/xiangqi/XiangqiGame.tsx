@@ -540,14 +540,12 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         )}
         <span className="xiangqi-grid-lines" aria-hidden="true" />
         <span className="xiangqi-frame" aria-hidden="true" />
-        {boardStyle !== 'concave' && (
-          <svg className="xiangqi-palace" viewBox="0 0 8 9" preserveAspectRatio="none" aria-hidden="true">
+        <svg className="xiangqi-palace" viewBox="0 0 8 9" preserveAspectRatio="none" aria-hidden="true">
           <line x1="3" y1="0" x2="5" y2="2" />
           <line x1="5" y1="0" x2="3" y2="2" />
           <line x1="3" y1="7" x2="5" y2="9" />
           <line x1="5" y1="7" x2="3" y2="9" />
         </svg>
-        )}
         <div className="xiangqi-river" aria-hidden="true">
           <span>楚河</span>
           <span>漢界</span>
