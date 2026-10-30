@@ -27,6 +27,7 @@ import {
   sideOfColor,
   tryMove,
   inCheck,
+  type Move,
   type XiangqiState,
 } from './logic'
 
@@ -91,6 +92,9 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   const stateLoadedRef = useRef(false)
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve())
   const aiTimerRef = useRef<number | null>(null)
+  const aiWorkerRef = useRef<Worker | null>(null)
+  const aiWorkerRequestRef = useRef(0)
+  const aiWorkerPendingRef = useRef(new Map<number, { resolve: (move: Move | null) => void; timer: number }>())
   const joinTimeoutRef = useRef<number | null>(null)
   const selfIdRef = useRef(selfId)
   const profileLookRequestsRef = useRef(new Set<string>())
@@ -201,6 +205,35 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     if (joinTimeoutRef.current !== null) window.clearTimeout(joinTimeoutRef.current)
   }, [])
   useEffect(() => {
+    let worker: Worker
+    try {
+      worker = new Worker(new URL('./ai/worker.ts', import.meta.url), { type: 'module' })
+    } catch {
+      return
+    }
+    aiWorkerRef.current = worker
+    worker.onmessage = (event: MessageEvent<{ id: number; move: Move | null }>) => {
+      const pending = aiWorkerPendingRef.current.get(event.data.id)
+      if (!pending) return
+      window.clearTimeout(pending.timer)
+      aiWorkerPendingRef.current.delete(event.data.id)
+      pending.resolve(event.data.move)
+    }
+    const failPending = () => {
+      for (const pending of aiWorkerPendingRef.current.values()) {
+        window.clearTimeout(pending.timer)
+        pending.resolve(null)
+      }
+      aiWorkerPendingRef.current.clear()
+    }
+    worker.onerror = failPending
+    return () => {
+      failPending()
+      worker.terminate()
+      if (aiWorkerRef.current === worker) aiWorkerRef.current = null
+    }
+  }, [])
+  useEffect(() => {
     for (const player of state.players) {
       if (player.isAI || (player.avatarStyle && player.avatarSeed) || profileLookRequestsRef.current.has(player.userId)) continue
       profileLookRequestsRef.current.add(player.userId)
@@ -220,21 +253,43 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     channelRef.current?.send({ type: 'broadcast', event: 'state', payload: next })
   }, [])
 
+  const requestAiMove = useCallback((board: number[][], color: 1 | 2) => {
+    const worker = aiWorkerRef.current
+    if (!worker) return Promise.resolve(chooseAiMove(board, color, 1200))
+    const id = ++aiWorkerRequestRef.current
+    return new Promise<Move | null>((resolve) => {
+      const timer = window.setTimeout(() => {
+        aiWorkerPendingRef.current.delete(id)
+        resolve(null)
+      }, 12000)
+      aiWorkerPendingRef.current.set(id, { resolve, timer })
+      try {
+        worker.postMessage({ id, board, color, timeLimitMs: 2800 })
+      } catch {
+        window.clearTimeout(timer)
+        aiWorkerPendingRef.current.delete(id)
+        resolve(chooseAiMove(board, color, 1200))
+      }
+    })
+  }, [])
+
   const scheduleAiTurn = useCallback((next: XiangqiState) => {
     const ai = next.players.find((player) => player.isAI && player.color === next.turn)
     if (!ai || next.status !== 'playing') return
     if (aiTimerRef.current !== null) window.clearTimeout(aiTimerRef.current)
-    aiTimerRef.current = window.setTimeout(() => {
+    aiTimerRef.current = window.setTimeout(async () => {
       const current = stateRef.current
       if (current.status !== 'playing') return
       const aiP = current.players.find((player) => player.isAI && player.color === current.turn)
       if (!aiP || current.turn !== aiP.color) return
-      const move = chooseAiMove(current.board, aiP.color)
-      if (!move) return
-      const afterAi = tryMove(current, aiP.userId, move.from[0], move.from[1], move.to[0], move.to[1])
+      const move = await requestAiMove(current.board, aiP.color)
+      if (stateRef.current !== current) return
+      const selectedMove = move ?? chooseAiMove(current.board, aiP.color, 1000)
+      if (!selectedMove) return
+      const afterAi = tryMove(current, aiP.userId, selectedMove.from[0], selectedMove.from[1], selectedMove.to[0], selectedMove.to[1])
       if (afterAi) { announceCapture(current, afterAi); publishState(afterAi) }
     }, 400)
-  }, [announceCapture, publishState])
+  }, [announceCapture, publishState, requestAiMove])
 
   useEffect(() => () => {
     if (aiTimerRef.current !== null) window.clearTimeout(aiTimerRef.current)
