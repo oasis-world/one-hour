@@ -1887,9 +1887,10 @@ button {
 }
 
 .plus-menu-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 17px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 11px;
+  column-gap: 11px;
   width: 100%;
   padding: 11px 13px;
   border: none;
@@ -1912,6 +1913,7 @@ button {
   color: var(--accent);
   flex-shrink: 0;
 }
+.plus-menu-item > svg { width: 17px; height: 17px; }
 
 .emoji-panel {
   right: -54px; /* align its right edge with the send button's */
@@ -2426,7 +2428,7 @@ button {
 .plus-menu-chevron {
   display: grid;
   place-items: center;
-  margin-left: auto;
+  justify-self: end;
   color: var(--ink-mute);
   opacity: 0.8;
   transition: transform 0.18s ease;

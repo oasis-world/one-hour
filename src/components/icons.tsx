@@ -386,6 +386,17 @@ export function GameIcon({ size = 17 }: GlyphProps) {
   )
 }
 
+export function XiangqiGeneralIcon({ size = 20 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="11" fill="currentColor" opacity=".12" />
+      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="12" cy="12" r="7.8" fill="none" stroke="currentColor" strokeWidth=".8" opacity=".7" />
+      <text x="12" y="16.5" textAnchor="middle" fill="currentColor" fontSize="13" fontWeight="700" fontFamily="serif">將</text>
+    </svg>
+  )
+}
+
 export function ChevronRightIcon({ size = 16 }: GlyphProps) {
   return (
     <svg
@@ -523,10 +534,10 @@ export function GomokuIcon({ size = 17 }: GlyphProps) {
       aria-hidden="true"
       focusable="false"
     >
-      <circle cx="4" cy="4" r="3" fill="#111" />
+      <circle cx="4" cy="4" r="3" fill="#111" stroke="#d8d8d8" strokeWidth="0.8" />
       <circle cx="12" cy="4" r="3" fill="#fff" stroke="#999" strokeWidth="0.5" />
       <circle cx="4" cy="12" r="3" fill="#fff" stroke="#999" strokeWidth="0.5" />
-      <circle cx="12" cy="12" r="3" fill="#111" />
+      <circle cx="12" cy="12" r="3" fill="#111" stroke="#d8d8d8" strokeWidth="0.8" />
     </svg>
   )
 }

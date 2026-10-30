@@ -248,7 +248,7 @@
   z-index: 2;
 }
 .xiangqi-board--concave .xiangqi-river {
-  z-index: 3;
+  z-index: 1;
 }
 .xiangqi-grid-lines {
   position: absolute;
@@ -309,7 +309,7 @@
   justify-content: space-between;
   padding: 0 12%;
   pointer-events: none;
-  z-index: 3;
+  z-index: 1;
   background: transparent;
   font-family: "LiSu", "隶书", "STLiti", "Kaiti SC", serif;
   font-size: clamp(14px, 4vw, 20px);
@@ -332,16 +332,94 @@
 .xiangqi-cell:disabled { cursor: default; }
 .xiangqi-cell.is-selected { background: rgba(250,204,21,0.18); }
 .xiangqi-cell.is-target { background: rgba(74,222,128,0.18); }
-.xiangqi-cell.is-last::after {
+.xiangqi-cell.is-last-from::after {
   content: '';
   position: absolute;
-  width: 22%;
-  height: 22%;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: rgba(220,38,38,0.85);
   z-index: 3;
   box-shadow: 0 0 4px rgba(220,38,38,0.6);
-  top: 4px; right: 4px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: xiangqi-origin-pulse 1.25s ease-in-out 4 forwards;
+}
+.xiangqi-cell.is-last-to .xiangqi-piece {
+  animation: xiangqi-piece-breathe 1s ease-in-out 5;
+}
+@keyframes xiangqi-origin-pulse {
+  0% { opacity: 0.45; box-shadow: 0 0 2px rgba(220,38,38,0.3); }
+  50% { opacity: 1; box-shadow: 0 0 10px 3px rgba(255,48,40,0.85); }
+  100% { opacity: 0; box-shadow: none; }
+}
+@keyframes xiangqi-piece-breathe {
+  0%, 100% { filter: drop-shadow(0 0 1px rgba(255,54,44,0.2)); transform: scale(1); }
+  50% {
+    filter: drop-shadow(0 0 4px rgba(255,238,151,1)) drop-shadow(0 0 10px rgba(255,54,44,0.95));
+    transform: scale(1.1);
+  }
+}
+.xiangqi-capture-toast {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 8;
+  transform: translate(-50%, -50%);
+  width: max-content;
+  max-width: 84%;
+  padding: 6px 12px;
+  border: 1px solid var(--line, rgba(255,255,255,0.22));
+  border-radius: 999px;
+  background: var(--surface-raised, rgba(24,26,32,0.94));
+  color: var(--ink, #f3efe7);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.28);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  pointer-events: none;
+  animation: xiangqi-toast-enter 0.2s ease both;
+}
+@keyframes xiangqi-toast-enter {
+  from { opacity: 0; transform: translate(-50%, -46%); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+.app-shell.theme-warm .xiangqi-capture-toast {
+  --line: rgba(96,62,29,0.32);
+  --surface-raised: rgba(255,248,228,0.96);
+  --ink: #4c321d;
+}
+.xiangqi-capture-toast.is-check {
+  padding: 10px 22px;
+  border: 2px solid #ffb1a9;
+  background: #a91f24;
+  color: #fff;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  box-shadow: 0 0 0 4px rgba(169,31,36,0.2), 0 8px 28px rgba(91,8,12,0.5);
+  animation: xiangqi-check-alert 0.65s ease-in-out infinite alternate;
+}
+.xiangqi-capture-toast.is-winner {
+  padding: 11px 24px;
+  border: 2px solid #fff0b8;
+  background: linear-gradient(135deg, #8b641e, #c49332 52%, #79531a);
+  color: #fff9e6;
+  font-size: 16px;
+  box-shadow: 0 0 0 4px rgba(196,147,50,0.2), 0 8px 28px rgba(62,39,7,0.42);
+  animation: xiangqi-winner-glow 1.2s ease-in-out 3;
+}
+.xiangqi-capture-toast.is-winner::before { content: '★'; margin-right: 8px; color: #fff0b8; }
+@keyframes xiangqi-winner-glow {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(196,147,50,0.16), 0 8px 24px rgba(62,39,7,0.35); }
+  50% { box-shadow: 0 0 0 8px rgba(255,213,100,0.28), 0 8px 30px rgba(62,39,7,0.52); }
+}
+@keyframes xiangqi-check-alert {
+  from { box-shadow: 0 0 0 3px rgba(169,31,36,0.16), 0 8px 24px rgba(91,8,12,0.4); }
+  to { box-shadow: 0 0 0 8px rgba(255,74,63,0.3), 0 8px 30px rgba(91,8,12,0.62); }
 }
 .xiangqi-piece {
   position: relative;
@@ -363,6 +441,12 @@
   text-shadow: 0 1px 0 rgba(255,255,255,0.7);
   user-select: none;
   overflow: hidden;
+}
+.xiangqi-moving-piece {
+  position: absolute;
+  z-index: 12;
+  margin: 0;
+  pointer-events: none;
 }
 .xiangqi-piece.is-red {
   color: #b0201a;

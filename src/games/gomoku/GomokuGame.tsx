@@ -48,6 +48,8 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   const selfId = identity?.userId ?? null
 
   const [state, setState] = useState<GomokuState>(() => createInitialState(instanceId, hostUserId))
+  const [winnerToast, setWinnerToast] = useState('')
+  const winnerToastTimerRef = useRef<number | null>(null)
   const [profileLooks, setProfileLooks] = useState<Record<string, { style: string; seed: string; url: string | null }>>({})
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false)
   const [spectatorsOpen, setSpectatorsOpen] = useState(false)
@@ -77,12 +79,26 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   const joinTimeoutRef = useRef<number | null>(null)
   const selfIdRef = useRef(selfId)
   const profileLookRequestsRef = useRef(new Set<string>())
+  const winnerToastKeyRef = useRef('')
   useEffect(() => {
     stateRef.current = state
   }, [state])
   useEffect(() => {
     selfIdRef.current = selfId
   }, [selfId])
+  useEffect(() => {
+    if (state.status !== 'result' || !state.winnerId) {
+      winnerToastKeyRef.current = ''
+      return
+    }
+    const toastKey = `${state.round}:${state.winnerId}`
+    if (winnerToastKeyRef.current === toastKey) return
+    winnerToastKeyRef.current = toastKey
+    const winner = state.players.find((player) => player.userId === state.winnerId)?.displayName ?? 'Player'
+    setWinnerToast(t('{{winner}} 获胜！', '{{winner}} wins!').replace('{{winner}}', winner))
+    if (winnerToastTimerRef.current !== null) window.clearTimeout(winnerToastTimerRef.current)
+    winnerToastTimerRef.current = window.setTimeout(() => setWinnerToast(''), 4000)
+  }, [state.status, state.winnerId, state.round, state.players])
   useEffect(() => {
     if (!selfId || !state.players.some((player) => player.userId === selfId)) return
     if (joinTimeoutRef.current !== null) window.clearTimeout(joinTimeoutRef.current)
@@ -132,6 +148,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
 
   useEffect(() => () => {
     if (aiTimerRef.current !== null) window.clearTimeout(aiTimerRef.current)
+    if (winnerToastTimerRef.current !== null) window.clearTimeout(winnerToastTimerRef.current)
   }, [])
 
   // Only the active host writes the canonical state. Spectators and stale tabs
@@ -600,6 +617,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
       <div className={`gomoku-board gomoku-board--${boardStyle}`} role="grid" aria-label={t('五子棋棋盘', 'Gomoku board')}>
         <span className="gomoku-grid-lines" aria-hidden="true" />
         <span className="gomoku-frame" aria-hidden="true" />
+        {winnerToast && <div className="gomoku-winner-toast" role="status" aria-live="assertive">{winnerToast}</div>}
         {state.board.map((row, r) =>
           row.map((cell, c) => {
             const isWin = state.winningLine?.some(([wr, wc]) => wr === r && wc === c)

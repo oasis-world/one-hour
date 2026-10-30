@@ -201,6 +201,33 @@
   box-shadow: inset 0 0 18px rgba(104,54,20,0.18), 0 6px 16px rgba(0,0,0,0.2);
   touch-action: manipulation;
 }
+.gomoku-winner-toast {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 20;
+  width: max-content;
+  max-width: 84%;
+  box-sizing: border-box;
+  padding: 11px 24px;
+  border: 2px solid #fff0b8;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8b641e, #c49332 52%, #79531a);
+  color: #fff9e6;
+  box-shadow: 0 0 0 4px rgba(196,147,50,0.2), 0 8px 28px rgba(62,39,7,0.42);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: gomoku-winner-glow 1.2s ease-in-out 3;
+}
+.gomoku-winner-toast::before { content: '★'; margin-right: 8px; color: #fff0b8; }
+@keyframes gomoku-winner-glow {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(196,147,50,0.16), 0 8px 24px rgba(62,39,7,0.35); }
+  50% { box-shadow: 0 0 0 8px rgba(255,213,100,0.28), 0 8px 30px rgba(62,39,7,0.52); }
+}
 .gomoku-grid-lines {
   position: absolute;
   inset: 4.5455%;

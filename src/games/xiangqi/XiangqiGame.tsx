@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { getSupabaseClient } from '../../lib/supabaseClient'
 import { isSupabaseConfigured } from '../../lib/supabaseConfig'
 import { useAccount } from '../../lib/useAccount'
@@ -26,6 +26,7 @@ import {
   restartXiangqiRound,
   sideOfColor,
   tryMove,
+  inCheck,
   type XiangqiState,
 } from './logic'
 
@@ -55,6 +56,10 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   const selfId = identity?.userId ?? null
 
   const [state, setState] = useState<XiangqiState>(() => createInitialState(instanceId, hostUserId))
+  const [captureToast, setCaptureToast] = useState('')
+  const [captureToastIsCheck, setCaptureToastIsCheck] = useState(false)
+  const [captureToastIsWinner, setCaptureToastIsWinner] = useState(false)
+  const captureToastTimerRef = useRef<number | null>(null)
   const [profileLooks, setProfileLooks] = useState<Record<string, { style: string; seed: string; url: string | null }>>({})
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false)
   const [spectatorsOpen, setSpectatorsOpen] = useState(false)
@@ -79,6 +84,9 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   const channelKey = `${instanceId}:${selfId ?? ''}:${displayName}:${avatarUrl ?? ''}:${avatarStyle ?? ''}:${avatarSeed ?? ''}`
   const channelReady = readyKey === channelKey
   const channelRef = useRef<ReturnType<Awaited<ReturnType<typeof getSupabaseClient>>['channel']> | null>(null)
+  const boardElementRef = useRef<HTMLDivElement>(null)
+  const renderedBoardRef = useRef(state.board)
+  const moveAnimationCleanupRef = useRef<(() => void) | null>(null)
   const stateRef = useRef(state)
   const stateLoadedRef = useRef(false)
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve())
@@ -86,6 +94,100 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   const joinTimeoutRef = useRef<number | null>(null)
   const selfIdRef = useRef(selfId)
   const profileLookRequestsRef = useRef(new Set<string>())
+  const currentBoard = state.board
+  const currentLastMove = state.lastMove
+  useLayoutEffect(() => {
+    const beforeBoard = renderedBoardRef.current
+    renderedBoardRef.current = currentBoard
+    const move = currentLastMove
+    if (!move || beforeBoard[move.from[0]]?.[move.from[1]] === 0) return
+    const [fromR, fromC] = move.from
+    const [toR, toC] = move.to
+    const movingPiece = beforeBoard[fromR]?.[fromC]
+    if (!movingPiece || currentBoard[fromR]?.[fromC] !== 0 || currentBoard[toR]?.[toC] !== movingPiece) return
+    const board = boardElementRef.current
+    if (!board) return
+    const cells = board.querySelectorAll<HTMLButtonElement>('.xiangqi-cell')
+    const fromCell = Array.from(cells).find((cell) => cell.dataset.cell === `${fromR}-${fromC}`)
+    const toCell = Array.from(cells).find((cell) => cell.dataset.cell === `${toR}-${toC}`)
+    const targetPiece = toCell?.querySelector<HTMLElement>('.xiangqi-piece')
+    if (!fromCell || !toCell || !targetPiece) return
+
+    moveAnimationCleanupRef.current?.()
+    const boardRect = board.getBoundingClientRect()
+    const fromRect = fromCell.getBoundingClientRect()
+    const toRect = toCell.getBoundingClientRect()
+    const pieceRect = targetPiece.getBoundingClientRect()
+    const startX = fromRect.left + fromRect.width / 2 - boardRect.left - pieceRect.width / 2
+    const startY = fromRect.top + fromRect.height / 2 - boardRect.top - pieceRect.height / 2
+    const deltaX = toRect.left - fromRect.left
+    const deltaY = toRect.top - fromRect.top
+    const originalOpacity = targetPiece.style.opacity
+    const ghost = document.createElement('span')
+    ghost.className = `xiangqi-piece xiangqi-moving-piece ${movingPiece > 0 ? 'is-red' : 'is-black'}`
+    ghost.textContent = PIECE_GLYPH[movingPiece]
+    Object.assign(ghost.style, {
+      left: `${startX}px`, top: `${startY}px`, width: `${pieceRect.width}px`, height: `${pieceRect.height}px`,
+    })
+    targetPiece.style.opacity = '0'
+    board.append(ghost)
+    const animation = ghost.animate(
+      [
+        { transform: 'translate(0, 0) scale(.96)' },
+        { transform: `translate(${deltaX}px, ${deltaY}px) scale(1)` },
+      ],
+      { duration: 420, easing: 'cubic-bezier(.2, .72, .28, 1)', fill: 'forwards' },
+    )
+    let cleaned = false
+    const cleanup = () => {
+      if (cleaned) return
+      cleaned = true
+      animation.cancel()
+      ghost.remove()
+      targetPiece.style.opacity = originalOpacity
+      if (moveAnimationCleanupRef.current === cleanup) moveAnimationCleanupRef.current = null
+    }
+    animation.onfinish = cleanup
+    moveAnimationCleanupRef.current = cleanup
+    return cleanup
+  }, [currentBoard, currentLastMove])
+  const announceCapture = useCallback((before: XiangqiState, after: XiangqiState) => {
+    if (before.status !== 'result' && after.status === 'result' && after.winnerId) {
+      const winner = after.players.find((player) => player.userId === after.winnerId)?.displayName ?? 'Player'
+      const template = t('{{winner}} 获胜！', '{{winner}} wins!')
+      setCaptureToast(template.replace('{{winner}}', winner))
+      setCaptureToastIsCheck(false)
+      setCaptureToastIsWinner(true)
+      if (captureToastTimerRef.current !== null) window.clearTimeout(captureToastTimerRef.current)
+      captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 4000)
+      return
+    }
+    const move = after.lastMove
+    if (!move) return
+    const [fromR, fromC] = move.from
+    const [toR, toC] = move.to
+    const captured = before.board[toR]?.[toC]
+    const movedPiece = before.board[fromR]?.[fromC]
+    if (!movedPiece || after.board[fromR]?.[fromC] !== 0 || after.board[toR]?.[toC] !== movedPiece) return
+    const checkedSide = before.turn === 1 ? 'black' : 'red'
+    if (inCheck(after.board, checkedSide)) {
+      setCaptureToast(t('将军！危险！', 'CHECK! King in danger!'))
+      setCaptureToastIsCheck(true)
+      setCaptureToastIsWinner(false)
+      if (captureToastTimerRef.current !== null) window.clearTimeout(captureToastTimerRef.current)
+      captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 4000)
+      return
+    }
+    if (!captured) return
+    const attacker = before.players.find((player) => player.color === before.turn)?.displayName ?? (before.turn === 1 ? '红方' : '黑方')
+    const victim = before.players.find((player) => player.color !== before.turn)?.displayName ?? (before.turn === 1 ? '黑方' : '红方')
+    const template = t('{{attacker}} 吃掉了 {{victim}} 的 {{piece}}', '{{attacker}} captured {{victim}}’s {{piece}}')
+    setCaptureToast(template.replace('{{attacker}}', attacker).replace('{{victim}}', victim).replace('{{piece}}', PIECE_GLYPH[captured]))
+    setCaptureToastIsCheck(false)
+    setCaptureToastIsWinner(false)
+    if (captureToastTimerRef.current !== null) window.clearTimeout(captureToastTimerRef.current)
+    captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 3400)
+  }, [])
   useEffect(() => { stateRef.current = state }, [state])
   useEffect(() => { selfIdRef.current = selfId }, [selfId])
   useEffect(() => {
@@ -130,12 +232,13 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       const move = chooseAiMove(current.board, aiP.color)
       if (!move) return
       const afterAi = tryMove(current, aiP.userId, move.from[0], move.from[1], move.to[0], move.to[1])
-      if (afterAi) publishState(afterAi)
+      if (afterAi) { announceCapture(current, afterAi); publishState(afterAi) }
     }, 400)
-  }, [publishState])
+  }, [announceCapture, publishState])
 
   useEffect(() => () => {
     if (aiTimerRef.current !== null) window.clearTimeout(aiTimerRef.current)
+    if (captureToastTimerRef.current !== null) window.clearTimeout(captureToastTimerRef.current)
   }, [])
 
   useEffect(() => {
@@ -198,6 +301,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
 
       channel.on('broadcast', { event: 'state' }, ({ payload }: { payload: unknown }) => {
         if (isXiangqiState(payload, instanceId)) {
+          announceCapture(stateRef.current, payload)
           stateLoadedRef.current = true
           stateRef.current = payload
           setState(payload)
@@ -212,6 +316,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         if (!p?.userId || typeof p.fromR !== 'number') return
         const next = tryMove(stateRef.current, p.userId, p.fromR, p.fromC!, p.toR!, p.toC!)
         if (!next) return
+        announceCapture(stateRef.current, next)
         publishState(next)
         scheduleAiTurn(next)
       })
@@ -244,7 +349,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         const next: XiangqiState = {
           ...cur,
           board: restarting ? initialBoard() : cur.board,
-          turn: restarting ? 1 : cur.turn,
+          turn: restarting ? (round % 2 === 1 ? 1 : 2) : cur.turn,
           winnerId: restarting ? null : cur.winnerId,
           lastMove: restarting ? null : cur.lastMove,
           round,
@@ -344,13 +449,13 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       if (channel) void channel.unsubscribe()
       channelRef.current = null
     }
-  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, publishState, scheduleAiTurn])
+  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, announceCapture, publishState, scheduleAiTurn])
 
   const sendMove = (fromR: number, fromC: number, toR: number, toC: number) => {
     if (!selfId) return
     if (selfId === stateRef.current.hostId) {
       const next = tryMove(stateRef.current, selfId, fromR, fromC, toR, toC)
-      if (next) { publishState(next); scheduleAiTurn(next) }
+      if (next) { announceCapture(stateRef.current, next); publishState(next); scheduleAiTurn(next) }
     } else {
       channelRef.current?.send({ type: 'broadcast', event: 'move', payload: { userId: selfId, fromR, fromC, toR, toC } })
     }
@@ -389,7 +494,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       const next: XiangqiState = {
         ...cur,
         board: restarting ? initialBoard() : cur.board,
-        turn: restarting ? 1 : cur.turn,
+        turn: restarting ? (round % 2 === 1 ? 1 : 2) : cur.turn,
         winnerId: restarting ? null : cur.winnerId,
         lastMove: restarting ? null : cur.lastMove,
         round,
@@ -530,7 +635,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
 
       {state.status === 'result' && <div className="xiangqi-result">{resultText()}</div>}
 
-      <div className={`xiangqi-board xiangqi-board--${boardStyle}`} role="grid" aria-label={t('中国象棋棋盘', 'Chinese Chess board')}>
+      <div ref={boardElementRef} className={`xiangqi-board xiangqi-board--${boardStyle}`} role="grid" aria-label={t('中国象棋棋盘', 'Chinese Chess board')}>
         {boardStyle === 'concave' && (
           <span className="xiangqi-concave-tiles" aria-hidden="true">
             {Array.from({ length: 72 }, (_, index) => (
@@ -550,17 +655,20 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
           <span>楚河</span>
           <span>漢界</span>
         </div>
+        {captureToast && <div className={`xiangqi-capture-toast${captureToastIsCheck ? ' is-check' : ''}${captureToastIsWinner ? ' is-winner' : ''}`} role="status" aria-live="assertive">{captureToast}</div>}
         {state.board.map((row, r) =>
           row.map((cell, c) => {
-            const isLast = state.lastMove && ([state.lastMove.from[0], state.lastMove.from[1]].join(',') === `${r},${c}` || [state.lastMove.to[0], state.lastMove.to[1]].join(',') === `${r},${c}`)
+            const isLastFrom = state.lastMove?.from[0] === r && state.lastMove.from[1] === c
+            const isLastTo = state.lastMove?.to[0] === r && state.lastMove.to[1] === c
             const isSel = selected && selected[0] === r && selected[1] === c
             const isTarget = legalTargets.has(`${r},${c}`)
             const isRedPiece = cell > 0
             return (
               <button
                 key={`${r}-${c}`}
+                data-cell={`${r}-${c}`}
                 type="button"
-                className={`xiangqi-cell${isLast ? ' is-last' : ''}${isSel ? ' is-selected' : ''}${isTarget ? ' is-target' : ''}${(r + c) % 2 === 0 ? ' is-dark' : ''}`}
+                className={`xiangqi-cell${isLastFrom ? ' is-last-from' : ''}${isLastTo ? ' is-last-to' : ''}${isSel ? ' is-selected' : ''}${isTarget ? ' is-target' : ''}${(r + c) % 2 === 0 ? ' is-dark' : ''}`}
                 onClick={() => onCellClick(r, c)}
                 aria-label={`${r + 1},${c + 1}`}
               >

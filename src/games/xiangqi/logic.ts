@@ -335,7 +335,7 @@ export function restartXiangqiRound(state: XiangqiState): XiangqiState {
   return {
     ...state,
     board: initialBoard(),
-    turn: 1,
+    turn: round % 2 === 1 ? 1 : 2,
     status: state.players.length === 2 ? 'playing' : 'waiting',
     winnerId: null,
     lastMove: null,
