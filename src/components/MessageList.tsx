@@ -260,7 +260,7 @@ export default function MessageList({
             </p>
           </div>
         )}
-        {entries.map((entry) => (
+        {entries.map((entry, index) => (
           <MessageRow
             key={entry.id}
             entry={entry}
@@ -276,6 +276,7 @@ export default function MessageList({
               profileExpiresAt: entry.farewell ? 0 : entry.at + 60 * 60 * 1000,
               enteredAt: entry.at,
             }}
+            initiallyVisibleGame={index === entries.length - 1}
             menuOpen={menu?.entry.id === entry.id}
             reactions={reactions[entry.id]}
             onImageClick={onImageClick}

@@ -8,10 +8,12 @@ interface Props {
   content: string
   hostUserId: string
   onlineMembers?: PresenceMember[]
+  /** On a fresh load the latest row is immediately scrolled into view. */
+  initiallyVisible?: boolean
 }
 
-export default function GameMessage({ content, hostUserId, onlineMembers = [] }: Props) {
-  const [isInView, setIsInView] = useState(false)
+export default function GameMessage({ content, hostUserId, onlineMembers = [], initiallyVisible = false }: Props) {
+  const [isInView, setIsInView] = useState(initiallyVisible)
   const elementRef = useRef<HTMLDivElement>(null)
   const gameRef = parseGameRef(content)
   const instanceId = gameRef?.instanceId
@@ -21,6 +23,7 @@ export default function GameMessage({ content, hostUserId, onlineMembers = [] }:
     if (!instanceId || !element) return
     const root = element.closest('.chat-log')
     let frame = 0
+    const settleTimers: number[] = []
     const measureVisibility = () => {
       frame = 0
       if (document.hidden) {
@@ -48,14 +51,34 @@ export default function GameMessage({ content, hostUserId, onlineMembers = [] }:
     observer?.observe(element)
     root?.addEventListener('scroll', scheduleMeasure, { passive: true })
     window.addEventListener('resize', scheduleMeasure)
+    window.addEventListener('orientationchange', scheduleMeasure)
+    window.addEventListener('pageshow', scheduleMeasure)
     document.addEventListener('visibilitychange', scheduleMeasure)
+    const viewport = window.visualViewport
+    viewport?.addEventListener('resize', scheduleMeasure)
+    viewport?.addEventListener('scroll', scheduleMeasure)
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleMeasure)
+    resizeObserver?.observe(element)
+    if (root) resizeObserver?.observe(root)
     scheduleMeasure()
+    // Mobile browsers can restore scroll position after the first layout and
+    // after passive effects run. Recheck as that restoration settles so a
+    // visible game doesn't remain stuck on its placeholder after refresh.
+    for (const delay of [80, 240, 700, 1400]) {
+      settleTimers.push(window.setTimeout(scheduleMeasure, delay))
+    }
     return () => {
       observer?.disconnect()
+      resizeObserver?.disconnect()
       root?.removeEventListener('scroll', scheduleMeasure)
       window.removeEventListener('resize', scheduleMeasure)
+      window.removeEventListener('orientationchange', scheduleMeasure)
+      window.removeEventListener('pageshow', scheduleMeasure)
       document.removeEventListener('visibilitychange', scheduleMeasure)
+      viewport?.removeEventListener('resize', scheduleMeasure)
+      viewport?.removeEventListener('scroll', scheduleMeasure)
       if (frame) window.cancelAnimationFrame(frame)
+      for (const timer of settleTimers) window.clearTimeout(timer)
     }
   }, [instanceId])
 
@@ -63,7 +86,10 @@ export default function GameMessage({ content, hostUserId, onlineMembers = [] }:
   const def = getGameById(gameRef.type)
   if (!def) return null
   const Component = def.Component
-  const active = typeof IntersectionObserver === 'undefined' || isInView
+  // The newest row is bottom-anchored on a fresh load. Mount its game
+  // immediately instead of waiting for an observer callback that may race
+  // scroll restoration on desktop and mobile browsers alike.
+  const active = initiallyVisible || typeof IntersectionObserver === 'undefined' || isInView
   return (
     <div ref={elementRef} className="game-message-inview">
       {active
