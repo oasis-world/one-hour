@@ -114,8 +114,7 @@
 }
 .summary-interactions {
   margin-top: 4px;
-  padding-top: 8px;
-  border-top: 1px solid var(--line-soft);
+  padding-top: 4px;
 }
 .summary-interaction-list {
   display: flex;
@@ -136,6 +135,33 @@
 .summary-interaction-name:hover {
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+.summary-interaction-empty {
+  margin-top: 6px;
+  color: var(--ink-mute);
+  font-size: 12px;
+}
+
+.summary-author-dialog .account-pop.summary-author-card {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  animation: none;
+  transform: none;
+  translate: none;
+  overflow: visible;
+}
+
+.summary-author-dialog .summary-author-card .account-pop-head {
+  padding: 8px 0 12px;
 }
 
 .welcome-avatar {

@@ -809,26 +809,38 @@ button {
   /* No auto vertical margins — the log's bottom anchor owns the free
      space, so the copy hugs the composer instead of floating mid-log. */
   margin: 0 auto;
-  padding: 30px 24px 18px;
-  max-width: 300px;
+  width: min(100%, 560px);
+  max-width: 560px;
+  box-sizing: border-box;
+  padding: 30px 8px 18px;
   text-align: center;
-  font-size: 13.5px;
+  font-size: clamp(11px, 3.8vw, 13.5px);
   line-height: 1.8;
   color: var(--ink-mute);
+}
+
+.chat-empty-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.chat-empty p {
+  margin: 0;
+  white-space: nowrap;
 }
 
 .chat-empty strong {
   display: block;
   margin-bottom: 6px;
-  font-size: 15px;
+  font-size: clamp(12px, 4.2vw, 15px);
   color: var(--ink-soft);
+  white-space: nowrap;
 }
 
-/* Minimal hourglass inline in the welcome copy. */
-.chat-empty-hourglass {
-  display: inline-flex;
-  vertical-align: -2px;
-  color: var(--accent);
+.chat-empty-line {
+  display: block;
+  white-space: nowrap;
 }
 
 .chat-loading-older {

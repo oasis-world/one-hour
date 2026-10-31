@@ -12,6 +12,7 @@ import OnlineList from '../../components/OnlineList'
 import type { PresenceMember } from '../../lib/chatTypes'
 import { setPopoverOpen } from '../../lib/popoverGuard'
 import { withTimeout } from '../../lib/withTimeout'
+import { acquireGameChannelSlot, canSendGameBroadcast, sendGameBroadcast } from '../realtime'
 import { chooseAiMove } from './ai'
 import { loadXiangqiState, saveXiangqiState } from './cloudState'
 import { PaletteIcon } from '../../components/icons'
@@ -110,6 +111,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   const selfIdRef = useRef(selfId)
   const channelRetryCountRef = useRef(0)
   const profileLookRequestsRef = useRef(new Set<string>())
+  const profileLookControllerRef = useRef(new AbortController())
   const recordedRoundRef = useRef('')
   const myColor = selfId ? colorOfPlayer(state, selfId) : null
   const currentBoard = state.board
@@ -247,16 +249,20 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   useEffect(() => { stateRef.current = state }, [state])
 
   useEffect(() => {
+    if (!selfId || !state.players.some((player) => player.userId === selfId)) return
+    for (const player of state.players) {
+      if (player.userId === selfId || player.isAI) continue
+      recordInteraction(player.userId, player.displayName, selfId)
+    }
+  }, [selfId, state.players])
+
+  useEffect(() => {
     if (!selfId || state.status !== 'result') return
     const key = `${instanceId}:${state.round}`
     if (recordedRoundRef.current === key) return
     if (!state.players.some((p) => p.userId === selfId)) return
     recordedRoundRef.current = key
     recordGameResult('xiangqi', selfId, state.winnerId ?? null, state.players.map((p) => p.userId))
-    for (const p of state.players) {
-      if (p.userId === selfId || p.isAI) continue
-      recordInteraction(p.userId, p.displayName, selfId)
-    }
   }, [instanceId, selfId, state.status, state.round, state.winnerId, state.players])
   useEffect(() => { selfIdRef.current = selfId }, [selfId])
   useEffect(() => {
@@ -268,6 +274,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   }, [selfId, state.players])
   useEffect(() => () => {
     if (joinTimeoutRef.current !== null) window.clearTimeout(joinTimeoutRef.current)
+    profileLookControllerRef.current.abort()
   }, [])
   useEffect(() => {
     let worker: Worker
@@ -302,7 +309,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     for (const player of state.players) {
       if (player.isAI || (player.avatarStyle && player.avatarSeed) || profileLookRequestsRef.current.has(player.userId)) continue
       profileLookRequestsRef.current.add(player.userId)
-      void fetchCloudProfile(player.userId).then((snapshot) => {
+      void fetchCloudProfile(player.userId, profileLookControllerRef.current.signal).then((snapshot) => {
         if (!snapshot) return
         setProfileLooks((current) => ({
           ...current,
@@ -315,7 +322,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   const publishState = useCallback((next: XiangqiState) => {
     stateRef.current = next
     setState(next)
-    channelRef.current?.send({ type: 'broadcast', event: 'state', payload: next })
+    sendGameBroadcast(channelRef.current, 'state', next)
   }, [])
 
   const requestAiMove = useCallback((board: number[][], color: 1 | 2) => {
@@ -343,12 +350,13 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     if (!ai || next.status !== 'playing') return
     if (aiTimerRef.current !== null) window.clearTimeout(aiTimerRef.current)
     aiTimerRef.current = window.setTimeout(async () => {
+      if (!canSendGameBroadcast(channelRef.current)) return
       const current = stateRef.current
       if (current.status !== 'playing') return
       const aiP = current.players.find((player) => player.isAI && player.color === current.turn)
       if (!aiP || current.turn !== aiP.color) return
       const move = await requestAiMove(current.board, aiP.color)
-      if (stateRef.current !== current) return
+      if (stateRef.current !== current || !canSendGameBroadcast(channelRef.current)) return
       const selectedMove = move ?? chooseAiMove(current.board, aiP.color, 1000)
       if (!selectedMove) return
       const afterAi = tryMove(current, aiP.userId, selectedMove.from[0], selectedMove.from[1], selectedMove.to[0], selectedMove.to[1])
@@ -364,33 +372,10 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
 
   useEffect(() => {
     if (!channelReady || !selfId || selfId !== state.hostId) return
-    persistQueueRef.current = persistQueueRef.current.catch(() => undefined).then(() => saveXiangqiState(instanceId, state))
+    persistQueueRef.current = persistQueueRef.current
+      .catch(() => undefined)
+      .then(() => saveXiangqiState(instanceId, state, () => canSendGameBroadcast(channelRef.current)))
   }, [channelReady, instanceId, selfId, state])
-
-  useEffect(() => {
-    if (!channelReady) return
-    let cancelled = false
-    const refresh = async () => {
-      const loaded = await loadXiangqiState(instanceId)
-      if (cancelled || !loaded.ok || !loaded.state) return
-      stateRef.current = loaded.state
-      setState(loaded.state)
-      if (selfIdRef.current === loaded.state.hostId) {
-        channelRef.current?.send({ type: 'broadcast', event: 'state', payload: loaded.state })
-        scheduleAiTurn(loaded.state)
-      }
-    }
-    const onVisible = () => { if (!document.hidden) void refresh() }
-    document.addEventListener('visibilitychange', onVisible)
-    window.addEventListener('pageshow', onVisible)
-    window.addEventListener('focus', onVisible)
-    return () => {
-      cancelled = true
-      document.removeEventListener('visibilitychange', onVisible)
-      window.removeEventListener('pageshow', onVisible)
-      window.removeEventListener('focus', onVisible)
-    }
-  }, [channelReady, instanceId, scheduleAiTurn])
 
   const isMyTurn = myColor !== null && state.turn === myColor && state.status === 'playing'
 
@@ -400,10 +385,20 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     let stateSyncTimer: number | null = null
     let reconnectTimer: number | null = null
     let cloudStateChecked = false
+    const cloudRequestController = new AbortController()
+    const channelSlotController = new AbortController()
+    let releaseChannelSlot: (() => void) | null = null
     let channel: ReturnType<Awaited<ReturnType<typeof getSupabaseClient>>['channel']> | null = null
+    const releaseSlot = () => {
+      const release = releaseChannelSlot
+      releaseChannelSlot = null
+      release?.()
+    }
     const retryChannel = (reason: string, error?: unknown) => {
       if (cancelled || reconnectTimer !== null) return
       console.error(`Xiangqi channel ${reason}:`, error)
+      if (stateSyncTimer !== null) window.clearInterval(stateSyncTimer)
+      stateSyncTimer = null
       setReadyKey('')
       const delays = [1000, 2000, 5000, 10000]
       const delay = delays[Math.min(channelRetryCountRef.current, delays.length - 1)]
@@ -420,6 +415,11 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         return null
       })
       if (!client || cancelled) return
+      releaseChannelSlot = await acquireGameChannelSlot(channelSlotController.signal)
+      if (!releaseChannelSlot || cancelled) {
+        releaseSlot()
+        return
+      }
       channel = client.channel(`game:xiangqi:${instanceId}`, { config: { presence: { key: selfId } } })
       channelRef.current = channel
 
@@ -434,7 +434,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         stateRef.current = init
         setState(init)
         setReadyKey(channelKey)
-        channel?.send({ type: 'broadcast', event: 'state', payload: init })
+        sendGameBroadcast(channel, 'state', init)
       }
 
       channel.on('broadcast', { event: 'state' }, ({ payload }: { payload: unknown }) => {
@@ -460,7 +460,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       })
       channel.on('broadcast', { event: 'state-request' }, () => {
         if (selfIdRef.current === stateRef.current.hostId && stateLoadedRef.current) {
-          channel?.send({ type: 'broadcast', event: 'state', payload: stateRef.current })
+          sendGameBroadcast(channel, 'state', stateRef.current)
         }
       })
       channel.on('broadcast', { event: 'move' }, ({ payload }: { payload: unknown }) => {
@@ -479,11 +479,11 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         if (!p?.userId) return
         const cur = stateRef.current
         if (cur.players.some((pl) => pl.userId === p.userId)) {
-          channel?.send({ type: 'broadcast', event: 'state', payload: cur })
+          sendGameBroadcast(channel, 'state', cur)
           return
         }
         if (cur.players.length >= 2) {
-          channel?.send({ type: 'broadcast', event: 'state', payload: cur })
+          sendGameBroadcast(channel, 'state', cur)
           return
         }
         const restarting = cur.status === 'result'
@@ -584,7 +584,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
           }
         }
         if (selfIdRef.current === cur.hostId) {
-          channel?.send({ type: 'broadcast', event: 'state', payload: cur })
+          sendGameBroadcast(channel, 'state', cur)
         }
       }
       channel.on('presence', { event: 'sync' }, reconcilePresence)
@@ -599,8 +599,9 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
           stateLoading = true
           try {
             const trackStatus = await withTimeout(channel!.track({ userId: selfId, displayName, avatarUrl, avatarStyle, avatarSeed }), 8000)
+            if (cancelled || !canSendGameBroadcast(channel)) return
             if (trackStatus !== 'ok') throw new Error(`presence track returned ${trackStatus}`)
-            channel?.send({ type: 'broadcast', event: 'state-request', payload: {} })
+            sendGameBroadcast(channel, 'state-request', {})
             if (stateSyncTimer === null) {
               stateSyncTimer = window.setInterval(() => {
                 if (stateLoadedRef.current) {
@@ -608,12 +609,17 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
                   stateSyncTimer = null
                   return
                 }
-                channel?.send({ type: 'broadcast', event: 'state-request', payload: {} })
+                if (!canSendGameBroadcast(channel)) {
+                  if (stateSyncTimer !== null) window.clearInterval(stateSyncTimer)
+                  stateSyncTimer = null
+                  return
+                }
+                sendGameBroadcast(channel, 'state-request', {})
                 if (statePolling) return
                 statePolling = true
-                void withTimeout(loadXiangqiState(instanceId), 5000)
+                void withTimeout(loadXiangqiState(instanceId, cloudRequestController.signal), 5000)
                   .then(({ state: saved, ok }) => {
-                    if (cancelled || !ok || !saved || stateLoadedRef.current) return
+                    if (cancelled || !canSendGameBroadcast(channel) || !ok || !saved || stateLoadedRef.current) return
                     const normalized = normalizeAiColors(saved)
                     cloudStateChecked = true
                     stateLoadedRef.current = true
@@ -622,7 +628,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
                     setState(normalized)
                     setReadyKey(channelKey)
                     if (selfIdRef.current === normalized.hostId) {
-                      channel?.send({ type: 'broadcast', event: 'state', payload: normalized })
+                      sendGameBroadcast(channel, 'state', normalized)
                       scheduleAiTurn(normalized)
                     }
                   })
@@ -631,12 +637,12 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
               }, 1800)
             }
             let loaded: Awaited<ReturnType<typeof loadXiangqiState>> | null = null
-            for (let attempt = 0; attempt < 4 && !cancelled; attempt++) {
-              try { loaded = await withTimeout(loadXiangqiState(instanceId), 8000) } catch { loaded = null }
+            for (let attempt = 0; attempt < 4 && !cancelled && canSendGameBroadcast(channel); attempt++) {
+              try { loaded = await withTimeout(loadXiangqiState(instanceId, cloudRequestController.signal), 8000) } catch { loaded = null }
               if (loaded?.ok) break
               await new Promise((resolve) => window.setTimeout(resolve, 500 * (attempt + 1)))
             }
-            if (cancelled) return
+            if (cancelled || !canSendGameBroadcast(channel)) return
             if (!loaded?.ok) throw new Error('could not load the game state after retries')
             const saved = loaded.state
             if (saved && !stateLoadedRef.current) {
@@ -647,12 +653,12 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
               stateRef.current = normalized
               setState(normalized)
               if (selfId === normalized.hostId) {
-                channel?.send({ type: 'broadcast', event: 'state', payload: normalized })
+                sendGameBroadcast(channel, 'state', normalized)
                 scheduleAiTurn(normalized)
               }
               setReadyKey(channelKey)
             } else if (stateLoadedRef.current) {
-              if (selfId === stateRef.current.hostId) channel?.send({ type: 'broadcast', event: 'state', payload: stateRef.current })
+              if (selfId === stateRef.current.hostId) sendGameBroadcast(channel, 'state', stateRef.current)
               setReadyKey(channelKey)
             } else {
               cloudStateChecked = true
@@ -667,6 +673,9 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
           setReadyKey('')
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             retryChannel(status, error)
+          } else if (stateSyncTimer !== null) {
+            window.clearInterval(stateSyncTimer)
+            stateSyncTimer = null
           }
         }
       })
@@ -674,25 +683,35 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
 
     return () => {
       cancelled = true
+      cloudRequestController.abort()
+      channelSlotController.abort()
       if (stateSyncTimer !== null) window.clearInterval(stateSyncTimer)
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer)
       if (aiTimerRef.current !== null) window.clearTimeout(aiTimerRef.current)
-      if (channel) void channel.unsubscribe()
       channelRef.current = null
+      if (channel) {
+        const releaseTimeout = window.setTimeout(releaseSlot, 1500)
+        void channel.unsubscribe().catch(() => undefined).finally(() => {
+          window.clearTimeout(releaseTimeout)
+          releaseSlot()
+        })
+      } else {
+        releaseSlot()
+      }
     }
   }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, channelAttempt, announceCapture, publishState, scheduleAiTurn, showStartToast])
 
   const sendMove = (fromR: number, fromC: number, toR: number, toC: number) => {
-    if (!selfId) return
+    if (!selfId || !channelReady || !canSendGameBroadcast(channelRef.current)) return
     if (selfId === stateRef.current.hostId) {
       const next = tryMove(stateRef.current, selfId, fromR, fromC, toR, toC)
       if (next) { announceCapture(stateRef.current, next); publishState(next); scheduleAiTurn(next) }
     } else {
-      channelRef.current?.send({ type: 'broadcast', event: 'move', payload: { userId: selfId, fromR, fromC, toR, toC } })
+      sendGameBroadcast(channelRef.current, 'move', { userId: selfId, fromR, fromC, toR, toC })
     }
   }
   const sendRematch = () => {
-    if (!channelReady) return
+    if (!channelReady || !canSendGameBroadcast(channelRef.current)) return
     if (selfId === stateRef.current.hostId) {
       const next = restartXiangqiRound(stateRef.current)
       publishState(next)
@@ -705,21 +724,21 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         }
       }
     } else {
-      channelRef.current?.send({ type: 'broadcast', event: 'rematch', payload: { round: stateRef.current.round } })
+      sendGameBroadcast(channelRef.current, 'rematch', { round: stateRef.current.round })
     }
   }
   const leaveRoom = () => {
-    if (!selfId || !channelReady) return
+    if (!selfId || !channelReady || !canSendGameBroadcast(channelRef.current)) return
     setLeaveConfirmOpen(false)
     if (selfId === stateRef.current.hostId) {
       const next = removeXiangqiPlayer(stateRef.current, selfId)
       if (next) publishState(next)
     } else {
-      channelRef.current?.send({ type: 'broadcast', event: 'leave', payload: { userId: selfId } })
+      sendGameBroadcast(channelRef.current, 'leave', { userId: selfId })
     }
   }
   const sendJoin = () => {
-    if (!selfId || !channelReady || !channelRef.current || joinStatus === 'joining') return
+    if (!selfId || !channelReady || !canSendGameBroadcast(channelRef.current) || joinStatus === 'joining') return
     setJoinStatus('joining')
     if (selfId === stateRef.current.hostId) {
       const cur = stateRef.current
@@ -756,12 +775,17 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       setJoinStatus('retry')
     }
     joinTimeoutRef.current = window.setTimeout(failJoin, 10000)
-    void channelRef.current.send({ type: 'broadcast', event: 'join', payload: { userId: selfId, displayName, avatarUrl, avatarStyle, avatarSeed } }).then((status: string) => {
+    const channel = channelRef.current
+    if (!canSendGameBroadcast(channel)) {
+      failJoin()
+      return
+    }
+    void channel.send({ type: 'broadcast', event: 'join', payload: { userId: selfId, displayName, avatarUrl, avatarStyle, avatarSeed } }).then((status: string) => {
       if (status !== 'ok') failJoin()
     }, failJoin)
   }
   const sendAiJoin = () => {
-    if (!channelReady || !selfId || !channelRef.current) return
+    if (!channelReady || !selfId || !canSendGameBroadcast(channelRef.current)) return
     if (selfId === stateRef.current.hostId) {
       const next = addAiOpponent(stateRef.current)
       if (next) {
@@ -776,7 +800,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         }
       }
     } else {
-      channelRef.current.send({ type: 'broadcast', event: 'ai', payload: {} })
+      sendGameBroadcast(channelRef.current, 'ai', {})
     }
   }
 

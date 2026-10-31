@@ -9,7 +9,7 @@ function countdown(ms: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
 
-export default function MessageAuthorCard({ member }: { member: PresenceMember }) {
+export default function MessageAuthorCard({ member, className }: { member: PresenceMember; className?: string }) {
   const [now, setNow] = useState<number | null>(null)
   const [cloudProfile, setCloudProfile] = useState<CloudProfileSnapshot | null>(null)
   useEffect(() => {
@@ -37,7 +37,7 @@ export default function MessageAuthorCard({ member }: { member: PresenceMember }
   const expiresAt = cloudProfile?.expiresAt ?? member.profileExpiresAt
   const remaining = now == null ? 0 : Math.max(0, (expiresAt ?? now) - now)
   return (
-    <div className="account-pop" role="status">
+    <div className={`account-pop${className ? ` ${className}` : ''}`} role="status">
       <div className="account-pop-head">
         <div className="account-pop-avatar" style={{ ['--avatar-progress' as string]: String(remaining / 3_600_000) }}>
           <AvatarBadge

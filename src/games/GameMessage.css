@@ -1,0 +1,20 @@
+.game-message-inview {
+  width: 100%;
+  max-width: 440px;
+}
+
+.game-message-placeholder {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 410px;
+  margin: 6px 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
+}
+
+@media (max-width: 600px) {
+  .game-message-placeholder {
+    min-height: 330px;
+  }
+}

@@ -24,7 +24,7 @@ import {
   updateOutboxContent,
   type ChatOutboxItem,
 } from './chatOutbox'
-import { isExpired, MESSAGE_TTL_MS } from './expiry'
+import { isExpired } from './expiry'
 import type { ChatEntry, ChatStatus, ChatMessage, MessageReply, PresenceMember } from './chatTypes'
 import type { ChatIdentity } from './identity'
 import type { RoomReactionChange, RoomReactionRecord } from './chatReactions'
@@ -120,7 +120,9 @@ export function enterChat(
 
   const expireUserMessages = (userId: string) => {
     for (const entry of [...entries]) {
-      if (entry.userId !== userId) continue
+      // Farewell notes belong to their recipient's remaining lifetime, not
+      // the sender's profile. Keep them through the post-summary cleanup.
+      if (entry.userId !== userId || entry.farewell) continue
       // Best-effort cloud delete so other clients see the farewell even when
       // the profile trigger / purge RPC is unavailable.
       if (!entry.state) void handle?.deleteMessage(entry.id, imagePathOf(entry.imageUrl))
@@ -287,7 +289,7 @@ export function enterChat(
           // The one-hour rule outlives a reconnect: an unsent draft whose
           // hour ran out while the tab was closed departs with the farewell
           // animation instead of going out with a fresh server-side hour.
-          if (Date.now() - item.at >= MESSAGE_TTL_MS) {
+          if (isExpired({ at: item.at, expiresAt: item.expiresAt })) {
             beginExpire(item.id, false)
             try {
               await removeFromOutbox(item.id)

@@ -636,6 +636,7 @@ export default function App() {
         <SummaryModal
           stats={pendingSummary.stats}
           presence={room.presence}
+          selfId={room.identity?.userId ?? null}
           startedAt={pendingSummary.startedAt}
           onComplete={handleSummaryComplete}
           onFarewell={(userId, name, expiresAt, sentence) => {

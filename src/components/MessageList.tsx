@@ -87,19 +87,20 @@ export default function MessageList({
   const previousStatusRef = useRef(status)
 
   const scroll = useChatScroll({ scrollRef: logRef, entries, incomingMessageSequence, layoutKey })
-  const { jumpToEnd } = scroll
+  const { scrollToEnd } = scroll
   const seenSentMessageRef = useRef(sentMessageSequence)
 
   useLayoutEffect(() => {
     if (seenSentMessageRef.current === sentMessageSequence) return
     seenSentMessageRef.current = sentMessageSequence
-    // Mobile keyboards reflow the viewport after a send; defer the
-    // scroll so it runs after layout settles instead of mid-reflow.
+    // Mobile keyboards reflow after sends, and game cards can grow after
+    // their first paint. Defer until layout settles, then pin immediately;
+    // the scroll hook keeps the reader pinned as the card finishes growing.
     const raf = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => jumpToEnd())
+      window.requestAnimationFrame(() => scrollToEnd())
     })
     return () => window.cancelAnimationFrame(raf)
-  }, [jumpToEnd, sentMessageSequence])
+  }, [scrollToEnd, sentMessageSequence])
 
   const requestOlder = useCallback(() => {
     const el = logRef.current
@@ -244,14 +245,20 @@ export default function MessageList({
           <div className="chat-top-hint">{t('已经到顶部了', 'You’re at the top')}</div>
         )}
         {entries.length === 0 && (
-          <p className="chat-empty">
-            <strong>{t('欢迎来到一小时聊天室', 'Welcome to the one-hour room')}</strong>
-            {t('每条消息只存在一个小时', 'Every message lives for just one hour')}{' '}
-            <span className="chat-empty-hourglass">
-              <HourglassIcon size={13} />
-            </span>{' '}
-            {t('留下的都是此刻，畅所欲言吧。', 'Say what matters, now.')}
-          </p>
+          <div className="chat-empty">
+            <span className="chat-empty-logo">
+              <HourglassIcon size={28} />
+            </span>
+            <p>
+              <strong>{t('欢迎来到一小时聊天室', 'Welcome to the one-hour room')}</strong>
+              <span className="chat-empty-line">
+                {t('每条消息只存在一个小时。', 'Every message lives for just one hour')}
+              </span>
+              <span className="chat-empty-line">
+                {t('留下的都是此刻，畅所欲言吧。', 'Say what matters, now.')}
+              </span>
+            </p>
+          </div>
         )}
         {entries.map((entry) => (
           <MessageRow

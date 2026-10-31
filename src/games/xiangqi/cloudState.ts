@@ -3,23 +3,27 @@ import { isXiangqiState, type XiangqiState } from './logic'
 
 const STATE_TTL_MS = 60 * 60 * 1000
 
-export async function loadXiangqiState(instanceId: string): Promise<{ state: XiangqiState | null; ok: boolean }> {
+export async function loadXiangqiState(instanceId: string, signal?: AbortSignal): Promise<{ state: XiangqiState | null; ok: boolean }> {
   const client = await getSupabaseClient()
-  const { data, error } = await client
+  let query = client
     .from('xiangqi_states')
     .select('state')
     .eq('instance_id', instanceId)
     .gt('expires_at', new Date().toISOString())
-    .maybeSingle()
+  if (signal) query = query.abortSignal(signal)
+  const { data, error } = await query.maybeSingle()
   if (error) {
+    if (signal?.aborted) return { state: null, ok: false }
     console.error('Could not load Xiangqi state:', error.message)
     return { state: null, ok: false }
   }
   return { state: isXiangqiState(data?.state, instanceId) ? data.state : null, ok: true }
 }
 
-export async function saveXiangqiState(instanceId: string, state: XiangqiState): Promise<void> {
+export async function saveXiangqiState(instanceId: string, state: XiangqiState, shouldContinue: () => boolean = () => true): Promise<void> {
+  if (!shouldContinue()) return
   const client = await getSupabaseClient()
+  if (!shouldContinue()) return
   const marker = `__GAME__:xiangqi:${instanceId}`
   const { data: card, error: cardError } = await client
     .from('chat_messages')
@@ -32,11 +36,13 @@ export async function saveXiangqiState(instanceId: string, state: XiangqiState):
     console.error('Could not verify Xiangqi card before save:', cardError.message)
     return
   }
+  if (!shouldContinue()) return
   if (!card) {
-    await deleteXiangqiState(instanceId)
+    if (shouldContinue()) await deleteXiangqiState(instanceId)
     return
   }
   const now = Date.now()
+  if (!shouldContinue()) return
   const { error } = await client.from('xiangqi_states').upsert({
     instance_id: instanceId,
     state,
