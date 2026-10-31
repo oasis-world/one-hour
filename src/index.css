@@ -886,11 +886,6 @@ button {
   color: var(--danger);
 }
 
-.msg-row.is-farewell {
-  background: rgba(90, 140, 255, 0.16);
-  border-left: 3px solid #2563eb;
-}
-
 /* The one-hour farewell: blur + lift away, then fold the row shut. */
 .msg-row.is-expiring {
   overflow: hidden; /* the fold-shut needs clipping; rows normally don't */

@@ -192,6 +192,9 @@ export function enterChat(
     if (existing?.avatarUrl && !merged.avatarUrl) {
       merged.avatarUrl = existing.avatarUrl
     }
+    if (existing?.authorRole && !merged.authorRole) {
+      merged.authorRole = existing.authorRole
+    }
     if (existing?.replyTo && !merged.replyTo) {
       merged.replyTo = existing.replyTo
     }
@@ -289,7 +292,7 @@ export function enterChat(
           // The one-hour rule outlives a reconnect: an unsent draft whose
           // hour ran out while the tab was closed departs with the farewell
           // animation instead of going out with a fresh server-side hour.
-          if (isExpired({ at: item.at, expiresAt: item.expiresAt })) {
+          if (isExpired({ at: item.at, expiresAt: item.expiresAt, farewell: item.farewell })) {
             beginExpire(item.id, false)
             try {
               await removeFromOutbox(item.id)
@@ -311,6 +314,7 @@ export function enterChat(
               displayName: item.displayName,
               avatar: item.avatar,
               avatarUrl: item.avatarUrl ?? null,
+              authorRole: item.authorRole ?? null,
               imageBlob: item.imageBlob,
               expiresAt: item.expiresAt,
               farewell: item.farewell,
@@ -386,6 +390,7 @@ export function enterChat(
         avatarStyle: item.avatar?.style ?? null,
         avatarSeed: item.avatar?.seed ?? null,
         avatarUrl: item.avatarUrl ?? null,
+        authorRole: item.authorRole ?? null,
         content: item.content,
         replyTo: item.replyTo ?? null,
         at: item.at,
@@ -526,6 +531,7 @@ export function enterChat(
         displayName: currentIdentity.displayName,
         avatar: currentIdentity.avatar ?? undefined,
         avatarUrl: currentIdentity.avatarUrl,
+        authorRole: currentIdentity.role,
         at: Date.now(),
         attempts: 0,
         expiresAt: options?.expiresAt,
@@ -539,6 +545,7 @@ export function enterChat(
         avatarStyle: currentIdentity.avatar?.style ?? null,
         avatarSeed: currentIdentity.avatar?.seed ?? null,
         avatarUrl: currentIdentity.avatarUrl,
+        authorRole: currentIdentity.role,
         content: trimmed,
         replyTo: replyTo ?? null,
         at: item.at,

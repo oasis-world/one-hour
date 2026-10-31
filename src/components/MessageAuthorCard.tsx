@@ -6,10 +6,18 @@ import AvatarBadge from './AvatarBadge'
 
 function countdown(ms: number): string {
   const seconds = Math.ceil(ms / 1000)
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+  return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
 }
 
-export default function MessageAuthorCard({ member, className }: { member: PresenceMember; className?: string }) {
+export default function MessageAuthorCard({
+  member,
+  className,
+  expired = false,
+}: {
+  member: PresenceMember
+  className?: string
+  expired?: boolean
+}) {
   const [now, setNow] = useState<number | null>(null)
   const [cloudProfile, setCloudProfile] = useState<CloudProfileSnapshot | null>(null)
   useEffect(() => {
@@ -34,12 +42,16 @@ export default function MessageAuthorCard({ member, className }: { member: Prese
     seed: member.avatarSeed ?? '',
     avatarUrl: member.avatarUrl,
   }
+  const role = cloudProfile?.profile.role?.trim() || member.role?.trim() || ''
   const expiresAt = cloudProfile?.expiresAt ?? member.profileExpiresAt
-  const remaining = now == null ? 0 : Math.max(0, (expiresAt ?? now) - now)
+  const remaining = expired || now == null ? 0 : Math.max(0, (expiresAt ?? now) - now)
   return (
     <div className={`account-pop${className ? ` ${className}` : ''}`} role="status">
       <div className="account-pop-head">
-        <div className="account-pop-avatar" style={{ ['--avatar-progress' as string]: String(remaining / 3_600_000) }}>
+        <div
+          className={`account-pop-avatar${expired ? ' is-expired' : ''}`}
+          style={{ ['--avatar-progress' as string]: String(remaining / 3_600_000) }}
+        >
           <AvatarBadge
             look={profile}
             size={52}
@@ -48,7 +60,7 @@ export default function MessageAuthorCard({ member, className }: { member: Prese
         </div>
         <div className="account-pop-id">
           <span className="account-pop-name">{profile.nickname}</span>
-          <span className="account-pop-role">{profile.role?.trim() || '—'}</span>
+          {role && <span className="account-pop-role">{role}</span>}
           <span className="account-pop-countdown">{countdown(remaining)}</span>
         </div>
       </div>

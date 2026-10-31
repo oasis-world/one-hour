@@ -272,8 +272,8 @@ export default function MessageList({
               avatarStyle: entry.avatarStyle ?? null,
               avatarSeed: entry.avatarSeed ?? null,
               avatarUrl: entry.avatarUrl ?? null,
-              role: '',
-              profileExpiresAt: entry.at + 60 * 60 * 1000,
+              role: entry.authorRole ?? '',
+              profileExpiresAt: entry.farewell ? 0 : entry.at + 60 * 60 * 1000,
               enteredAt: entry.at,
             }}
             menuOpen={menu?.entry.id === entry.id}

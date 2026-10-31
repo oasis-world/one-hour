@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLang, t, type Lang } from '../lib/i18n'
 import type { LifetimeStats } from '../lib/lifetimeStats'
 import { FAREWELL_SENTENCES } from '../lib/lifetimeStats'
+import { FAREWELL_TTL_MS } from '../lib/expiry'
 import type { PresenceMember } from '../lib/chatTypes'
 import MessageAuthorCard from './MessageAuthorCard'
 import { HourglassIcon } from './icons'
@@ -147,11 +148,7 @@ export default function SummaryModal({ stats, presence, selfId, startedAt, onCom
               style={{ marginTop: 12 }}
               onClick={() => {
                 const sentence = pickFarewell(lang)
-                const expiresAt = selected.member.profileExpiresAt ?? Date.now() + 60 * 60 * 1000
-                if (expiresAt <= Date.now()) {
-                  setSelected(null)
-                  return
-                }
+                const expiresAt = Date.now() + FAREWELL_TTL_MS
                 onFarewell(selected.userId, selected.name, expiresAt, sentence)
                 setSelected(null)
               }}

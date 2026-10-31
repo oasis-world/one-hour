@@ -9,6 +9,8 @@ export interface ChatMessage {
   avatarSeed?: string | null
   /** Custom photo avatar URL captured at send time; wins over the look. */
   avatarUrl?: string | null
+  /** Author role snapshot, retained after an anonymous profile expires. */
+  authorRole?: string | null
   content: string
   /** Snapshot of the message this one replies to, retained with this message. */
   replyTo?: MessageReply | null
@@ -18,7 +20,7 @@ export interface ChatMessage {
   serverCreatedAt?: string
   /** Optional per-message expiry (epoch ms); defaults to created_at + 1h. */
   expiresAt?: number
-  /** Farewell message (special background). */
+  /** Farewell message, with its own ten-minute lifetime. */
   farewell?: boolean
   /** Public storage URL of the attached image, if any. */
   imageUrl?: string | null

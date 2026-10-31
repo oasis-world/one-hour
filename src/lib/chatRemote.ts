@@ -78,6 +78,7 @@ export interface RoomHandle {
     displayName: string
     avatar?: { style: string; seed: string }
     avatarUrl?: string | null
+    authorRole?: string | null
     imageBlob?: Blob
     expiresAt?: number
     farewell?: boolean
@@ -98,6 +99,7 @@ interface MessageRow {
   avatar_style: string | null
   avatar_seed: string | null
   avatar_url: string | null
+  author_role?: string | null
   content: string
   reply_to?: MessageReply | null
   image_url: string | null
@@ -415,7 +417,7 @@ export async function joinChatRoom(options: {
           }
           imageUrl = ctx.storage.from(IMAGES_BUCKET).getPublicUrl(path).data.publicUrl
         }
-        const base = {
+        const base: Record<string, unknown> = {
           id: draft.id,
           user_id: uid,
           display_name: draft.displayName,
@@ -424,45 +426,29 @@ export async function joinChatRoom(options: {
           reply_to: draft.replyTo ?? null,
           ...(draft.expiresAt ? { expires_at: new Date(draft.expiresAt).toISOString() } : {}),
           ...(draft.farewell ? { farewell: true } : {}),
+          ...(draft.authorRole?.trim() ? { author_role: draft.authorRole.trim() } : {}),
         }
-        let payloadBase: Omit<typeof base, 'reply_to'> | typeof base = base
-        let { error } = await withTimeout(
-          ctx.from(MESSAGES_TABLE).insert({
-            ...base,
-            avatar_style: draft.avatar?.style ?? null,
-            avatar_seed: draft.avatar?.seed ?? null,
-            avatar_url: draft.avatarUrl ?? null,
-          }),
+        const optional: Record<string, unknown> = {
+          avatar_style: draft.avatar?.style ?? null,
+          avatar_seed: draft.avatar?.seed ?? null,
+          avatar_url: draft.avatarUrl ?? null,
+        }
+        const insert = () => withTimeout(
+          ctx.from(MESSAGES_TABLE).insert({ ...base, ...optional }),
           INSERT_TIMEOUT_MS,
         )
-        if (error && isMissingReplyColumnError(error)) {
-          payloadBase = {
-            id: base.id,
-            user_id: base.user_id,
-            display_name: base.display_name,
-            content: base.content,
-            image_url: base.image_url,
-            ...(draft.expiresAt ? { expires_at: new Date(draft.expiresAt).toISOString() } : {}),
-            ...(draft.farewell ? { farewell: true } : {}),
-          }
-          const retry = await withTimeout(
-            ctx.from(MESSAGES_TABLE).insert({
-              ...payloadBase,
-              avatar_style: draft.avatar?.style ?? null,
-              avatar_seed: draft.avatar?.seed ?? null,
-              avatar_url: draft.avatarUrl ?? null,
-            }),
-            INSERT_TIMEOUT_MS,
-          )
-          error = retry.error
-        }
-        if (error && isMissingColumnError(error)) {
-          // Schema not migrated yet: the avatar is cosmetic, the words are
-          // not — retry once without the unknown columns.
-          ({ error } = await withTimeout(
-            ctx.from(MESSAGES_TABLE).insert(payloadBase),
-            INSERT_TIMEOUT_MS,
-          ))
+        let { error } = await insert()
+        // Older deployments can lack optional columns. Drop only the one
+        // rejected by PostgREST and retry, preserving the actual message.
+        for (let attempt = 0; error && attempt < 8; attempt++) {
+          if ((error as { code?: string }).code === '23505') return { ok: true }
+          const missing = missingOptionalMessageColumn(error)
+          if (!missing) break
+          if (missing in optional) delete optional[missing]
+          else if (missing in base && !['id', 'user_id', 'display_name', 'content', 'image_url'].includes(missing)) {
+            delete base[missing]
+          } else break
+          ;({ error } = await insert())
         }
         if (error) {
           // Our own id already on the server (first try landed, its
@@ -563,6 +549,7 @@ function rowToMessage(row: MessageRow): ChatMessage {
     avatarStyle: row.avatar_style ?? null,
     avatarSeed: row.avatar_seed ?? null,
     avatarUrl: row.avatar_url ?? null,
+    authorRole: row.author_role ?? null,
     content: row.content,
     replyTo: row.reply_to ?? null,
     at: new Date(row.created_at).getTime(),
@@ -587,6 +574,8 @@ function isMissingColumnError(error: { message?: string; code?: string }): boole
   )
 }
 
-function isMissingReplyColumnError(error: { message?: string }): boolean {
-  return /could not find the .*reply_to column/i.test(error.message ?? '')
+function missingOptionalMessageColumn(error: { message?: string }): string | null {
+  const message = (error.message ?? '').toLowerCase()
+  return ['reply_to', 'avatar_style', 'avatar_seed', 'avatar_url', 'author_role', 'farewell', 'expires_at']
+    .find((column) => message.includes(column)) ?? null
 }

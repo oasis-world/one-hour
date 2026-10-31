@@ -3,7 +3,7 @@
 -- Run once in the Supabase dashboard → SQL Editor.
 --
 -- One global ephemeral chat room: every row carries expires_at
--- (created_at + 1 hour). Clients hide and delete expired rows; the
+-- (normally created_at + 1 hour; farewell notes use 10 minutes). Clients hide and delete expired rows; the
 -- pg_cron job below purges them server-side every minute so the cloud
 -- truly forgets even if an author never returns online.
 -- ============================================================
@@ -17,6 +17,7 @@ create table if not exists public.chat_messages (
   avatar_style text, -- dicebear style name captured at send time
   avatar_seed text, -- dicebear seed captured at send time
   avatar_url text, -- custom photo avatar URL captured at send time
+  author_role text, -- role/title snapshot for expired anonymous authors
   content text not null default '' check (char_length(content) <= 1000),
   reply_to jsonb, -- snapshot of the message being replied to
   image_url text, -- public storage URL of the attached photo, null for text-only
@@ -32,6 +33,7 @@ create table if not exists public.chat_messages (
 alter table public.chat_messages add column if not exists avatar_style text;
 alter table public.chat_messages add column if not exists avatar_seed text;
 alter table public.chat_messages add column if not exists avatar_url text;
+alter table public.chat_messages add column if not exists author_role text;
 alter table public.chat_messages add column if not exists reply_to jsonb;
 alter table public.chat_messages add column if not exists edited_at timestamptz;
 alter table public.chat_messages add column if not exists farewell boolean not null default false;
@@ -282,6 +284,7 @@ as $$
 begin
   delete from public.chat_messages m
   where m.expires_at <= now()
+     or (coalesce(m.farewell, false) and m.created_at <= now() - interval '10 minutes')
      or (
        not coalesce(m.farewell, false)
        and exists (

@@ -64,6 +64,10 @@
   animation: account-pop-avatar-breathe 2.4s ease-in-out infinite;
 }
 
+.account-pop-avatar.is-expired::before {
+  display: none;
+}
+
 @keyframes account-pop-avatar-breathe {
   0%, 100% { opacity: 0.35; }
   50% { opacity: 1; }

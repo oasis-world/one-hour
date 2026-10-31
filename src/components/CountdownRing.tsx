@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
-import { MESSAGE_TTL_MS, expiresAtOf } from '../lib/expiry'
+import { FAREWELL_TTL_MS, MESSAGE_TTL_MS, expiresAtOf } from '../lib/expiry'
 import { t } from '../lib/i18n'
 import { subscribeTick } from '../lib/tick'
 import type { ChatEntry } from '../lib/chatTypes'
 import CountdownVisual from './CountdownVisual'
 
 /**
- * The one-hour countdown: a depleting ring with a mm:ss readout, next to
- * the message's send time. Amber in the final ten minutes, pulsing red in
- * the last two.
+ * Message lifetime countdown: a depleting ring with an mm:ss readout next
+ * to the message. Amber in the final ten minutes, pulsing red in the last two.
  */
 
 type Phase = 'fresh' | 'late' | 'final'
@@ -20,7 +19,7 @@ export default function CountdownRing({ entry }: { entry: ChatEntry }) {
   useEffect(() => subscribeTick(() => setNow(Date.now())), [])
 
   const remaining = Math.max(0, expiresAt - now)
-  const fraction = Math.min(1, remaining / MESSAGE_TTL_MS)
+  const fraction = Math.min(1, remaining / (entry.farewell ? FAREWELL_TTL_MS : MESSAGE_TTL_MS))
   const phase: Phase = remaining <= 2 * 60_000 ? 'final' : remaining <= 10 * 60_000 ? 'late' : 'fresh'
   const mm = Math.floor(remaining / 60_000)
   const ss = Math.floor((remaining % 60_000) / 1000)

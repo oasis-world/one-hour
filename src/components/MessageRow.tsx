@@ -87,9 +87,9 @@ function renderMessageContent(content: string): ReactNode {
 
 /**
  * One message row (every row carries its own header — each message owns a
- * personal one-hour countdown): avatar gutter, name, a dot separator and
- * the hour-glass countdown, then the text and/or photo. No clock is shown:
- * the message lifetime is fixed at one hour, so the countdown is the only
+ * personal countdown): avatar gutter, name, a dot separator and the
+ * hour-glass countdown, then the text and/or photo. No clock is shown:
+ * the message lifetime is fixed, so the countdown is the only
  * time that matters. Desktop hover shows the quick toolbar; right-click
  * opens the context menu; on touch a 500ms long-press opens the bottom
  * sheet (scrolling aborts the press). Rows carry their own farewell —
@@ -192,7 +192,6 @@ export default function MessageRow({
         mine ? 'is-mine' : '',
         entry.state ? `is-${entry.state}` : '',
         entry.expiring ? 'is-expiring' : '',
-        entry.farewell ? 'is-farewell' : '',
         menuOpen ? 'is-menu-open' : '',
       ].join(' ')}
       onContextMenu={(e) => {
@@ -347,7 +346,7 @@ export default function MessageRow({
           className="author-pop-portal"
           style={{ left: authorPosition.left, top: authorPosition.top }}
         >
-          <MessageAuthorCard member={author} />
+            <MessageAuthorCard member={author} expired={Boolean(entry.farewell)} />
         </div>,
         portalRoot ?? document.body,
       )}
