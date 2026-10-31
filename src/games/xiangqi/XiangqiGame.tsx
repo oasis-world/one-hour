@@ -211,7 +211,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   }, [])
 
   const showStartToast = useCallback(() => {
-    setStartToast(t('游戏开始！', 'Game start!'))
+    setStartToast(t('游戏开始', 'Game start'))
     if (startToastTimerRef.current !== null) window.clearTimeout(startToastTimerRef.current)
     startToastTimerRef.current = window.setTimeout(() => setStartToast(''), 2500)
   }, [])
@@ -220,7 +220,11 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     if (!stateLoadedRef.current) return
     if (!hydratedRef.current) {
       hydratedRef.current = true
-      startToastKeyRef.current = `${state.round}:started`
+      if (state.status === 'playing' && state.players.length >= 2) {
+        startToastKeyRef.current = `${state.round}:started`
+      } else {
+        startToastKeyRef.current = ''
+      }
       prevStatusRef.current = state.status
       prevRoundRef.current = state.round
       return
@@ -506,11 +510,28 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
           status: cur.players.length + 1 >= 2 ? 'playing' : 'waiting',
         }
         publishState(next)
+        if (next.status === 'playing' && next.players.length >= 2) {
+          const startKey = `${next.round}:started`
+          if (startToastKeyRef.current !== startKey) {
+            startToastKeyRef.current = startKey
+            showStartToast()
+          }
+        }
       })
       channel.on('broadcast', { event: 'ai' }, () => {
         if (selfIdRef.current !== stateRef.current.hostId) return
         const next = addAiOpponent(stateRef.current)
-        if (next) { publishState(next); scheduleAiTurn(next) }
+        if (next) {
+          publishState(next)
+          scheduleAiTurn(next)
+          if (next.status === 'playing' && next.players.length >= 2) {
+            const startKey = `${next.round}:started`
+            if (startToastKeyRef.current !== startKey) {
+              startToastKeyRef.current = startKey
+              showStartToast()
+            }
+          }
+        }
       })
       channel.on('broadcast', { event: 'leave' }, ({ payload }: { payload: unknown }) => {
         if (selfIdRef.current !== stateRef.current.hostId) return
@@ -527,6 +548,13 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         const next = restartXiangqiRound(current)
         publishState(next)
         scheduleAiTurn(next)
+        if (next.status === 'playing' && next.players.length >= 2) {
+          const startKey = `${next.round}:started`
+          if (startToastKeyRef.current !== startKey) {
+            startToastKeyRef.current = startKey
+            showStartToast()
+          }
+        }
       })
 
       const reconcilePresence = () => {
@@ -917,7 +945,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       <div className="xiangqi-actions">
         {canJoin && (
           <button type="button" className="btn-accent" disabled={!channelReady || !selfId || joinStatus === 'joining'} aria-busy={joinStatus === 'joining'} onClick={sendJoin}>
-            {!channelReady || !selfId ? t('连接游戏中…', 'Connecting…') : joinStatus === 'joining' ? t('正在加入…', 'Joining…') : joinStatus === 'retry' ? t('加入较慢，点击重试', 'Taking longer; tap to retry') : t('加入游戏', 'Join game')}
+            {!channelReady || !selfId ? t('重新连接中…', 'Reconnecting…') : joinStatus === 'joining' ? t('正在加入…', 'Joining…') : joinStatus === 'retry' ? t('加入较慢，点击重试', 'Taking longer; tap to retry') : t('加入游戏', 'Join game')}
           </button>
         )}
         {canJoinAI && (

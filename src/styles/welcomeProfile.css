@@ -75,6 +75,69 @@
   margin-bottom: 38px;
 }
 
+/* ---------- Summary modal stats ---------- */
+.summary-stats {
+  width: 100%;
+  margin: 12px 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+.summary-stat-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.summary-stat-row:last-child {
+  border-bottom: none;
+}
+.summary-stat-label {
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.summary-stat-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.summary-stat-sub {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-mute);
+}
+.summary-interactions {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
+}
+.summary-interaction-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 6px;
+}
+.summary-interaction-name {
+  font-weight: 700;
+  color: #2563eb;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.summary-interaction-name:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .welcome-avatar {
   display: block;
   border-radius: 50%;

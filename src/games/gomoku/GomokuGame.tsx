@@ -171,7 +171,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   }, [publishState])
 
   const showStartToast = useCallback(() => {
-    setStartToast(t('游戏开始！', 'Game start!'))
+    setStartToast(t('游戏开始', 'Game start'))
     if (startToastTimerRef.current !== null) window.clearTimeout(startToastTimerRef.current)
     startToastTimerRef.current = window.setTimeout(() => setStartToast(''), 2500)
   }, [])
@@ -180,7 +180,11 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
     if (!stateLoadedRef.current) return
     if (!hydratedRef.current) {
       hydratedRef.current = true
-      startToastKeyRef.current = `${state.round}:started`
+      if (state.status === 'playing' && state.players.length >= 2) {
+        startToastKeyRef.current = `${state.round}:started`
+      } else {
+        startToastKeyRef.current = ''
+      }
       prevStatusRef.current = state.status
       prevRoundRef.current = state.round
       return
@@ -368,6 +372,13 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
           status: nextPlayers.length >= 2 ? 'playing' : 'waiting',
         }
         publishState(next)
+        if (next.status === 'playing' && next.players.length >= 2) {
+          const startKey = `${next.round}:started`
+          if (startToastKeyRef.current !== startKey) {
+            startToastKeyRef.current = startKey
+            showStartToast()
+          }
+        }
       })
 
       channel.on('broadcast', { event: 'ai' }, () => {
@@ -376,6 +387,13 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         if (next) {
           publishState(next)
           scheduleAiTurn(next)
+          if (next.status === 'playing' && next.players.length >= 2) {
+            const startKey = `${next.round}:started`
+            if (startToastKeyRef.current !== startKey) {
+              startToastKeyRef.current = startKey
+              showStartToast()
+            }
+          }
         }
       })
       channel.on('broadcast', { event: 'leave' }, ({ payload }) => {
@@ -393,6 +411,13 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         const next = restartGomokuRound(current)
         publishState(next)
         scheduleAiTurn(next)
+        if (next.status === 'playing' && next.players.length >= 2) {
+          const startKey = `${next.round}:started`
+          if (startToastKeyRef.current !== startKey) {
+            startToastKeyRef.current = startKey
+            showStartToast()
+          }
+        }
       })
 
       const reconcilePresence = () => {
@@ -808,7 +833,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
             onClick={sendJoin}
           >
             {!channelReady || !selfId
-              ? t('连接游戏中…', 'Connecting…')
+              ? t('重新连接中…', 'Reconnecting…')
               : joinStatus === 'joining'
                 ? t('正在加入…', 'Joining…')
                 : joinStatus === 'retry'

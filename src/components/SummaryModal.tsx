@@ -4,6 +4,7 @@ import type { LifetimeStats } from '../lib/lifetimeStats'
 import { FAREWELL_SENTENCES } from '../lib/lifetimeStats'
 import type { PresenceMember } from '../lib/chatTypes'
 import MessageAuthorCard from './MessageAuthorCard'
+import { HourglassIcon } from './icons'
 
 interface Props {
   stats: LifetimeStats
@@ -74,52 +75,48 @@ export default function SummaryModal({ stats, presence, startedAt, onComplete, o
     <div className="welcome-backdrop" role="presentation">
       <div className="welcome-card" role="dialog" aria-modal="true" aria-label={t('一小时聊天室', 'the one-hour room')}>
         <h2 className="welcome-title">
-          <span aria-hidden="true">⏳</span>
+          <HourglassIcon size={20} />
           {t('一小时聊天室', 'the one-hour room')}
         </h2>
         <p className="welcome-copy">
           <strong>{HEADLINE[lang]}</strong>
         </p>
 
-        <div style={{ textAlign: 'left', margin: '12px 0', fontSize: 14, lineHeight: 1.7 }}>
-          <div>
-            {t('本小时内发送消息', 'Messages sent this hour')}:{' '}
-            <strong>{stats.messagesSent}</strong>
+        <div className="summary-stats">
+          <div className="summary-stat-row">
+            <span className="summary-stat-label">{t('本小时内发送消息', 'Messages sent this hour')}</span>
+            <span className="summary-stat-value">{stats.messagesSent}</span>
           </div>
-          <div>
-            {t('五子棋对局', 'Gomoku games')}:{' '}
-            <strong>{stats.gomokuPlayed}</strong>
-            {' · '}
-            {t('中国象棋对局', 'Chinese Chess games')}:{' '}
-            <strong>{stats.xiangqiPlayed}</strong>
+          <div className="summary-stat-row">
+            <span className="summary-stat-label">{t('五子棋对局', 'Gomoku games')}</span>
+            <span className="summary-stat-value">
+              {stats.gomokuPlayed}
+              <span className="summary-stat-sub">
+                {t('胜', 'W')} {stats.gomokuWins} · {t('负', 'L')} {stats.gomokuLosses}
+              </span>
+            </span>
           </div>
-          <div>
-            {t('胜利', 'Wins')}:{' '}
-            <strong>{stats.wins}</strong>
-            {' · '}
-            {t('失败', 'Losses')}:{' '}
-            <strong>{stats.losses}</strong>
+          <div className="summary-stat-row">
+            <span className="summary-stat-label">{t('中国象棋对局', 'Chinese Chess games')}</span>
+            <span className="summary-stat-value">
+              {stats.xiangqiPlayed}
+              <span className="summary-stat-sub">
+                {t('胜', 'W')} {stats.xiangqiWins} · {t('负', 'L')} {stats.xiangqiLosses}
+              </span>
+            </span>
           </div>
           {interactions.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              {t('互动过的用户', 'Users you interacted with')}:
-              <div style={{ marginTop: 4 }}>
+            <div className="summary-interactions">
+              <div className="summary-stat-label">{t('互动过的用户', 'Users you interacted with')}</div>
+              <div className="summary-interaction-list">
                 {interactions.map(([id, name]) => {
-                  const member = presence.find((m) => m.userId === id)!
+                  const member = presence.find((m) => m.userId === id)
+                  if (!member) return null
                   return (
                     <button
                       key={id}
                       type="button"
-                      style={{
-                        fontWeight: 700,
-                        color: '#2563eb',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        margin: '0 6px 4px 0',
-                        padding: 0,
-                        fontSize: 14,
-                      }}
+                      className="summary-interaction-name"
                       onClick={() => setSelected({ userId: id, name, member })}
                     >
                       {name}
