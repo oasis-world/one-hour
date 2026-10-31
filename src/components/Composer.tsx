@@ -220,7 +220,7 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
         <div className="composer-reply-preview">
           <div className="composer-reply-copy">
             <strong>{t('回复给', 'Replying to')} {replyTo.displayName}</strong>
-            <span>{replyTo.content || (replyTo.hasImage ? t('图片', 'Image') : '')}</span>
+            <span>{(replyTo.content || '').split('\n__GAME__:')[0].trim() || (replyTo.hasImage ? t('图片', 'Image') : '')}</span>
           </div>
           <button
             type="button"

@@ -65,6 +65,12 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   const [captureToastIsCheck, setCaptureToastIsCheck] = useState(false)
   const [captureToastIsWinner, setCaptureToastIsWinner] = useState(false)
   const captureToastTimerRef = useRef<number | null>(null)
+  const [startToast, setStartToast] = useState('')
+  const startToastTimerRef = useRef<number | null>(null)
+  const startToastKeyRef = useRef('')
+  const hydratedRef = useRef(false)
+  const prevStatusRef = useRef<XiangqiState['status']>('waiting')
+  const prevRoundRef = useRef(1)
   const [profileLooks, setProfileLooks] = useState<Record<string, { style: string; seed: string; url: string | null }>>({})
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false)
   const [spectatorsOpen, setSpectatorsOpen] = useState(false)
@@ -203,6 +209,37 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     if (captureToastTimerRef.current !== null) window.clearTimeout(captureToastTimerRef.current)
     captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 3400)
   }, [])
+
+  const showStartToast = useCallback(() => {
+    setStartToast(t('游戏开始！', 'Game start!'))
+    if (startToastTimerRef.current !== null) window.clearTimeout(startToastTimerRef.current)
+    startToastTimerRef.current = window.setTimeout(() => setStartToast(''), 2500)
+  }, [])
+
+  useEffect(() => {
+    if (!stateLoadedRef.current) return
+    if (!hydratedRef.current) {
+      hydratedRef.current = true
+      startToastKeyRef.current = `${state.round}:started`
+      prevStatusRef.current = state.status
+      prevRoundRef.current = state.round
+      return
+    }
+    if (state.status !== 'playing' || state.players.length < 2) {
+      prevStatusRef.current = state.status
+      prevRoundRef.current = state.round
+      return
+    }
+    const startKey = `${state.round}:started`
+    const isTransition = prevStatusRef.current !== 'playing' || prevRoundRef.current !== state.round
+    if (startToastKeyRef.current !== startKey && isTransition) {
+      startToastKeyRef.current = startKey
+      showStartToast()
+    }
+    prevStatusRef.current = state.status
+    prevRoundRef.current = state.round
+  }, [state.status, state.round, state.players.length, showStartToast])
+
   useEffect(() => { stateRef.current = state }, [state])
 
   useEffect(() => {
@@ -318,6 +355,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   useEffect(() => () => {
     if (aiTimerRef.current !== null) window.clearTimeout(aiTimerRef.current)
     if (captureToastTimerRef.current !== null) window.clearTimeout(captureToastTimerRef.current)
+    if (startToastTimerRef.current !== null) window.clearTimeout(startToastTimerRef.current)
   }, [])
 
   useEffect(() => {
@@ -400,6 +438,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
           if (stateSyncTimer !== null) window.clearInterval(stateSyncTimer)
           stateSyncTimer = null
           const normalized = normalizeAiColors(payload)
+          const prev = stateRef.current
           announceCapture(stateRef.current, normalized)
           stateLoadedRef.current = true
           channelRetryCountRef.current = 0
@@ -408,6 +447,11 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
           setReadyKey(channelKey)
           if (selfIdRef.current === normalized.hostId) scheduleAiTurn(normalized)
           reconcilePresence()
+          const startKey = `${normalized.round}:started`
+          if (normalized.status === 'playing' && normalized.players.length >= 2 && startToastKeyRef.current !== startKey && (prev.status !== 'playing' || prev.round !== normalized.round)) {
+            startToastKeyRef.current = startKey
+            showStartToast()
+          }
         }
       })
       channel.on('broadcast', { event: 'state-request' }, () => {
@@ -608,7 +652,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       if (channel) void channel.unsubscribe()
       channelRef.current = null
     }
-  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, channelAttempt, announceCapture, publishState, scheduleAiTurn])
+  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, channelAttempt, announceCapture, publishState, scheduleAiTurn, showStartToast])
 
   const sendMove = (fromR: number, fromC: number, toR: number, toC: number) => {
     if (!selfId) return
@@ -625,6 +669,13 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       const next = restartXiangqiRound(stateRef.current)
       publishState(next)
       scheduleAiTurn(next)
+      if (next.status === 'playing' && next.players.length >= 2) {
+        const startKey = `${next.round}:started`
+        if (startToastKeyRef.current !== startKey) {
+          startToastKeyRef.current = startKey
+          showStartToast()
+        }
+      }
     } else {
       channelRef.current?.send({ type: 'broadcast', event: 'rematch', payload: { round: stateRef.current.round } })
     }
@@ -661,6 +712,13 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         status: cur.players.length + 1 >= 2 ? 'playing' : 'waiting',
       }
       publishState(next)
+      if (next.status === 'playing' && next.players.length >= 2) {
+        const startKey = `${next.round}:started`
+        if (startToastKeyRef.current !== startKey) {
+          startToastKeyRef.current = startKey
+          showStartToast()
+        }
+      }
       return
     }
     const failJoin = () => {
@@ -678,7 +736,17 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     if (!channelReady || !selfId || !channelRef.current) return
     if (selfId === stateRef.current.hostId) {
       const next = addAiOpponent(stateRef.current)
-      if (next) { publishState(next); scheduleAiTurn(next) }
+      if (next) {
+        publishState(next)
+        scheduleAiTurn(next)
+        if (next.status === 'playing' && next.players.length >= 2) {
+          const startKey = `${next.round}:started`
+          if (startToastKeyRef.current !== startKey) {
+            startToastKeyRef.current = startKey
+            showStartToast()
+          }
+        }
+      }
     } else {
       channelRef.current.send({ type: 'broadcast', event: 'ai', payload: {} })
     }
@@ -821,6 +889,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
           <span>漢界</span>
         </div>
         {captureToast && <div className={`xiangqi-capture-toast${captureToastIsCheck ? ' is-check' : ''}${captureToastIsWinner ? ' is-winner' : ''}`} role="status" aria-live="assertive">{captureToast}</div>}
+        {startToast && <div className="xiangqi-start-toast" role="status" aria-live="assertive">{startToast}</div>}
         {state.board.map((row, r) =>
           row.map((cell, c) => {
             const isLastFrom = state.lastMove?.from[0] === r && state.lastMove.from[1] === c

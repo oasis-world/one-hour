@@ -224,6 +224,36 @@
   animation: gomoku-winner-glow 1.2s ease-in-out 3;
 }
 .gomoku-winner-toast::before { content: '★'; margin-right: 8px; color: #fff0b8; }
+.gomoku-start-toast {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 21;
+  width: max-content;
+  max-width: 84%;
+  box-sizing: border-box;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 12px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.35;
+  text-align: center;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: gomoku-start-fade 2.5s ease both;
+}
+@keyframes gomoku-start-fade {
+  0% { opacity: 0; transform: translate(-50%, -46%); }
+  8% { opacity: 1; transform: translate(-50%, -50%); }
+  92% { opacity: 1; transform: translate(-50%, -50%); }
+  100% { opacity: 0; transform: translate(-50%, -50%); }
+}
 @keyframes gomoku-winner-glow {
   0%, 100% { box-shadow: 0 0 0 3px rgba(196,147,50,0.16), 0 8px 24px rgba(62,39,7,0.35); }
   50% { box-shadow: 0 0 0 8px rgba(255,213,100,0.28), 0 8px 30px rgba(62,39,7,0.52); }

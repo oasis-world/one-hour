@@ -457,6 +457,44 @@
   animation: xiangqi-winner-glow 1.2s ease-in-out 3;
 }
 .xiangqi-capture-toast.is-winner::before { content: '★'; margin-right: 8px; color: #fff0b8; }
+.xiangqi-start-toast {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 9;
+  transform: translate(-50%, -50%);
+  width: max-content;
+  max-width: 84%;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 12px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.35;
+  text-align: center;
+  pointer-events: none;
+  animation: xiangqi-start-fade 2.5s ease both;
+}
+@keyframes xiangqi-start-fade {
+  0% { opacity: 0; transform: translate(-50%, -46%); }
+  8% { opacity: 1; transform: translate(-50%, -50%); }
+  92% { opacity: 1; transform: translate(-50%, -50%); }
+  100% { opacity: 0; transform: translate(-50%, -50%); }
+}
+.xiangqi-board--flipped .xiangqi-start-toast {
+  animation-name: xiangqi-start-fade-flipped;
+}
+@keyframes xiangqi-start-fade-flipped {
+  0% { opacity: 0; transform: translate(-50%, -46%) scaleY(-1); }
+  8% { opacity: 1; transform: translate(-50%, -50%) scaleY(-1); }
+  92% { opacity: 1; transform: translate(-50%, -50%) scaleY(-1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scaleY(-1); }
+}
 @keyframes xiangqi-winner-glow {
   0%, 100% { box-shadow: 0 0 0 3px rgba(196,147,50,0.16), 0 8px 24px rgba(62,39,7,0.35); }
   50% { box-shadow: 0 0 0 8px rgba(255,213,100,0.28), 0 8px 30px rgba(62,39,7,0.52); }

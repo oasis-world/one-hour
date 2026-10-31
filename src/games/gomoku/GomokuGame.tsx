@@ -52,6 +52,12 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   const [state, setState] = useState<GomokuState>(() => createInitialState(instanceId, hostUserId))
   const [winnerToast, setWinnerToast] = useState('')
   const winnerToastTimerRef = useRef<number | null>(null)
+  const [startToast, setStartToast] = useState('')
+  const startToastTimerRef = useRef<number | null>(null)
+  const startToastKeyRef = useRef('')
+  const hydratedRef = useRef(false)
+  const prevStatusRef = useRef<GomokuState['status']>('waiting')
+  const prevRoundRef = useRef(1)
   const [profileLooks, setProfileLooks] = useState<Record<string, { style: string; seed: string; url: string | null }>>({})
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false)
   const [spectatorsOpen, setSpectatorsOpen] = useState(false)
@@ -164,9 +170,40 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
     }, 350)
   }, [publishState])
 
+  const showStartToast = useCallback(() => {
+    setStartToast(t('游戏开始！', 'Game start!'))
+    if (startToastTimerRef.current !== null) window.clearTimeout(startToastTimerRef.current)
+    startToastTimerRef.current = window.setTimeout(() => setStartToast(''), 2500)
+  }, [])
+
+  useEffect(() => {
+    if (!stateLoadedRef.current) return
+    if (!hydratedRef.current) {
+      hydratedRef.current = true
+      startToastKeyRef.current = `${state.round}:started`
+      prevStatusRef.current = state.status
+      prevRoundRef.current = state.round
+      return
+    }
+    if (state.status !== 'playing' || state.players.length < 2) {
+      prevStatusRef.current = state.status
+      prevRoundRef.current = state.round
+      return
+    }
+    const startKey = `${state.round}:started`
+    const isTransition = prevStatusRef.current !== 'playing' || prevRoundRef.current !== state.round
+    if (startToastKeyRef.current !== startKey && isTransition) {
+      startToastKeyRef.current = startKey
+      showStartToast()
+    }
+    prevStatusRef.current = state.status
+    prevRoundRef.current = state.round
+  }, [state.status, state.round, state.players.length, showStartToast])
+
   useEffect(() => () => {
     if (aiTimerRef.current !== null) window.clearTimeout(aiTimerRef.current)
     if (winnerToastTimerRef.current !== null) window.clearTimeout(winnerToastTimerRef.current)
+    if (startToastTimerRef.current !== null) window.clearTimeout(startToastTimerRef.current)
   }, [])
 
   // Only the active host writes the canonical state. Spectators and stale tabs
@@ -263,11 +300,17 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
           stateSyncTimer = null
           stateLoadedRef.current = true
           channelRetryCountRef.current = 0
+          const prev = stateRef.current
           stateRef.current = payload
           setState(payload)
           setReadyChannelKey(channelKey)
           if (selfIdRef.current === payload.hostId) scheduleAiTurn(payload)
           reconcilePresence()
+          const startKey = `${payload.round}:started`
+          if (payload.status === 'playing' && payload.players.length >= 2 && startToastKeyRef.current !== startKey && (prev.status !== 'playing' || prev.round !== payload.round)) {
+            startToastKeyRef.current = startKey
+            showStartToast()
+          }
         }
       })
       channel.on('broadcast', { event: 'state-request' }, () => {
@@ -480,7 +523,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
       if (channel) void channel.unsubscribe()
       channelRef.current = null
     }
-  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, channelAttempt, publishState, scheduleAiTurn])
+  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, channelAttempt, publishState, scheduleAiTurn, showStartToast])
 
   const sendMove = (r: number, c: number) => {
     if (!selfId) return
@@ -500,6 +543,13 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
       const next = restartGomokuRound(stateRef.current)
       publishState(next)
       scheduleAiTurn(next)
+      if (next.status === 'playing' && next.players.length >= 2) {
+        const startKey = `${next.round}:started`
+        if (startToastKeyRef.current !== startKey) {
+          startToastKeyRef.current = startKey
+          showStartToast()
+        }
+      }
     } else {
       channelRef.current?.send({
         type: 'broadcast',
@@ -557,6 +607,13 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         status: cur.players.length + 1 >= 2 ? 'playing' : 'waiting',
       }
       publishState(next)
+      if (next.status === 'playing' && next.players.length >= 2) {
+        const startKey = `${next.round}:started`
+        if (startToastKeyRef.current !== startKey) {
+          startToastKeyRef.current = startKey
+          showStartToast()
+        }
+      }
       return
     }
     const failJoin = () => {
@@ -582,6 +639,13 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
       if (next) {
         publishState(next)
         scheduleAiTurn(next)
+        if (next.status === 'playing' && next.players.length >= 2) {
+          const startKey = `${next.round}:started`
+          if (startToastKeyRef.current !== startKey) {
+            startToastKeyRef.current = startKey
+            showStartToast()
+          }
+        }
       }
     } else {
       channelRef.current.send({ type: 'broadcast', event: 'ai', payload: {} })
@@ -713,6 +777,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         <span className="gomoku-grid-lines" aria-hidden="true" />
         <span className="gomoku-frame" aria-hidden="true" />
         {winnerToast && <div className="gomoku-winner-toast" role="status" aria-live="assertive">{winnerToast}</div>}
+        {startToast && <div className="gomoku-start-toast" role="status" aria-live="assertive">{startToast}</div>}
         {state.board.map((row, r) =>
           row.map((cell, c) => {
             const isWin = state.winningLine?.some(([wr, wc]) => wr === r && wc === c)

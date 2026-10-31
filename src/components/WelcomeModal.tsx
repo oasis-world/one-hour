@@ -83,18 +83,8 @@ export default function WelcomeModal({
       nicknameRef.current?.focus()
       return
     }
-    if (nickname.length < 2) {
-      setError(t('昵称至少 2 个字符', 'Nickname must be at least 2 characters'))
-      nicknameRef.current?.focus()
-      return
-    }
     if (!role) {
       setError(t('请输入角色', 'Role is required'))
-      roleRef.current?.focus()
-      return
-    }
-    if (role.length < 2) {
-      setError(t('角色至少 2 个字符', 'Role must be at least 2 characters'))
       roleRef.current?.focus()
       return
     }

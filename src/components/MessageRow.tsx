@@ -254,9 +254,14 @@ export default function MessageRow({
       </div>
       <div className="msg-main">
         <div className="msg-head">
-          <span className="msg-name" style={{ color: userNameColor(entry.userId) }}>
+          <button
+            type="button"
+            className="msg-name"
+            style={{ color: userNameColor(entry.userId) }}
+            onClick={toggleAuthor}
+          >
             {entry.displayName}
-          </span>
+          </button>
           <span className="msg-dot" aria-hidden="true" />
           <CountdownRing entry={entry} />
         </div>
@@ -270,7 +275,7 @@ export default function MessageRow({
           >
             <span className="msg-reply-name">{entry.replyTo.displayName}</span>
             <span className="msg-reply-content">
-              {entry.replyTo.content || (entry.replyTo.hasImage ? t('图片', 'Image') : '')}
+              {(entry.replyTo.content || '').split('\n__GAME__:')[0].trim() || (entry.replyTo.hasImage ? t('图片', 'Image') : '')}
             </span>
           </button>
         )}
