@@ -363,6 +363,7 @@ export default function MessageList({
           onReply={(entry) => {
             onReply({
               id: entry.id,
+              userId: entry.userId,
               displayName: entry.displayName,
               content: entry.content,
               hasImage: Boolean(entry.imageUrl || entry.localImage),

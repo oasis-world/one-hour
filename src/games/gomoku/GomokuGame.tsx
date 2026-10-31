@@ -4,6 +4,7 @@ import { isSupabaseConfigured } from '../../lib/supabaseConfig'
 import { useAccount } from '../../lib/useAccount'
 import { fetchCloudProfile } from '../../lib/profileCloud'
 import { loadUserProfile } from '../../lib/userProfile'
+import { recordGameResult, recordInteraction } from '../../lib/lifetimeStats'
 import { resolveChatIdentity } from '../../lib/identity'
 import { t, useLang } from '../../lib/i18n'
 import AvatarBadge from '../../components/AvatarBadge'
@@ -83,6 +84,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   const channelRetryCountRef = useRef(0)
   const profileLookRequestsRef = useRef(new Set<string>())
   const winnerToastKeyRef = useRef('')
+  const recordedRoundRef = useRef('')
   useEffect(() => {
     stateRef.current = state
   }, [state])
@@ -102,6 +104,19 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
     if (winnerToastTimerRef.current !== null) window.clearTimeout(winnerToastTimerRef.current)
     winnerToastTimerRef.current = window.setTimeout(() => setWinnerToast(''), 4000)
   }, [state.status, state.winnerId, state.round, state.players])
+
+  useEffect(() => {
+    if (!selfId || state.status !== 'result') return
+    const key = `${instanceId}:${state.round}`
+    if (recordedRoundRef.current === key) return
+    if (!state.players.some((p) => p.userId === selfId)) return
+    recordedRoundRef.current = key
+    recordGameResult('gomoku', selfId, state.winnerId ?? null, state.players.map((p) => p.userId))
+    for (const p of state.players) {
+      if (p.userId === selfId || p.isAI) continue
+      recordInteraction(p.userId, p.displayName, selfId)
+    }
+  }, [instanceId, selfId, state.status, state.round, state.winnerId, state.players])
   useEffect(() => {
     if (!selfId || !state.players.some((player) => player.userId === selfId)) return
     if (joinTimeoutRef.current !== null) window.clearTimeout(joinTimeoutRef.current)

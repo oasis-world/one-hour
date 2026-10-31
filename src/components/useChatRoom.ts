@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { enterChat, type ChatApi } from '../lib/chatSync'
 import type { ChatEntry, ChatStatus, MessageReply, PresenceMember } from '../lib/chatTypes'
 import { resolveChatIdentity, type ChatIdentity } from '../lib/identity'
+import { recordInteraction } from '../lib/lifetimeStats'
 import { useAccount } from '../lib/useAccount'
 import {
   applyRoomReactionChange,
@@ -75,8 +76,8 @@ export function useChatRoom(enabled: boolean) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, displayName, avatarKey, avatarUrl, profileDetails])
 
-  const send = useCallback((text: string, imageBlob?: Blob, replyTo?: MessageReply | null) => {
-    apiRef.current?.send(text, imageBlob, replyTo)
+  const send = useCallback((text: string, imageBlob?: Blob, replyTo?: MessageReply | null, options?: { expiresAt?: number; farewell?: boolean }) => {
+    apiRef.current?.send(text, imageBlob, replyTo, options)
   }, [])
   const retry = useCallback(() => apiRef.current?.retry(), [])
   const remove = useCallback((id: string) => apiRef.current?.remove(id), [])
@@ -90,6 +91,12 @@ export function useChatRoom(enabled: boolean) {
         reaction.userId === reactionUserId &&
         reaction.emoji === emoji,
     )
+    if (active) {
+      const target = entries.find((entry) => entry.id === messageId)
+      if (target && target.userId !== reactionUserId) {
+        recordInteraction(target.userId, target.displayName, reactionUserId)
+      }
+    }
     const change: RoomReactionChange = {
       messageId,
       userId: reactionUserId,
@@ -106,7 +113,7 @@ export function useChatRoom(enabled: boolean) {
       .catch(() => {
         setReactionRows((rows) => applyRoomReactionChange(rows, { ...change, active: !active }))
       })
-  }, [identity?.userId, reactionRows])
+  }, [identity?.userId, reactionRows, entries])
   const loadOlder = useCallback(() => {
     return (
       apiRef.current?.loadOlder() ?? Promise.resolve({ loaded: 0, hasMore: false })

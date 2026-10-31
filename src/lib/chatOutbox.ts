@@ -20,7 +20,10 @@ export interface ChatOutboxItem {
   avatarUrl?: string | null
   /** epoch ms */
   at: number
-  /** Failed send attempts so far (the current try not included). */
+  /** Optional per-message expiry (epoch ms). */
+  expiresAt?: number
+  /** Farewell message. */
+  farewell?: boolean  /** Failed send attempts so far (the current try not included). */
   attempts: number
   /** Downscaled image waiting for its storage upload. */
   imageBlob?: Blob

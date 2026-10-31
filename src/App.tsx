@@ -10,6 +10,7 @@ import MessageList from './components/MessageList'
 import SettingsBar from './components/SettingsBar'
 import TopBar from './components/TopBar'
 import WelcomeModal from './components/WelcomeModal'
+import SummaryModal from './components/SummaryModal'
 import ChatTopAvatar from './components/ChatTopAvatar'
 import { ChatBubbleIcon, ThinXIcon } from './components/icons'
 import { useChatRoom } from './components/useChatRoom'
@@ -25,6 +26,16 @@ import { fileToChatImage, looksLikeHeic } from './lib/imageBlob'
 import { withTimeout } from './lib/withTimeout'
 import { popoverJustClosed } from './lib/popoverGuard'
 import { useLang, t } from './lib/i18n'
+import {
+  loadPendingSummary,
+  savePendingSummary,
+  clearPendingSummary,
+  loadStats,
+  recordMessageSent,
+  recordInteraction,
+  resetStats,
+  type PendingSummary,
+} from './lib/lifetimeStats'
 import { pauseMessageMedia, resumeMessageMedia } from './lib/mediaPlayback'
 import { useBackgroundMusic } from './lib/useBackgroundMusic'
 import { loadCountdownAnimation, loadTheme, loadVeil, saveCountdownAnimation, type ThemeName } from './lib/settings'
@@ -158,21 +169,32 @@ export default function App() {
   const expiringRef = useRef(false)
   const currentUserId = room.identity?.userId
   const expireUserMessages = room.expireUserMessages
+  const [pendingSummary, setPendingSummary] = useState<PendingSummary | null>(() => loadPendingSummary())
   useEffect(() => {
     const check = () => {
+      // Already in summary window: nothing to do.
+      if (loadPendingSummary()) {
+        if (!pendingSummary) setPendingSummary(loadPendingSummary())
+        return
+      }
       const exp = getProfileExpiresAt()
       if (!exp || expiringRef.current) return
       if (Date.now() < exp) return
       expiringRef.current = true
       if (currentUserId) expireUserMessages(currentUserId)
-      void expireAnonymousProfile().finally(() => {
-        expiringRef.current = false
-      })
+      const summary: PendingSummary = {
+        stats: loadStats(),
+        profileExpiresAt: exp,
+        startedAt: Date.now(),
+      }
+      savePendingSummary(summary)
+      setPendingSummary(summary)
+      expiringRef.current = false
     }
     check()
     const id = window.setInterval(check, 1000)
     return () => window.clearInterval(id)
-  }, [currentUserId, expireUserMessages])
+  }, [currentUserId, expireUserMessages, pendingSummary])
 
   const systemTheme = (): ThemeName => {
     try {
@@ -247,6 +269,16 @@ export default function App() {
     toastTimer.current = window.setTimeout(() => setToast(null), 2600)
   }
 
+  const handleSummaryComplete = () => {
+    if (currentUserId) expireUserMessages(currentUserId)
+    void expireAnonymousProfile().finally(() => {
+      resetStats()
+      clearPendingSummary()
+      setPendingSummary(null)
+      expiringRef.current = false
+    })
+  }
+
   const closeChat = () => {
     if (fold !== 'open') return
     pauseMessageMedia()
@@ -272,6 +304,10 @@ export default function App() {
 
   const handleSend = (text: string, reply?: MessageReply | null) => {
     room.send(text, undefined, reply)
+    recordMessageSent()
+    if (reply?.userId && reply.userId !== (room.identity?.userId ?? null)) {
+      recordInteraction(reply.userId, reply.displayName, room.identity?.userId ?? undefined)
+    }
     setSentMessageSequence((sequence) => sequence + 1)
     setReplyTo(null)
   }
@@ -281,6 +317,7 @@ export default function App() {
     const game = getGameById(gameId)
     const title = game ? t(game.name, game.nameEn) : gameId
     room.send(`🎮 ${title}\n__GAME__:${gameId}:${instanceId}`, undefined, replyTo)
+    recordMessageSent()
     setSentMessageSequence((sequence) => sequence + 1)
     setReplyTo(null)
   }
@@ -299,6 +336,7 @@ export default function App() {
     try {
       const blob = await withTimeout(fileToChatImage(file), 60_000)
       room.send('', blob, replyTo)
+      recordMessageSent()
       setSentMessageSequence((sequence) => sequence + 1)
       setReplyTo(null)
     } catch {
@@ -328,6 +366,7 @@ export default function App() {
       try {
         const blob = await withTimeout(fileToChatImage(file), 60_000)
         room.send('', blob, replyForNext)
+        recordMessageSent()
         setSentMessageSequence((sequence) => sequence + 1)
         if (replyForNext) {
           replyForNext = null
@@ -593,12 +632,23 @@ export default function App() {
           }}
         />
       )} */}
-      {(!profile || welcomeOpen) && (
+      {pendingSummary ? (
+        <SummaryModal
+          stats={pendingSummary.stats}
+          presence={room.presence}
+          startedAt={pendingSummary.startedAt}
+          onComplete={handleSummaryComplete}
+          onFarewell={(userId, name, expiresAt, sentence) => {
+            void userId
+            room.send(`@${name} ${sentence}`, undefined, null, { expiresAt, farewell: true })
+          }}
+        />
+      ) : (!profile || welcomeOpen) ? (
         <WelcomeModal
           mode={profile ? 'edit' : 'welcome'}
           onClose={profile ? () => setWelcomeOpen(false) : undefined}
         />
-      )}
+      ) : null}
       {toast && <div className="app-toast">{toast}</div>}
     </div>
   )

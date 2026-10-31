@@ -56,7 +56,7 @@ export interface ChatCallbacks {
 }
 
 export interface ChatApi {
-  send(content: string, imageBlob?: Blob, replyTo?: MessageReply | null): void
+  send(content: string, imageBlob?: Blob, replyTo?: MessageReply | null, options?: { expiresAt?: number; farewell?: boolean }): void
   /** Retry every failed/pending message right now. */
   retry(): void
   /** Load and prepend the page older than the current oldest message. */
@@ -310,6 +310,8 @@ export function enterChat(
               avatar: item.avatar,
               avatarUrl: item.avatarUrl ?? null,
               imageBlob: item.imageBlob,
+              expiresAt: item.expiresAt,
+              farewell: item.farewell,
             })
           } catch {
             // One bad item must never wedge the queue (and the flush lock):
@@ -385,6 +387,8 @@ export function enterChat(
         content: item.content,
         replyTo: item.replyTo ?? null,
         at: item.at,
+        expiresAt: item.expiresAt,
+        farewell: item.farewell,
         state: 'pending',
       }
       if (item.imageBlob) {
@@ -510,7 +514,7 @@ export function enterChat(
   }, PURGE_INTERVAL_MS)
 
   return {
-    send(content, imageBlob, replyTo) {
+    send(content, imageBlob, replyTo, options) {
       const trimmed = content.trim()
       if ((!trimmed && !imageBlob) || closed) return
       const item: ChatOutboxItem = {
@@ -522,6 +526,8 @@ export function enterChat(
         avatarUrl: currentIdentity.avatarUrl,
         at: Date.now(),
         attempts: 0,
+        expiresAt: options?.expiresAt,
+        farewell: options?.farewell,
       }
       if (imageBlob) item.imageBlob = imageBlob
       const entry: ChatEntry = {
@@ -534,6 +540,8 @@ export function enterChat(
         content: trimmed,
         replyTo: replyTo ?? null,
         at: item.at,
+        expiresAt: options?.expiresAt,
+        farewell: options?.farewell,
         state: 'pending',
       }
       if (imageBlob) {

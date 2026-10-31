@@ -21,6 +21,7 @@ create table if not exists public.chat_messages (
   reply_to jsonb, -- snapshot of the message being replied to
   image_url text, -- public storage URL of the attached photo, null for text-only
   edited_at timestamptz, -- set when the author edits the message text
+  farewell boolean not null default false, -- goodbye message (special background)
   created_at timestamptz not null default now(),
   expires_at timestamptz not null default (now() + interval '1 hour'),
   constraint chat_messages_has_payload
@@ -33,6 +34,7 @@ alter table public.chat_messages add column if not exists avatar_seed text;
 alter table public.chat_messages add column if not exists avatar_url text;
 alter table public.chat_messages add column if not exists reply_to jsonb;
 alter table public.chat_messages add column if not exists edited_at timestamptz;
+alter table public.chat_messages add column if not exists farewell boolean not null default false;
 
 -- Full replica identity so Realtime UPDATE/DELETE payloads carry every column
 -- (including edited_at) instead of just the primary key.
@@ -280,11 +282,14 @@ as $$
 begin
   delete from public.chat_messages m
   where m.expires_at <= now()
-     or exists (
-       select 1 from public.profiles p
-       where p.user_id = m.user_id
-         and p.expires_at is not null
-         and p.expires_at <= now()
+     or (
+       not coalesce(m.farewell, false)
+       and exists (
+         select 1 from public.profiles p
+         where p.user_id = m.user_id
+           and p.expires_at is not null
+           and p.expires_at <= now()
+       )
      );
   delete from public.gomoku_states where expires_at <= now();
   delete from public.xiangqi_states where expires_at <= now();
@@ -391,7 +396,7 @@ security definer
 set search_path = public
 as $$
 begin
-  delete from public.chat_messages where user_id = old.user_id;
+  delete from public.chat_messages where user_id = old.user_id and expires_at <= now();
   return old;
 end;
 $$;

@@ -16,6 +16,10 @@ export interface ChatMessage {
   at: number
   /** Exact database timestamp for gap-free pagination + expiry anchor. */
   serverCreatedAt?: string
+  /** Optional per-message expiry (epoch ms); defaults to created_at + 1h. */
+  expiresAt?: number
+  /** Farewell message (special background). */
+  farewell?: boolean
   /** Public storage URL of the attached image, if any. */
   imageUrl?: string | null
   /** Set when the message text was edited after sending. */
@@ -24,6 +28,7 @@ export interface ChatMessage {
 
 export interface MessageReply {
   id: string
+  userId?: string
   displayName: string
   content: string
   hasImage: boolean

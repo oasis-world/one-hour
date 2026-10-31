@@ -79,6 +79,8 @@ export interface RoomHandle {
     avatar?: { style: string; seed: string }
     avatarUrl?: string | null
     imageBlob?: Blob
+    expiresAt?: number
+    farewell?: boolean
   }): Promise<{ ok: true } | { ok: false; error: 'network' | 'rejected' }>
   /** Author deletes one own message: dissolve here, purge the cloud row
    *  and, through the storage API (SQL deletes on storage.objects are
@@ -101,6 +103,8 @@ interface MessageRow {
   image_url: string | null
   created_at: string
   edited_at?: string | null
+  expires_at?: string
+  farewell?: boolean
 }
 
 interface ReactionRow {
@@ -418,6 +422,8 @@ export async function joinChatRoom(options: {
           content: draft.content || '',
           image_url: imageUrl,
           reply_to: draft.replyTo ?? null,
+          ...(draft.expiresAt ? { expires_at: new Date(draft.expiresAt).toISOString() } : {}),
+          ...(draft.farewell ? { farewell: true } : {}),
         }
         let payloadBase: Omit<typeof base, 'reply_to'> | typeof base = base
         let { error } = await withTimeout(
@@ -436,6 +442,8 @@ export async function joinChatRoom(options: {
             display_name: base.display_name,
             content: base.content,
             image_url: base.image_url,
+            ...(draft.expiresAt ? { expires_at: new Date(draft.expiresAt).toISOString() } : {}),
+            ...(draft.farewell ? { farewell: true } : {}),
           }
           const retry = await withTimeout(
             ctx.from(MESSAGES_TABLE).insert({
@@ -559,6 +567,8 @@ function rowToMessage(row: MessageRow): ChatMessage {
     replyTo: row.reply_to ?? null,
     at: new Date(row.created_at).getTime(),
     serverCreatedAt: row.created_at,
+    expiresAt: row.expires_at ? new Date(row.expires_at).getTime() : undefined,
+    farewell: row.farewell ?? false,
     imageUrl: row.image_url ?? null,
     editedAt: row.edited_at ?? null,
   }
@@ -573,7 +583,7 @@ function isNetworkError(error: { message?: string }): boolean {
 function isMissingColumnError(error: { message?: string; code?: string }): boolean {
   return (
     error.code === 'PGRST204' ||
-    /could not find the .*(avatar_(style|seed|url)|edited_at) column/i.test(error.message ?? '')
+    /could not find the .*(avatar_(style|seed|url)|edited_at|farewell|expires_at) column/i.test(error.message ?? '')
   )
 }
 

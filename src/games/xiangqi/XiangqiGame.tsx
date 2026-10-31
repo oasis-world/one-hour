@@ -4,6 +4,7 @@ import { isSupabaseConfigured } from '../../lib/supabaseConfig'
 import { useAccount } from '../../lib/useAccount'
 import { fetchCloudProfile } from '../../lib/profileCloud'
 import { loadUserProfile } from '../../lib/userProfile'
+import { recordGameResult, recordInteraction } from '../../lib/lifetimeStats'
 import { resolveChatIdentity } from '../../lib/identity'
 import { t, useLang } from '../../lib/i18n'
 import AvatarBadge from '../../components/AvatarBadge'
@@ -103,6 +104,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   const selfIdRef = useRef(selfId)
   const channelRetryCountRef = useRef(0)
   const profileLookRequestsRef = useRef(new Set<string>())
+  const recordedRoundRef = useRef('')
   const myColor = selfId ? colorOfPlayer(state, selfId) : null
   const currentBoard = state.board
   const currentLastMove = state.lastMove
@@ -202,6 +204,19 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 3400)
   }, [])
   useEffect(() => { stateRef.current = state }, [state])
+
+  useEffect(() => {
+    if (!selfId || state.status !== 'result') return
+    const key = `${instanceId}:${state.round}`
+    if (recordedRoundRef.current === key) return
+    if (!state.players.some((p) => p.userId === selfId)) return
+    recordedRoundRef.current = key
+    recordGameResult('xiangqi', selfId, state.winnerId ?? null, state.players.map((p) => p.userId))
+    for (const p of state.players) {
+      if (p.userId === selfId || p.isAI) continue
+      recordInteraction(p.userId, p.displayName, selfId)
+    }
+  }, [instanceId, selfId, state.status, state.round, state.winnerId, state.players])
   useEffect(() => { selfIdRef.current = selfId }, [selfId])
   useEffect(() => {
     if (!selfId || !state.players.some((player) => player.userId === selfId)) return

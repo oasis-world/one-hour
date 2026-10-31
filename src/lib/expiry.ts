@@ -9,9 +9,13 @@ export const MESSAGE_TTL_MS = 60 * 60 * 1000
 interface Expirable {
   at: number
   serverCreatedAt?: string
+  expiresAt?: number
 }
 
 export function expiresAtOf(entry: Expirable): number {
+  if (typeof entry.expiresAt === 'number' && Number.isFinite(entry.expiresAt)) {
+    return entry.expiresAt
+  }
   const anchor = entry.serverCreatedAt
     ? new Date(entry.serverCreatedAt).getTime()
     : entry.at

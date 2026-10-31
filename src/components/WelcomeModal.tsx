@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useLang, t } from '../lib/i18n'
+import { resetStats } from '../lib/lifetimeStats'
 import { useImeEnter } from '../lib/ime'
 import { useAccount } from '../lib/useAccount'
 import { pushProfileToCloud } from '../lib/profileCloud'
@@ -105,6 +106,7 @@ export default function WelcomeModal({
       seed: draft.seed,
       avatarUrl: draft.avatarUrl ?? null,
     })
+    if (mode !== 'edit') resetStats()
     // Anonymous users also live for one hour: stamp the expiry now.
     setProfileExpiresAt(Date.now() + PROFILE_LIFETIME_MS)
     // Returning player with a live session: the pick belongs in the cloud.

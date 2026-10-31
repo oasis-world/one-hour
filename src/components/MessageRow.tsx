@@ -192,6 +192,7 @@ export default function MessageRow({
         mine ? 'is-mine' : '',
         entry.state ? `is-${entry.state}` : '',
         entry.expiring ? 'is-expiring' : '',
+        entry.farewell ? 'is-farewell' : '',
         menuOpen ? 'is-menu-open' : '',
       ].join(' ')}
       onContextMenu={(e) => {
