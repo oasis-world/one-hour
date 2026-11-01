@@ -54,6 +54,23 @@ Deno.serve(async () => {
     (rows ?? []).map((r) => objectPathOf(r.image_url as string)).filter(Boolean),
   )
 
+  // Profile expiry state: an avatar is doomed when its owner has no profile
+  // row left, or the profile row is expired (anonymous identity vanished).
+  // Signed-in profiles (expires_at IS NULL) are never doomed.
+  const { data: profileRows } = await admin
+    .from('profiles')
+    .select('user_id, expires_at')
+  const profileExpiry = new Map<string, string | null>(
+    (profileRows ?? []).map((p) => [p.user_id as string, (p.expires_at as string | null) ?? null]),
+  )
+  const nowMs = Date.now()
+  const profileDoomed = (uid: string): boolean => {
+    if (!profileExpiry.has(uid)) return true // row already purged (or never existed)
+    const exp = profileExpiry.get(uid)
+    if (exp === null || exp === undefined) return false // signed-in: never expires
+    return new Date(exp).getTime() <= nowMs
+  }
+
   // Walk the bucket: one folder per player id, avatar-* skipped inside.
   const cutoff = Date.now() - MIN_AGE_MS
   const doomed: string[] = []
@@ -62,12 +79,19 @@ Deno.serve(async () => {
     .list(undefined, { limit: PAGE, sortBy: { column: 'name', order: 'asc' } })
   for (const folder of folders ?? []) {
     if (folder.id !== null) continue // root-level files are not ours
+    const uid = folder.name
+    const doomedProfile = profileDoomed(uid)
     const { data: files } = await admin.storage
       .from(BUCKET)
       .list(folder.name, { limit: PAGE })
     for (const file of files ?? []) {
       const path = `${folder.name}/${file.name}`
-      if (file.name.startsWith(AVATAR_PREFIX)) continue
+      if (file.name.startsWith(AVATAR_PREFIX)) {
+        // Avatar assets are persistent while the profile lives; once the
+        // profile is gone/expired, sweep every avatar-* file in the folder.
+        if (doomedProfile) doomed.push(path)
+        continue
+      }
       if (new Date(file.created_at ?? 0).getTime() > cutoff) continue
       if (live.has(path)) continue
       doomed.push(path)

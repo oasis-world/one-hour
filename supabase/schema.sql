@@ -296,6 +296,12 @@ begin
      );
   delete from public.gomoku_states where expires_at <= now();
   delete from public.xiangqi_states where expires_at <= now();
+  -- Purge expired anonymous profiles (and their now-orphaned messages were
+  -- already removed above). Signed-in profiles have expires_at IS NULL and
+  -- are never touched here.
+  delete from public.profiles
+   where expires_at is not null
+     and expires_at <= now();
   -- Drop game states whose card message is gone (expired or author vanished).
   delete from public.gomoku_states gs
   where not exists (
@@ -343,8 +349,9 @@ end $$;
 -- ── Player profiles ─────────────────────────────────────────────────────────
 --
 -- Nickname + DiceBear look (style name + seed, rendered client-side).
--- Written only for players who bind an email; the same row restores the
--- face on every device after sign-in. Never expires.
+-- Written for anonymous visitors (expires_at set, ~1 hour) and for players
+-- who bind an email (expires_at NULL, never expires). The hourly purge
+-- sweeps expired anonymous rows; signed-in rows are never touched.
 
 create table if not exists public.profiles (
   user_id uuid primary key references auth.users (id) on delete cascade,
@@ -360,6 +367,8 @@ create table if not exists public.profiles (
 alter table public.profiles add column if not exists avatar_url text;
 alter table public.profiles add column if not exists role text;
 alter table public.profiles add column if not exists expires_at timestamptz;
+
+create index if not exists profiles_expiry on public.profiles (expires_at);
 
 alter table public.profiles enable row level security;
 
