@@ -75,20 +75,25 @@ const categories = [
     emojis: list(`
       🏁 🚩 🎌 🏴 🏳️ 🏳️‍🌈 🏳️‍⚧️ 🏴‍☠️
       🇺🇸 🇨🇦 🇲🇽 🇧🇷 🇦🇷 🇬🇧 🇮🇪 🇫🇷 🇩🇪 🇪🇸 🇮🇹 🇵🇹 🇳🇱 🇧🇪 🇨🇭 🇸🇪 🇳🇴 🇩🇰 🇫🇮 🇵🇱 🇺🇦 🇷🇺 🇹🇷 🇬🇷
-      🇨🇳 🇭🇰 🇹🇼 🇯🇵 🇰🇷 🇮🇳 🇹🇭 🇻🇳 🇸🇬 🇲🇾 🇵🇭 🇮🇩 🇵🇰 🇦🇺 🇳🇿 🇿🇦 🇪🇬 🇳🇬 🇰🇪 🇦🇪 🇸🇦 🇮🇱 🇺🇳
+      🇨🇳 🇭🇰 🇯🇵 🇰🇷 🇮🇳 🇹🇭 🇻🇳 🇸🇬 🇲🇾 🇵🇭 🇮🇩 🇵🇰 🇦🇺 🇳🇿 🇿🇦 🇪🇬 🇳🇬 🇰🇪 🇦🇪 🇸🇦 🇮🇱 🇺🇳
     `),
   },
 ] as const
 
+const CATEGORY_ORDER = ['smileys', 'food', 'activities', 'animals', 'travel', 'objects', 'symbols', 'flags']
+
 const seen = new Set<string>()
-export const EMOJI_CATEGORIES = categories.map((category) => ({
-  ...category,
-  emojis: category.emojis.filter((emoji) => {
-    if (seen.has(emoji)) return false
-    seen.add(emoji)
-    return true
-  }),
-}))
+export const EMOJI_CATEGORIES = categories
+  .slice()
+  .sort((a, b) => CATEGORY_ORDER.indexOf(a.id) - CATEGORY_ORDER.indexOf(b.id))
+  .map((category) => ({
+    ...category,
+    emojis: category.emojis.filter((emoji) => {
+      if (seen.has(emoji)) return false
+      seen.add(emoji)
+      return true
+    }),
+  }))
 
 export const EMOJI_LIST = EMOJI_CATEGORIES.flatMap((category) => category.emojis)
 

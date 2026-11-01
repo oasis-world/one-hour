@@ -1992,18 +1992,35 @@ button {
 }
 
 .emoji-category-title {
-  position: sticky;
-  top: 0;
-  z-index: 1;
+  position: static;
   margin: 0;
   padding: 5px 4px 6px;
   background: var(--emoji-panel-bg);
   color: var(--ink-mute);
-  font-size: 11px;
+  font-size: 11px !important;
   font-weight: 750;
   letter-spacing: 0.04em;
   line-height: 1.2;
-  text-transform: uppercase;
+  text-transform: none;
+}
+
+.emoji-category-toggle {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  font-size: 11px !important;
+}
+
+.emoji-category-chevron {
+  font-size: 10px;
+  opacity: 0.7;
 }
 
 .emoji-no-results {
@@ -2016,7 +2033,7 @@ button {
 .emoji-category-grid {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: 4px;
+  gap: 2px;
 }
 
 .emoji-cell {
@@ -2466,27 +2483,27 @@ button {
 
   /* Keep the picker tall enough to show more choices above the keyboard. */
   .emoji-grid {
-    max-height: min(280px, 42vh);
+    max-height: min(320px, 42vh);
   }
   .emoji-panel {
-    width: min(280px, calc(100vw - 32px));
-    padding: 6px;
+    width: min(360px, calc(100vw - 32px));
+    padding: 12px;
   }
   .emoji-search {
-    margin-bottom: 4px;
+    margin-bottom: 8px;
   }
   .emoji-category + .emoji-category {
-    margin-top: 4px;
+    margin-top: 8px;
   }
   .emoji-category-title {
-    padding: 2.5px 4px 3px;
+    padding: 5px 4px 6px;
   }
   .emoji-category-grid {
-    grid-template-columns: repeat(6, 1fr);
-    gap: 2px;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 1px;
   }
   .emoji-cell {
-    font-size: 24px;
+    font-size: 26px;
   }
 
   /* Mobile: single-emoji messages render larger. */

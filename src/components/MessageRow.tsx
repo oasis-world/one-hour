@@ -6,6 +6,7 @@ import { setPopoverOpen, suppressNextClick } from '../lib/popoverGuard'
 import type { RoomReactionMap } from '../lib/chatReactions'
 import { isAutoTravelerName } from '../lib/nickname'
 import { findMessageMedia, stripRenderedMediaMarkup } from '../lib/messageMedia'
+import { EMOJI_LIST } from '../lib/emoji'
 import MessageMediaEmbed from './MessageMediaEmbed'
 import GameMessage from '../games/GameMessage'
 import { parseGameRef } from '../games/types'
@@ -61,7 +62,11 @@ function isSingleEmoji(text: string): boolean {
   } catch {
     if (Array.from(trimmed).length !== 1) return false
   }
-  return /\p{Extended_Pictographic}/u.test(trimmed)
+  // The picker's own list is the source of truth for what counts as a
+  // single emoji message (covers flags, symbols, keycaps, etc. that the
+  // narrower Extended_Pictographic property misses).
+  if (EMOJI_LIST.includes(trimmed)) return true
+  return /[\p{Extended_Pictographic}\p{Regional_Indicator}\u20E3]/u.test(trimmed)
 }
 
 function renderMessageContent(content: string): ReactNode {

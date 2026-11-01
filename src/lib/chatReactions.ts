@@ -20,8 +20,8 @@ export interface RoomReactionChange extends RoomReactionRecord {
 /** Player-global quick-emoji habits (input habit, not per room). */
 const QUICK_KEY = 'one-hour-chat-quick-emoji'
 
-/** How many recent picks are remembered; the row itself only shows up to 6. */
-const MAX_RECENT = 12
+/** How many recent picks are remembered for the emoji picker's Recent row. */
+const MAX_RECENT = 16
 
 /**
  * Default quick row, in order: hover bar shows the first 4, the right-click
@@ -50,7 +50,7 @@ function readStorage(): Storage | null {
 }
 
 /** Most-recent-first picks, sanitized (corrupt / foreign values fall away). */
-function loadRecent(): string[] {
+export function loadRecent(): string[] {
   const storage = readStorage()
   if (!storage) return []
   try {
