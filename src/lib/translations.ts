@@ -126,6 +126,9 @@ export const TRANSLATIONS: TranslationDict = {
     'Styles': '風格',
     'Email': '郵箱',
     'retry': '重試',
+    'Search emoji': '搜尋表情', 'No emoji found': '找不到表情',
+    'Smileys & People': '表情與人物', 'Animals & Nature': '動物與自然', 'Food & Drink': '食物與飲品',
+    'Activities': '活動與遊戲', 'Travel & Places': '旅行與地點', 'Objects': '物品與科技', 'Symbols': '符號', 'Flags': '旗幟',
   },
   ja: {
     'Games': 'ゲーム', 'Gomoku': '五目並べ', 'Chinese Chess': '中国象棋', 'Edit Message': 'メッセージを編集',
@@ -250,6 +253,9 @@ export const TRANSLATIONS: TranslationDict = {
     'Styles': 'スタイル',
     'Email': 'メール',
     'retry': '再試行',
+    'Search emoji': '絵文字を検索', 'No emoji found': '絵文字が見つかりません',
+    'Smileys & People': '顔文字と人', 'Animals & Nature': '動物と自然', 'Food & Drink': '食べ物と飲み物',
+    'Activities': 'アクティビティ', 'Travel & Places': '旅行と場所', 'Objects': '物', 'Symbols': '記号', 'Flags': '旗',
   },
   fr: {
     'Games': 'Jeux', 'Gomoku': 'Gomoku', 'Chinese Chess': 'Échecs chinois', 'Edit Message': 'Modifier le message',
@@ -375,6 +381,9 @@ export const TRANSLATIONS: TranslationDict = {
     'Styles': 'Styles',
     'Email': 'E-mail',
     'retry': 'réessayer',
+    'Search emoji': 'Rechercher un emoji', 'No emoji found': 'Aucun emoji trouvé',
+    'Smileys & People': 'Émoticônes et personnes', 'Animals & Nature': 'Animaux et nature', 'Food & Drink': 'Nourriture et boissons',
+    'Activities': 'Activités', 'Travel & Places': 'Voyages et lieux', 'Objects': 'Objets', 'Symbols': 'Symboles', 'Flags': 'Drapeaux',
   },
   es: {
     'Games': 'Juegos', 'Gomoku': 'Gomoku', 'Chinese Chess': 'Ajedrez chino', 'Edit Message': 'Editar mensaje',
@@ -500,6 +509,9 @@ export const TRANSLATIONS: TranslationDict = {
     'Styles': 'Estilos',
     'Email': 'Correo',
     'retry': 'reintentar',
+    'Search emoji': 'Buscar emoji', 'No emoji found': 'No se encontraron emojis',
+    'Smileys & People': 'Caras y personas', 'Animals & Nature': 'Animales y naturaleza', 'Food & Drink': 'Comida y bebida',
+    'Activities': 'Actividades', 'Travel & Places': 'Viajes y lugares', 'Objects': 'Objetos', 'Symbols': 'Símbolos', 'Flags': 'Banderas',
   },
   de: {
     'Games': 'Spiele', 'Gomoku': 'Gomoku', 'Chinese Chess': 'Chinesisches Schach', 'Edit Message': 'Nachricht bearbeiten',
@@ -625,6 +637,9 @@ export const TRANSLATIONS: TranslationDict = {
     'Styles': 'Stile',
     'Email': 'E-Mail',
     'retry': 'wiederholen',
+    'Search emoji': 'Emoji suchen', 'No emoji found': 'Keine Emojis gefunden',
+    'Smileys & People': 'Smileys & Personen', 'Animals & Nature': 'Tiere & Natur', 'Food & Drink': 'Essen & Trinken',
+    'Activities': 'Aktivitäten', 'Travel & Places': 'Reisen & Orte', 'Objects': 'Objekte', 'Symbols': 'Symbole', 'Flags': 'Flaggen',
   },
   ko: {
     'Games': '게임', 'Gomoku': '오목', 'Chinese Chess': '중국 장기', 'Edit Message': '메시지 수정',
@@ -750,6 +765,9 @@ export const TRANSLATIONS: TranslationDict = {
     'Styles': '스타일',
     'Email': '이메일',
     'retry': '재시도',
+    'Search emoji': '이모지 검색', 'No emoji found': '이모지를 찾을 수 없습니다',
+    'Smileys & People': '스마일리 및 사람', 'Animals & Nature': '동물 및 자연', 'Food & Drink': '음식 및 음료',
+    'Activities': '활동', 'Travel & Places': '여행 및 장소', 'Objects': '사물', 'Symbols': '기호', 'Flags': '깃발',
   },
   it: {
     'Games': 'Giochi', 'Gomoku': 'Gomoku', 'Chinese Chess': 'Scacchi cinesi', 'Edit Message': 'Modifica messaggio',
@@ -875,6 +893,9 @@ export const TRANSLATIONS: TranslationDict = {
     'Styles': 'Stili',
     'Email': 'Email',
     'retry': 'riprova',
+    'Search emoji': 'Cerca emoji', 'No emoji found': 'Nessuna emoji trovata',
+    'Smileys & People': 'Faccine e persone', 'Animals & Nature': 'Animali e natura', 'Food & Drink': 'Cibo e bevande',
+    'Activities': 'Attività', 'Travel & Places': 'Viaggi e luoghi', 'Objects': 'Oggetti', 'Symbols': 'Simboli', 'Flags': 'Bandiere',
   },
   ar: {
     'Games': 'الألعاب', 'Gomoku': 'غوموكو', 'Chinese Chess': 'شطرنج صيني', 'Edit Message': 'تعديل الرسالة',
@@ -1000,5 +1021,8 @@ export const TRANSLATIONS: TranslationDict = {
     'Styles': 'أنماط',
     'Email': 'البريد الإلكتروني',
     'retry': 'إعادة المحاولة',
+    'Search emoji': 'ابحث عن رمز تعبيري', 'No emoji found': 'لم يتم العثور على رموز تعبيرية',
+    'Smileys & People': 'الوجوه والأشخاص', 'Animals & Nature': 'الحيوانات والطبيعة', 'Food & Drink': 'الطعام والشراب',
+    'Activities': 'الأنشطة', 'Travel & Places': 'السفر والأماكن', 'Objects': 'الأشياء', 'Symbols': 'الرموز', 'Flags': 'الأعلام',
   },
 }
