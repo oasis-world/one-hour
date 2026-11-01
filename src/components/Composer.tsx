@@ -232,6 +232,7 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
           </button>
         </div>
       )}
+      {mobileForm && emojiOpen && <EmojiPanel onInsert={insertEmoji} />}
       <div className={`composer${multiline ? ' is-multiline' : ''}`}>
         <div className="composer-zone">
           <button
@@ -383,7 +384,7 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
             <EmojiIcon />
           </button>
 
-          {emojiOpen && <EmojiPanel onInsert={insertEmoji} />}
+          {!mobileForm && emojiOpen && <EmojiPanel onInsert={insertEmoji} />}
         </div>
 
         <button

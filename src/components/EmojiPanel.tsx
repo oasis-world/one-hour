@@ -1,4 +1,4 @@
-import { useState, type SyntheticEvent } from 'react'
+import { useEffect, useState, type SyntheticEvent } from 'react'
 import { EMOJI_CATEGORIES } from '../lib/emoji'
 import { t, useLang, type Lang } from '../lib/i18n'
 import { loadRecent, recordEmojiUse } from '../lib/chatReactions'
@@ -27,7 +27,35 @@ export default function EmojiPanel({ onInsert }: { onInsert: (emoji: string) => 
   const lang = useLang()
   const [recent, setRecent] = useState<string[]>(() => loadRecent())
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [gridMaxHeight, setGridMaxHeight] = useState<number | null>(null)
   const keepFocus = (e: SyntheticEvent) => e.preventDefault()
+
+  // Mobile: keep the whole popup visible above the composer when the soft
+  // keyboard is up — shrink the scrollable grid if space is tight.
+  useEffect(() => {
+    const isMobile = () =>
+      (window.matchMedia?.('(pointer: coarse)').matches ?? false) || window.innerWidth <= 820
+    if (!isMobile()) return
+    const update = () => {
+      const vv = window.visualViewport
+      if (!vv) return
+      const composer = document.querySelector('.composer') as HTMLElement | null
+      const rect = composer?.getBoundingClientRect()
+      const composerTopInViewport = rect ? rect.top - vv.offsetTop : vv.height
+      const available = composerTopInViewport - 16
+      const next = Math.max(60, Math.min(320, available - 40))
+      setGridMaxHeight(next)
+    }
+    update()
+    window.visualViewport?.addEventListener('resize', update)
+    window.visualViewport?.addEventListener('scroll', update)
+    window.addEventListener('resize', update)
+    return () => {
+      window.visualViewport?.removeEventListener('resize', update)
+      window.visualViewport?.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+    }
+  }, [])
 
   const toggle = (id: string) => {
     setCollapsed((prev) => {
@@ -46,7 +74,7 @@ export default function EmojiPanel({ onInsert }: { onInsert: (emoji: string) => 
 
   return (
     <div className="popover emoji-panel" role="dialog" aria-label={t('表情选择', 'Emoji picker')}>
-      <div className="emoji-grid" onMouseDown={(e) => e.preventDefault()}>
+      <div className="emoji-grid" onMouseDown={(e) => e.preventDefault()} style={gridMaxHeight ? { maxHeight: `${gridMaxHeight}px` } : undefined}>
         {recent.length > 0 && (
           <section className="emoji-category" aria-label={RECENT_LABEL[lang]}>
             <button

@@ -2490,8 +2490,12 @@ button {
     max-height: min(320px, 42vh);
   }
   .emoji-panel {
-    width: min(360px, calc(100vw - 32px));
+    width: min(380px, calc(100vw - 24px));
     padding: 12px;
+    position: static;
+    margin: 0 auto 8px;
+    right: auto;
+    left: auto;
   }
   .emoji-search {
     margin-bottom: 8px;

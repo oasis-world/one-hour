@@ -26,6 +26,15 @@ export default function SummaryModal({ stats, presence, selfId, startedAt, onCom
   const lang = useLang()
   const copy = SUMMARY_COPY[lang]
   const [now, setNow] = useState(startedAt)
+
+  // Mobile: dismiss the soft keyboard when the summary modal appears.
+  useEffect(() => {
+    const coarse = window.matchMedia?.('(pointer: coarse)').matches ?? false
+    const narrow = window.innerWidth <= 820
+    if (!coarse && !narrow) return
+    const el = document.activeElement
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.blur()
+  }, [])
   const [selected, setSelected] = useState<{ userId: string; name: string; member: PresenceMember } | null>(null)
   const completedRef = useRef(false)
 
