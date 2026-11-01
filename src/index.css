@@ -2019,7 +2019,11 @@ button {
 }
 
 .emoji-category-chevron {
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
   opacity: 0.7;
 }
 
