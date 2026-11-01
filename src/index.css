@@ -2016,6 +2016,7 @@ button {
 .emoji-category-grid {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
 }
 
 .emoji-cell {
@@ -2465,13 +2466,27 @@ button {
 
   /* Keep the picker tall enough to show more choices above the keyboard. */
   .emoji-grid {
-    max-height: min(320px, 42vh);
+    max-height: min(280px, 42vh);
+  }
+  .emoji-panel {
+    width: min(280px, calc(100vw - 32px));
+    padding: 6px;
+  }
+  .emoji-search {
+    margin-bottom: 4px;
+  }
+  .emoji-category + .emoji-category {
+    margin-top: 4px;
+  }
+  .emoji-category-title {
+    padding: 2.5px 4px 3px;
   }
   .emoji-category-grid {
     grid-template-columns: repeat(6, 1fr);
+    gap: 2px;
   }
   .emoji-cell {
-    font-size: 26px;
+    font-size: 24px;
   }
 
   /* Mobile: single-emoji messages render larger. */
@@ -2495,6 +2510,11 @@ button {
   /* Dock sits a touch lower; camera / emoji glyphs read bigger on touch. */
   .composer-dock {
     bottom: max(15px, env(safe-area-inset-bottom));
+  }
+
+  /* Mobile: reply preview bar spans 70% of the screen width. */
+  .composer-reply-preview {
+    width: 70%;
   }
 
   .composer-side-btn svg {

@@ -168,7 +168,7 @@ export default function BackgroundStage({
         const canvas = document.createElement('canvas')
         canvas.width = w
         canvas.height = h
-        const ctx = canvas.getContext('2d')
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
         if (!ctx) return
         ctx.drawImage(img, 0, 0, w, h)
         const sample = (x: number) => {

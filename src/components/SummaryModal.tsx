@@ -73,7 +73,7 @@ export default function SummaryModal({ stats, presence, selfId, startedAt, onCom
           <div className="summary-stat-row">
             <span className="summary-stat-label">{copy.gomoku}</span>
             <span className="summary-stat-value">
-              {stats.gomokuPlayed}
+              {copy.play} {stats.gomokuPlayed}
               <span className="summary-stat-sub">
                 {copy.wins} {stats.gomokuWins} · {copy.losses} {stats.gomokuLosses}
               </span>
@@ -82,7 +82,7 @@ export default function SummaryModal({ stats, presence, selfId, startedAt, onCom
           <div className="summary-stat-row">
             <span className="summary-stat-label">{copy.xiangqi}</span>
             <span className="summary-stat-value">
-              {stats.xiangqiPlayed}
+              {copy.play} {stats.xiangqiPlayed}
               <span className="summary-stat-sub">
                 {copy.wins} {stats.xiangqiWins} · {copy.losses} {stats.xiangqiLosses}
               </span>

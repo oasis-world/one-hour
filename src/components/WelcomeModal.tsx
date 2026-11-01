@@ -191,8 +191,12 @@ export default function WelcomeModal({
                   type="button"
                   className="field-clear"
                   aria-label={t('清空', 'Clear')}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
+                  tabIndex={-1}
+                  onPointerDown={(e) => { e.preventDefault(); e.stopPropagation() }}
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
                     setDraft((prev) => ({ ...prev, nickname: '' }))
                   }}
                 >
@@ -227,8 +231,12 @@ export default function WelcomeModal({
                   type="button"
                   className="field-clear"
                   aria-label={t('清空', 'Clear')}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
+                  tabIndex={-1}
+                  onPointerDown={(e) => { e.preventDefault(); e.stopPropagation() }}
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
                     setDraft((prev) => ({ ...prev, role: '' }))
                   }}
                 >
