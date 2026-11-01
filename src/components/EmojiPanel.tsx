@@ -61,7 +61,7 @@ export default function EmojiPanel({ onInsert }: { onInsert: (emoji: string) => 
             </button>
             {!collapsed.has('recent') && (
               <div className="emoji-category-grid">
-                {recent.slice(0, 16).map((emoji, i) => (
+                {recent.slice(0, 21).map((emoji, i) => (
                   <button
                     key={`recent-${emoji}-${i}`}
                     type="button"

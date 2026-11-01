@@ -21,7 +21,7 @@ export interface RoomReactionChange extends RoomReactionRecord {
 const QUICK_KEY = 'one-hour-chat-quick-emoji'
 
 /** How many recent picks are remembered for the emoji picker's Recent row. */
-const MAX_RECENT = 16
+const MAX_RECENT = 21
 
 /**
  * Default quick row, in order: hover bar shows the first 4, the right-click
