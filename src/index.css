@@ -1987,6 +1987,10 @@ button {
   scrollbar-color: var(--line) transparent;
 }
 
+.app-shell.is-keyboard-open .emoji-grid {
+  max-height: calc(min(320px, 42vh) - 20px);
+}
+
 .emoji-category + .emoji-category {
   margin-top: 8px;
 }
@@ -2507,7 +2511,7 @@ button {
     padding: 5px 4px 6px;
   }
   .emoji-category-grid {
-    grid-template-columns: repeat(8, 1fr);
+    grid-template-columns: repeat(7, 1fr);
     gap: 1px;
   }
   .emoji-cell {
