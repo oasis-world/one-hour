@@ -461,7 +461,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         if (cloudPollTimer !== null) window.clearTimeout(cloudPollTimer)
         cloudPollTimer = window.setTimeout(() => {
           cloudPollTimer = null
-          if (cancelled || statePolling || stateLoadedRef.current || !canSendGameBroadcast(channel)) return
+          if (cancelled || statePolling || stateLoadedRef.current) return
           statePolling = true
           const requestController = new AbortController()
           const abortRequest = () => requestController.abort()
@@ -469,7 +469,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
           void withTimeout(loadGomokuState(instanceId, requestController.signal), 5000)
             .then(({ state: saved, ok }) => {
               if (!ok) throw new Error('could not load the game state')
-              if (cancelled || !canSendGameBroadcast(channel) || stateLoadedRef.current) return
+              if (cancelled || stateLoadedRef.current) return
               cloudStateChecked = true
               cloudPollAttempt = 0
               channelRetryCountRef.current = 0
@@ -477,12 +477,12 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
                 stateLoadedRef.current = true
                 stateRef.current = saved
                 setState(saved)
-                if (selfIdRef.current === saved.hostId) {
+                if (selfIdRef.current === saved.hostId && canSendGameBroadcast(channel)) {
                   sendGameBroadcast(channel, 'state', saved)
                   scheduleAiTurn(saved)
                 }
-                setReadyChannelKey(channelKey)
-              } else {
+                if (canSendGameBroadcast(channel)) setReadyChannelKey(channelKey)
+              } else if (canSendGameBroadcast(channel)) {
                 reconcilePresence()
               }
             })
@@ -500,6 +500,9 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
             })
         }, delay)
       }
+      // Hydrate the visible board independently of Realtime subscription
+      // latency; the channel will publish/catch up as soon as it is ready.
+      scheduleCloudStateLoad(0)
       await channel.subscribe(async (status, error) => {
         if (status === 'SUBSCRIBED') {
           if (reconnectTimer !== null) window.clearTimeout(reconnectTimer)
@@ -529,8 +532,6 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
             if (stateLoadedRef.current) {
               if (selfId === stateRef.current.hostId) sendGameBroadcast(channel, 'state', stateRef.current)
               setReadyChannelKey(channelKey)
-            } else {
-              scheduleCloudStateLoad(0)
             }
             // Players join only by clicking "Join game" — never auto-join.
           } catch (error) {

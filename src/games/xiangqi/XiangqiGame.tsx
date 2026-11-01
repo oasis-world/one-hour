@@ -600,7 +600,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         if (cloudPollTimer !== null) window.clearTimeout(cloudPollTimer)
         cloudPollTimer = window.setTimeout(() => {
           cloudPollTimer = null
-          if (cancelled || statePolling || stateLoadedRef.current || !canSendGameBroadcast(channel)) return
+          if (cancelled || statePolling || stateLoadedRef.current) return
           statePolling = true
           const requestController = new AbortController()
           const abortRequest = () => requestController.abort()
@@ -608,7 +608,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
           void withTimeout(loadXiangqiState(instanceId, requestController.signal), 5000)
             .then(({ state: saved, ok }) => {
               if (!ok) throw new Error('could not load the game state')
-              if (cancelled || !canSendGameBroadcast(channel) || stateLoadedRef.current) return
+              if (cancelled || stateLoadedRef.current) return
               cloudStateChecked = true
               cloudPollAttempt = 0
               if (saved) {
@@ -618,11 +618,13 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
                 stateRef.current = normalized
                 setState(normalized)
                 if (selfIdRef.current === normalized.hostId) {
-                  sendGameBroadcast(channel, 'state', normalized)
-                  scheduleAiTurn(normalized)
+                  if (canSendGameBroadcast(channel)) {
+                    sendGameBroadcast(channel, 'state', normalized)
+                    scheduleAiTurn(normalized)
+                  }
                 }
-                setReadyKey(channelKey)
-              } else {
+                if (canSendGameBroadcast(channel)) setReadyKey(channelKey)
+              } else if (canSendGameBroadcast(channel)) {
                 reconcilePresence()
               }
             })
@@ -640,6 +642,9 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
             })
         }, delay)
       }
+      // Hydrate the visible board independently of Realtime subscription
+      // latency; the channel will publish/catch up as soon as it is ready.
+      scheduleCloudStateLoad(0)
       await channel.subscribe(async (status: string, error) => {
         if (status === 'SUBSCRIBED') {
           if (reconnectTimer !== null) window.clearTimeout(reconnectTimer)
@@ -669,8 +674,6 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
             if (stateLoadedRef.current) {
               if (selfId === stateRef.current.hostId) sendGameBroadcast(channel, 'state', stateRef.current)
               setReadyKey(channelKey)
-            } else {
-              scheduleCloudStateLoad(0)
             }
           } catch (error) {
             retryChannel('initialization failed', error)

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { parseGameRef } from './types'
 import { getGameById } from './registry'
 import type { PresenceMember } from '../lib/chatTypes'
@@ -18,25 +18,27 @@ export default function GameMessage({ content, hostUserId, onlineMembers = [], i
   const gameRef = parseGameRef(content)
   const instanceId = gameRef?.instanceId
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = elementRef.current
     if (!instanceId || !element) return
     const root = element.closest('.chat-log')
+    const column = element.closest('.chat-column')
     let frame = 0
     const settleTimers: number[] = []
     const measureVisibility = () => {
       frame = 0
-      if (document.hidden) {
-        setIsInView(false)
-        return
-      }
+      // A background tab is not evidence that this game left the viewport.
+      // Keep mounted games (and their live state) intact while the page is
+      // hidden; visibility is measured again as soon as it becomes active.
+      if (document.hidden) return
       const bounds = element.getBoundingClientRect()
       const rootBounds = root?.getBoundingClientRect()
       const left = Math.max(bounds.left, rootBounds?.left ?? 0, 0)
       const right = Math.min(bounds.right, rootBounds?.right ?? window.innerWidth, window.innerWidth)
       const top = Math.max(bounds.top, rootBounds?.top ?? 0, 0)
       const bottom = Math.min(bounds.bottom, rootBounds?.bottom ?? window.innerHeight, window.innerHeight)
-      setIsInView(right > left && bottom > top)
+      const visible = right > left && bottom > top
+      setIsInView((current) => current === visible ? current : visible)
     }
     const scheduleMeasure = () => {
       if (frame) return
@@ -45,21 +47,42 @@ export default function GameMessage({ content, hostUserId, onlineMembers = [], i
     const observer = typeof IntersectionObserver === 'undefined'
       ? null
       : new IntersectionObserver(([entry]) => {
-          setIsInView(Boolean(entry?.isIntersecting))
-          if (!entry?.isIntersecting) scheduleMeasure()
-        }, { root, threshold: 0 })
+          if (document.hidden) return
+          if (entry?.isIntersecting) setIsInView(true)
+          else scheduleMeasure()
+        }, { root, rootMargin: '120px 0px', threshold: 0 })
     observer?.observe(element)
     root?.addEventListener('scroll', scheduleMeasure, { passive: true })
     window.addEventListener('resize', scheduleMeasure)
     window.addEventListener('orientationchange', scheduleMeasure)
-    window.addEventListener('pageshow', scheduleMeasure)
-    document.addEventListener('visibilitychange', scheduleMeasure)
+    const measureOnReturn = () => {
+      if (document.hidden) return
+      measureVisibility()
+      scheduleMeasure()
+    }
+    const measureAfterUnfold = (event: Event) => {
+      if ((event as AnimationEvent).animationName !== 'fold-back') return
+      // The chat column enters the viewport through a transform animation.
+      // ResizeObserver does not report transforms, so explicitly remeasure
+      // while it unfolds and once the final geometry has settled.
+      for (const delay of [120, 280, 540]) {
+        settleTimers.push(window.setTimeout(scheduleMeasure, delay))
+      }
+    }
+    const measureAfterAnimation = () => scheduleMeasure()
+    column?.addEventListener('animationstart', measureAfterUnfold)
+    column?.addEventListener('animationend', measureAfterAnimation)
+    window.addEventListener('pageshow', measureOnReturn)
+    document.addEventListener('visibilitychange', measureOnReturn)
     const viewport = window.visualViewport
     viewport?.addEventListener('resize', scheduleMeasure)
     viewport?.addEventListener('scroll', scheduleMeasure)
     const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleMeasure)
     resizeObserver?.observe(element)
     if (root) resizeObserver?.observe(root)
+    // Measure before paint so an already-visible game never flashes the
+    // empty placeholder while waiting for IntersectionObserver's first tick.
+    measureVisibility()
     scheduleMeasure()
     // Mobile browsers can restore scroll position after the first layout and
     // after passive effects run. Recheck as that restoration settles so a
@@ -71,10 +94,12 @@ export default function GameMessage({ content, hostUserId, onlineMembers = [], i
       observer?.disconnect()
       resizeObserver?.disconnect()
       root?.removeEventListener('scroll', scheduleMeasure)
+      column?.removeEventListener('animationstart', measureAfterUnfold)
+      column?.removeEventListener('animationend', measureAfterAnimation)
       window.removeEventListener('resize', scheduleMeasure)
       window.removeEventListener('orientationchange', scheduleMeasure)
-      window.removeEventListener('pageshow', scheduleMeasure)
-      document.removeEventListener('visibilitychange', scheduleMeasure)
+      window.removeEventListener('pageshow', measureOnReturn)
+      document.removeEventListener('visibilitychange', measureOnReturn)
       viewport?.removeEventListener('resize', scheduleMeasure)
       viewport?.removeEventListener('scroll', scheduleMeasure)
       if (frame) window.cancelAnimationFrame(frame)
