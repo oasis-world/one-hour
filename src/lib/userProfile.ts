@@ -229,11 +229,28 @@ const ROLES_BY_LANG: Partial<Record<Lang, readonly string[]>> = {
   fr: ROLES_FR, es: ROLES_ES, de: ROLES_DE, ko: ROLES_KO, it: ROLES_IT, ar: ROLES_AR,
 }
 
+/** How many recently produced values to avoid repeating, per language. */
+const RECENT_ROLE_COUNT = 10
+const RECENT_NICK_COUNT = 24
+const recentRoles = new Map<Lang, string[]>()
+const recentNicks = new Map<Lang, string[]>()
+
 export function randomRole(previous?: string | null, lang: Lang = getLang()): string {
   const list = ROLES_BY_LANG[lang] ?? ROLES_EN
   const pick = () => list[Math.floor(Math.random() * list.length)]
+  const recent = recentRoles.get(lang) ?? []
   let role = pick()
-  while (previous != null && previous !== '' && role === previous) role = pick()
+  let tries = 0
+  while (
+    (previous != null && previous !== '' && role === previous) ||
+    (recent.includes(role) && tries < list.length)
+  ) {
+    role = pick()
+    tries++
+    if (tries > list.length * 2) break
+  }
+  const next = [role, ...recent.filter((r) => r !== role)].slice(0, RECENT_ROLE_COUNT)
+  recentRoles.set(lang, next)
   return role
 }
 
@@ -292,9 +309,18 @@ export function randomNickname(previous?: string | null, lang: Lang = getLang())
   const { a, b } = NICKNAMES_BY_LANG[lang]
   const pick = <T,>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)]
   const join = (x: string, y: string) => (isCjkLang(lang) ? `${x}${y}` : `${x} ${y}`)
+  const recent = recentNicks.get(lang) ?? []
   let name = join(pick(a), pick(b))
-  while (previous != null && previous !== '' && name === previous) {
+  let tries = 0
+  while (
+    (previous != null && previous !== '' && name === previous) ||
+    (recent.includes(name) && tries < a.length * b.length)
+  ) {
     name = join(pick(a), pick(b))
+    tries++
+    if (tries > a.length * b.length * 2) break
   }
+  const next = [name, ...recent.filter((n) => n !== name)].slice(0, RECENT_NICK_COUNT)
+  recentNicks.set(lang, next)
   return name
 }
