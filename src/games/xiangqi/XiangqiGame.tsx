@@ -12,7 +12,7 @@ import OnlineList from '../../components/OnlineList'
 import type { PresenceMember } from '../../lib/chatTypes'
 import { setPopoverOpen } from '../../lib/popoverGuard'
 import { withTimeout } from '../../lib/withTimeout'
-import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGamePresenceUsers, isGameHostAuthority, sendGameBroadcast } from '../realtime'
+import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGamePresenceUsers, isGameHostAuthority, sendGameBroadcast, watchGameChannelClose } from '../realtime'
 import { chooseAiMove } from './ai'
 import { loadXiangqiState, saveXiangqiState } from './cloudState'
 import { PaletteIcon } from '../../components/icons'
@@ -379,6 +379,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   }, [channelReady, instanceId, selfId, state])
 
   const isMyTurn = myColor !== null && state.turn === myColor && state.status === 'playing'
+  const isRealtimeReady = () => channelReady && canSendGameBroadcast(channelRef.current)
 
   useEffect(() => {
     if (!isSupabaseConfigured() || !selfId) return
@@ -409,7 +410,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       joinTimeoutRef.current = null
       setJoinStatus((status) => status === 'joining' ? 'retry' : status)
       setReadyKey('')
-      const delays = [1000, 2000, 5000, 10000, 30000, 60000]
+      const delays = [1000, 2000, 5000, 10000, 15000]
       const baseDelay = delays[Math.min(channelRetryCountRef.current, delays.length - 1)]
       const delay = Math.round(baseDelay * (0.8 + Math.random() * 0.4))
       console.warn(`Xiangqi channel ${reason}; retrying in ${delay}ms`, {
@@ -440,6 +441,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       }
       channel = client.channel(`game:xiangqi:${instanceId}`, { config: { presence: { key: presenceKey } } })
       channelRef.current = channel
+      watchGameChannelClose(channel, 'Xiangqi', instanceId, () => !cancelled)
 
       const initializeIfNeeded = () => {
         if (!cloudStateChecked || stateLoadedRef.current || cancelled) return
@@ -455,7 +457,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       }
 
       channel.on('broadcast', { event: 'state' }, ({ payload }: { payload: unknown }) => {
-        if (isXiangqiState(payload, instanceId)) {
+        if (!cancelled && canSendGameBroadcast(channel) && isXiangqiState(payload, instanceId)) {
           if (stateSyncTimer !== null) window.clearInterval(stateSyncTimer)
           stateSyncTimer = null
           const normalized = normalizeAiColors(payload)
@@ -735,16 +737,16 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, channelAttempt, presenceKey, announceCapture, publishState, scheduleAiTurn, showStartToast])
 
   const sendMove = (fromR: number, fromC: number, toR: number, toC: number) => {
-    if (!selfId) return
+    if (!selfId || !isRealtimeReady()) return
     if (selfId === stateRef.current.hostId) {
       const next = tryMove(stateRef.current, selfId, fromR, fromC, toR, toC)
       if (next) { announceCapture(stateRef.current, next); publishState(next); scheduleAiTurn(next) }
     } else {
-      if (!channelReady || !canSendGameBroadcast(channelRef.current)) return
       sendGameBroadcast(channelRef.current, 'move', { userId: selfId, fromR, fromC, toR, toC })
     }
   }
   const sendRematch = () => {
+    if (!selfId || !isRealtimeReady()) return
     if (selfId === stateRef.current.hostId) {
       const next = restartXiangqiRound(stateRef.current)
       publishState(next)
@@ -757,23 +759,25 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         }
       }
     } else {
-      if (!channelReady || !canSendGameBroadcast(channelRef.current)) return
       sendGameBroadcast(channelRef.current, 'rematch', { round: stateRef.current.round })
     }
   }
   const leaveRoom = () => {
+    if (!selfId || !isRealtimeReady()) return
     setLeaveConfirmOpen(false)
-    if (!selfId) return
     if (selfId === stateRef.current.hostId) {
       const next = removeXiangqiPlayer(stateRef.current, selfId)
       if (next) publishState(next)
     } else {
-      if (!channelReady || !canSendGameBroadcast(channelRef.current)) return
       sendGameBroadcast(channelRef.current, 'leave', { userId: selfId })
     }
   }
   const sendJoin = () => {
     if (!selfId || joinStatus === 'joining') return
+    if (!isRealtimeReady()) {
+      setJoinStatus('retry')
+      return
+    }
     setJoinStatus('joining')
     if (selfId === stateRef.current.hostId) {
       const cur = stateRef.current
@@ -803,10 +807,6 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       }
       return
     }
-    if (!channelReady || !canSendGameBroadcast(channelRef.current)) {
-      setJoinStatus('retry')
-      return
-    }
     const failJoin = () => {
       if (stateRef.current.players.some((player) => player.userId === selfId)) return
       if (joinTimeoutRef.current !== null) window.clearTimeout(joinTimeoutRef.current)
@@ -824,7 +824,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     }, failJoin)
   }
   const sendAiJoin = () => {
-    if (!selfId) return
+    if (!selfId || !isRealtimeReady()) return
     if (selfId === stateRef.current.hostId) {
       const next = addAiOpponent(stateRef.current)
       if (next) {
@@ -839,7 +839,6 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         }
       }
     } else {
-      if (!channelReady || !canSendGameBroadcast(channelRef.current)) return
       sendGameBroadcast(channelRef.current, 'ai', {})
     }
   }
@@ -852,7 +851,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   }, [state.lastMove, state.turn, state.status])
 
   const onCellClick = (r: number, c: number) => {
-    if (!isMyTurn) return
+    if (!isRealtimeReady() || !isMyTurn) return
     const side = sideOfColor(myColor!)
     const piece = state.board[r][c]
     // if selected and target legal
@@ -883,7 +882,6 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   }
 
   const isPlayer = myColor !== null
-  const isLocalHost = selfId === state.hostId
   const spectators = onlineMembers.filter((member) => !state.players.some((player) => player.userId === member.userId))
   const canJoin = !isPlayer && state.players.length < 2 && (state.status === 'waiting' || state.status === 'result')
   const canJoinAI = isPlayer && state.players.length === 1 && state.status === 'waiting'
@@ -1009,18 +1007,18 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
 
       <div className="xiangqi-actions">
         {canJoin && (
-          <button type="button" className="btn-accent" disabled={(!channelReady && !isLocalHost) || !selfId || joinStatus === 'joining'} aria-busy={joinStatus === 'joining'} onClick={sendJoin}>
-            {!channelReady && !isLocalHost || !selfId ? t('重新连接中…', 'Reconnecting…') : joinStatus === 'joining' ? t('正在加入…', 'Joining…') : joinStatus === 'retry' ? t('加入较慢，点击重试', 'Taking longer; tap to retry') : t('加入游戏', 'Join game')}
+          <button type="button" className="btn-accent" disabled={!channelReady || !selfId || joinStatus === 'joining'} aria-busy={joinStatus === 'joining'} onClick={sendJoin}>
+            {!channelReady || !selfId ? t('重新连接中…', 'Reconnecting…') : joinStatus === 'joining' ? t('正在加入…', 'Joining…') : joinStatus === 'retry' ? t('加入较慢，点击重试', 'Taking longer; tap to retry') : t('加入游戏', 'Join game')}
           </button>
         )}
         {canJoinAI && (
-          <button type="button" className="btn-accent" disabled={!selfId || (!channelReady && !isLocalHost)} onClick={sendAiJoin}>{t('与 AI 对战', 'Play vs AI')}</button>
+          <button type="button" className="btn-accent" disabled={!channelReady || !selfId} onClick={sendAiJoin}>{t('与 AI 对战', 'Play vs AI')}</button>
         )}
         {canRestart && (
-          <button type="button" className="btn-accent" disabled={!selfId || (!channelReady && !isLocalHost)} onClick={sendRematch}>{t('重新开始', 'Restart')}</button>
+          <button type="button" className="btn-accent" disabled={!channelReady || !selfId} onClick={sendRematch}>{t('重新开始', 'Restart')}</button>
         )}
         {canLeave && (
-          <button type="button" className="btn-accent" disabled={!selfId || (!channelReady && !isLocalHost)} onClick={() => setLeaveConfirmOpen(true)}>{t('离开房间', 'Leave room')}</button>
+          <button type="button" className="btn-accent" disabled={!channelReady || !selfId} onClick={() => setLeaveConfirmOpen(true)}>{t('离开房间', 'Leave room')}</button>
         )}
       </div>
 
@@ -1031,7 +1029,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
             <p>{t('离开后棋盘会重置，你可以之后重新加入。', 'The board will reset when you leave. You can join again later.')}</p>
             <div className="xiangqi-confirm-actions">
               <button type="button" className="xiangqi-confirm-cancel" onClick={() => setLeaveConfirmOpen(false)}>{t('继续游戏', 'Stay')}</button>
-              <button type="button" className="btn-accent" onClick={leaveRoom}>{t('离开房间', 'Leave room')}</button>
+              <button type="button" className="btn-accent" disabled={!channelReady} onClick={leaveRoom}>{t('离开房间', 'Leave room')}</button>
             </div>
           </div>
         </div>

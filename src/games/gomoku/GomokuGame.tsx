@@ -12,7 +12,7 @@ import OnlineList from '../../components/OnlineList'
 import type { PresenceMember } from '../../lib/chatTypes'
 import { setPopoverOpen } from '../../lib/popoverGuard'
 import { withTimeout } from '../../lib/withTimeout'
-import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGamePresenceUsers, isGameHostAuthority, sendGameBroadcast } from '../realtime'
+import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGamePresenceUsers, isGameHostAuthority, sendGameBroadcast, watchGameChannelClose } from '../realtime'
 import { chooseAiMove } from './ai'
 import { loadGomokuState, saveGomokuState } from './cloudState'
 import { PaletteIcon } from '../../components/icons'
@@ -21,6 +21,7 @@ import './GomokuBoardStyles.css'
 
 const BOARD_STYLES = ['classic', 'minimal', 'dark', 'neon', 'ocean', 'sakura', 'forest', 'retro', 'glass'] as const
 type BoardStyle = (typeof BOARD_STYLES)[number]
+const currentTimestamp = () => Date.now()
 import {
   addAiOpponent,
   colorOfPlayer,
@@ -230,6 +231,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
 
   const myColor = selfId ? colorOfPlayer(state, selfId) : null
   const isMyTurn = myColor !== null && state.turn === myColor && state.status === 'playing'
+  const isRealtimeReady = () => channelReady && canSendGameBroadcast(channelRef.current)
 
   useEffect(() => {
     if (!isSupabaseConfigured() || !selfId) return
@@ -260,7 +262,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
       joinTimeoutRef.current = null
       setJoinStatus((status) => status === 'joining' ? 'retry' : status)
       setReadyChannelKey('')
-      const delays = [1000, 2000, 5000, 10000, 30000, 60000]
+      const delays = [1000, 2000, 5000, 10000, 15000]
       const baseDelay = delays[Math.min(channelRetryCountRef.current, delays.length - 1)]
       const delay = Math.round(baseDelay * (0.8 + Math.random() * 0.4))
       console.warn(`Gomoku channel ${reason}; retrying in ${delay}ms`, {
@@ -293,6 +295,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         config: { presence: { key: presenceKey } },
       })
       channelRef.current = channel
+      watchGameChannelClose(channel, 'Gomoku', instanceId, () => !cancelled)
 
       const initializeIfNeeded = () => {
         if (!cloudStateChecked || stateLoadedRef.current || cancelled) return
@@ -310,7 +313,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
       }
 
       channel.on('broadcast', { event: 'state' }, ({ payload }) => {
-        if (isGomokuState(payload, instanceId)) {
+        if (!cancelled && canSendGameBroadcast(channel) && isGomokuState(payload, instanceId)) {
           if (stateSyncTimer !== null) window.clearInterval(stateSyncTimer)
           stateSyncTimer = null
           stateLoadedRef.current = true
@@ -367,7 +370,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
           avatarSeed: p.avatarSeed ?? null,
           color,
           score: existingScore,
-          joinedAt: Date.now(),
+          joinedAt: currentTimestamp(),
         }
         const nextPlayers = [...basePlayers, newPlayer]
         const next: GomokuState = {
@@ -594,7 +597,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, channelAttempt, presenceKey, publishState, scheduleAiTurn, showStartToast])
 
   const sendMove = (r: number, c: number) => {
-    if (!selfId) return
+    if (!selfId || !isRealtimeReady()) return
     if (selfId === stateRef.current.hostId) {
       const next = tryMove(stateRef.current, selfId, r, c)
       if (next) {
@@ -602,11 +605,11 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         scheduleAiTurn(next)
       }
     } else {
-      if (!channelReady || !canSendGameBroadcast(channelRef.current)) return
       sendGameBroadcast(channelRef.current, 'move', { userId: selfId, r, c })
     }
   }
   const sendRematch = () => {
+    if (!selfId || !isRealtimeReady()) return
     if (selfId === stateRef.current.hostId) {
       const next = restartGomokuRound(stateRef.current)
       publishState(next)
@@ -619,23 +622,25 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         }
       }
     } else {
-      if (!channelReady || !canSendGameBroadcast(channelRef.current)) return
       sendGameBroadcast(channelRef.current, 'rematch', { round: stateRef.current.round })
     }
   }
   const leaveRoom = () => {
+    if (!selfId || !isRealtimeReady()) return
     setLeaveConfirmOpen(false)
-    if (!selfId) return
     if (selfId === stateRef.current.hostId) {
       const next = removeGomokuPlayer(stateRef.current, selfId)
       if (next) publishState(next)
     } else {
-      if (!channelReady || !canSendGameBroadcast(channelRef.current)) return
       sendGameBroadcast(channelRef.current, 'leave', { userId: selfId })
     }
   }
   const sendJoin = () => {
     if (!selfId || joinStatus === 'joining') return
+    if (!isRealtimeReady()) {
+      setJoinStatus('retry')
+      return
+    }
     setJoinStatus('joining')
     if (selfId === stateRef.current.hostId) {
       // The host does not receive its own broadcast, so apply locally.
@@ -659,7 +664,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         avatarSeed,
         color,
         score: 0,
-        joinedAt: Date.now(),
+        joinedAt: currentTimestamp(),
       }
       const next: GomokuState = {
         ...cur,
@@ -680,10 +685,6 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
           showStartToast()
         }
       }
-      return
-    }
-    if (!channelReady || !canSendGameBroadcast(channelRef.current)) {
-      setJoinStatus('retry')
       return
     }
     const failJoin = () => {
@@ -708,7 +709,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   }
 
   const sendAiJoin = () => {
-    if (!selfId) return
+    if (!selfId || !isRealtimeReady()) return
     if (selfId === stateRef.current.hostId) {
       const next = addAiOpponent(stateRef.current)
       if (next) {
@@ -723,7 +724,6 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         }
       }
     } else {
-      if (!channelReady || !canSendGameBroadcast(channelRef.current)) return
       sendGameBroadcast(channelRef.current, 'ai', {})
     }
   }
@@ -863,7 +863,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
                 key={`${r}-${c}`}
                 type="button"
                 className={`gomoku-cell${isWin ? ' is-win' : ''}${isLast ? ' is-last' : ''}`}
-                disabled={(!channelReady && selfId !== state.hostId) || !isMyTurn || cell !== 0}
+                disabled={!channelReady || !isMyTurn || cell !== 0}
                 onClick={() => isMyTurn && cell === 0 && sendMove(r, c)}
                 aria-label={`${r + 1},${c + 1}`}
               >
@@ -879,7 +879,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
           <button
             type="button"
             className="btn-accent"
-            disabled={(!channelReady && selfId !== state.hostId) || !selfId || joinStatus === 'joining'}
+            disabled={!channelReady || !selfId || joinStatus === 'joining'}
             aria-busy={joinStatus === 'joining'}
             onClick={sendJoin}
           >
@@ -893,17 +893,17 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
           </button>
         )}
         {canJoinAI && (
-          <button type="button" className="btn-accent" disabled={!selfId || (!channelReady && selfId !== state.hostId)} onClick={sendAiJoin}>
+          <button type="button" className="btn-accent" disabled={!channelReady || !selfId} onClick={sendAiJoin}>
             {t('与 AI 对战', 'Play vs AI')}
           </button>
         )}
         {canRestart && (
-          <button type="button" className="btn-accent" disabled={!selfId || (!channelReady && selfId !== state.hostId)} onClick={sendRematch}>
+          <button type="button" className="btn-accent" disabled={!channelReady || !selfId} onClick={sendRematch}>
             {t('重新开始', 'Restart')}
           </button>
         )}
         {canLeave && (
-          <button type="button" className="btn-accent" disabled={!selfId || (!channelReady && selfId !== state.hostId)} onClick={() => setLeaveConfirmOpen(true)}>
+          <button type="button" className="btn-accent" disabled={!channelReady || !selfId} onClick={() => setLeaveConfirmOpen(true)}>
             {t('离开房间', 'Leave room')}
           </button>
         )}
@@ -918,7 +918,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
               <button type="button" className="gomoku-confirm-cancel" onClick={() => setLeaveConfirmOpen(false)}>
                 {t('继续游戏', 'Stay')}
               </button>
-              <button type="button" className="btn-accent" onClick={leaveRoom}>
+              <button type="button" className="btn-accent" disabled={!channelReady} onClick={leaveRoom}>
                 {t('离开房间', 'Leave room')}
               </button>
             </div>

@@ -34,6 +34,21 @@ export function isGameHostAuthority(channel: GameChannel | null | undefined, use
   return hostKeys[0] === getGamePresenceKey(userId)
 }
 
+/** Preserve the server's close payload, which Supabase omits from CLOSED callbacks. */
+export function watchGameChannelClose(
+  channel: GameChannel,
+  game: 'Gomoku' | 'Xiangqi',
+  instanceId: string,
+  shouldLog: () => boolean,
+): void {
+  const rawChannel = channel as unknown as {
+    on: (event: string, filter: Record<string, never>, callback: (payload: unknown) => void) => unknown
+  }
+  rawChannel.on('phx_close', {}, (payload) => {
+    if (shouldLog()) console.warn(`${game} server phx_close payload`, { instanceId, payload })
+  })
+}
+
 const MAX_ACTIVE_GAME_CHANNELS = 2
 let activeGameChannels = 0
 const waitingForGameChannel: Array<{
