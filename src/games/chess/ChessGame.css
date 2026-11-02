@@ -12,4 +12,5 @@
 @media (hover:none),(pointer:coarse){.chess-board{touch-action:pan-y;-webkit-overflow-scrolling:touch}.chess-square:hover{background-color:transparent;filter:none}.chess-square:not(:disabled):hover .chess-piece{transform:none}}
 @media(max-width:520px){.chess-card{box-sizing:border-box;max-width:none}.chess-board{width:100%;max-width:none;border-width:5px}.chess-head{align-items:center}.chess-heading{align-items:center}.chess-status{display:block;position:static}.chess-actions button,.chess-confirm-actions button{min-height:36px}.chess-confirm-cancel{min-height:36px}}
 @media(max-width:360px){.chess-player-slot{gap:4px}.chess-player-avatar,.chess-ai-avatar{flex-basis:26px;width:26px;height:26px}.chess-ai-avatar svg{width:19px;height:19px}.chess-player{gap:4px;padding:4px 5px;font-size:11px}.chess-side-indicator{width:8px;height:8px;flex-basis:8px}}
+.chess-card{isolation:isolate;contain:layout paint;transform:translateZ(0);backface-visibility:hidden}
 @media(prefers-reduced-motion:reduce){.chess-piece{transition:none}.chess-square.is-last .chess-piece,.chess-capture-toast,.chess-start-toast{animation:none}}

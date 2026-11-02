@@ -26,6 +26,7 @@ export interface GomokuState {
   round: number
   aiSource?: 'cloud' | 'local'
   aiMode?: 'cloud' | 'local'
+  moveHistory?: { r: number; c: number; color: 1 | 2 }[]
 }
 
 export function emptyBoard(): Stone[][] {
@@ -79,6 +80,7 @@ export function restartGomokuRound(state: GomokuState): GomokuState {
     winnerId: null,
     winningLine: null,
     lastMove: null,
+    moveHistory: [],
     round,
     aiSource: undefined,
   }
@@ -103,6 +105,7 @@ export function removeGomokuPlayer(state: GomokuState, userId: string): GomokuSt
     winnerId: null,
     winningLine: null,
     lastMove: null,
+    moveHistory: [],
     round,
     aiSource: undefined,
   }
@@ -179,6 +182,7 @@ export function tryMove(state: GomokuState, userId: string, r: number, c: number
     ...state,
     board,
     lastMove: { r, c },
+    moveHistory: [...(state.moveHistory ?? []), { r, c, color }],
     winningLine: line,
     winnerId,
     status: line || draw ? 'result' : 'playing',

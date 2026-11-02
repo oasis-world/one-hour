@@ -6,6 +6,7 @@ export interface ChessState {
   instanceId: string; hostId: string; players: ChessPlayer[]; board: Piece[][]; turn: Color
   status: 'waiting' | 'playing' | 'result'; winnerId: string | null; lastMove: { from: Square; to: Square } | null
   castling: string; enPassant: Square | null; halfmove: number; round: number; positionHistory?: string[]
+  moveHistory?: { from: Square; to: Square }[]
   aiSource?: 'cloud' | 'local'
   aiMode?: 'cloud' | 'local'
 }
@@ -94,7 +95,9 @@ export function tryMove(state:ChessState,userId:string,from:Square,to:Square):Ch
   if(captured==='br'){if(to[0]===0&&to[1]===0)castling=castling.replace('q','');if(to[0]===0&&to[1]===7)castling=castling.replace('k','')}
   const nextColor:Color=state.turn==='w'?'b':'w', next:ChessState={...state,board,turn:nextColor,castling,
     enPassant:piece[1]==='p'&&Math.abs(to[0]-from[0])===2?[(from[0]+to[0])/2,from[1]] as Square:null,
-    halfmove:piece[1]==='p'||state.board[to[0]][to[1]]?0:state.halfmove+1,lastMove:{from,to}}
+    halfmove:piece[1]==='p'||state.board[to[0]][to[1]]?0:state.halfmove+1,lastMove:{from,to},
+    moveHistory: [...(state.moveHistory ?? []), { from, to }],
+  }
   const history=state.positionHistory?.length?state.positionHistory:[positionKey(state.board,state.turn,state.castling,state.enPassant)]
   const positionHistory=[...history,positionKey(board,nextColor,castling,next.enPassant)]
   next.positionHistory=positionHistory
@@ -107,7 +110,7 @@ export function tryMove(state:ChessState,userId:string,from:Square,to:Square):Ch
 export function restartChessRound(state:ChessState):ChessState {
   const round=state.round+1
   const board=initialBoard(),turn:Color=round%2===0?'b':'w'
-  return {...state,board,turn,status:state.players.length===2?'playing':'waiting',winnerId:null,lastMove:null,castling:'KQkq',enPassant:null,halfmove:0,round,aiSource:undefined,positionHistory:[positionKey(board,turn,'KQkq',null)]}
+  return {...state,board,turn,status:state.players.length===2?'playing':'waiting',winnerId:null,lastMove:null,castling:'KQkq',enPassant:null,halfmove:0,round,aiSource:undefined,moveHistory:[],positionHistory:[positionKey(board,turn,'KQkq',null)]}
 }
 export function joinChess(state:ChessState, player:ChessPlayer):ChessState {
   if(state.players.some(p=>p.userId===player.userId)||state.players.length>=2)return state
@@ -118,6 +121,7 @@ export function joinChess(state:ChessState, player:ChessPlayer):ChessState {
     status:players.length===2?'playing':'waiting',winnerId:restarting?null:state.winnerId,lastMove:restarting?null:state.lastMove,
     castling:restarting?'KQkq':state.castling,enPassant:restarting?null:state.enPassant,halfmove:restarting?0:state.halfmove,round,
     aiSource:restarting?undefined:state.aiSource,
+    moveHistory:restarting?[]:state.moveHistory,
     positionHistory:restarting?[positionKey(board,turn,'KQkq',null)]:state.positionHistory}
 }
 export function addChessAi(state:ChessState):ChessState|null {
@@ -131,7 +135,7 @@ export function removeChessPlayer(state:ChessState,userId:string):ChessState|nul
   if(!leaving)return null
   const players=state.players.some(p=>p.isAI)?[]:state.players.filter(p=>p.userId!==userId)
   const board=initialBoard(),round=players.length?state.round+1:1
-  return {...state,players,board,turn:'w',status:players.length===2?'playing':'waiting',winnerId:null,lastMove:null,castling:'KQkq',enPassant:null,halfmove:0,round,positionHistory:[positionKey(board,'w','KQkq',null)]}
+  return {...state,players,board,turn:'w',status:players.length===2?'playing':'waiting',winnerId:null,lastMove:null,castling:'KQkq',enPassant:null,halfmove:0,round,moveHistory:[],positionHistory:[positionKey(board,'w','KQkq',null)]}
 }
 function insufficientMaterial(board:Piece[][]):boolean {
   const pieces=board.flatMap(row=>row.filter((piece):piece is Exclude<Piece,null>=>Boolean(piece)&&piece?.[1]!=='k'))

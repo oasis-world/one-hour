@@ -15,7 +15,10 @@ import { withTimeout } from '../../lib/withTimeout'
 import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGamePresenceUsers, isGameHostAuthority, removeStaleGameChannel, sendGameBroadcast, watchGameChannelClose } from '../realtime'
 import { chooseAiMove } from './ai'
 import { requestCloudMove } from '../cloudAi'
+import { buildXiangqiHints } from './cloudHints'
+import { getOpeningMove, isBookPosition } from './openingBook'
 import AiSourceIcon from '../AiSourceIcon'
+import { AiThinkingTimer } from '../AiThinkingTimer'
 import GameCardMenu from '../GameCardMenu'
 import { getCachedAiMode, setCachedAiMode } from '../aiModePreference'
 import { loadXiangqiState, saveXiangqiState } from './cloudState'
@@ -44,6 +47,7 @@ interface Props {
   instanceId: string
   hostUserId: string
   onlineMembers?: PresenceMember[]
+  isVisible?: boolean
 }
 
 const BOARD_STYLES = ['wood', 'classic', 'concave', 'jade'] as const
@@ -55,7 +59,7 @@ const PIECE_GLYPH: Record<number, string> = {
 }
 const currentTimestamp = () => Date.now()
 
-export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = [] }: Props) {
+export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = [], isVisible = true }: Props) {
   useLang()
   const account = useAccount()
   const identity = resolveChatIdentity(account)
@@ -341,20 +345,20 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
 
   const requestAiMove = useCallback((board: number[][], color: 1 | 2) => {
     const worker = aiWorkerRef.current
-    if (!worker) return Promise.resolve(chooseAiMove(board, color, 1200))
+    if (!worker) return Promise.resolve(chooseAiMove(board, color, 1500))
     const id = ++aiWorkerRequestRef.current
     return new Promise<Move | null>((resolve) => {
       const timer = window.setTimeout(() => {
         aiWorkerPendingRef.current.delete(id)
         resolve(null)
-      }, 12000)
+      }, 5000)
       aiWorkerPendingRef.current.set(id, { resolve, timer })
       try {
-        worker.postMessage({ id, board, color, timeLimitMs: 2800 })
+        worker.postMessage({ id, board, color, timeLimitMs: 4000 })
       } catch {
         window.clearTimeout(timer)
         aiWorkerPendingRef.current.delete(id)
-        resolve(chooseAiMove(board, color, 1200))
+        resolve(chooseAiMove(board, color, 1500))
       }
     })
   }, [])
@@ -370,10 +374,19 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       const aiP = current.players.find((player) => player.isAI && player.color === current.turn)
       if (!aiP || current.turn !== aiP.color) return
       const side = sideOfColor(aiP.color)
-      const position = { board: current.board, turn: current.turn, round: current.round, lastMove: current.lastMove }
+      const xqLegal = legalMoves(current.board, side)
+      // Opening book: if early game and book hit, use instantly (no cloud needed)
+      const bookMove = isBookPosition(current.board, (current.moveHistory ?? []).length) ? getOpeningMove((current.moveHistory ?? []).length, side) : null
+      const validBookMove = bookMove && xqLegal.some((m) => m.from[0] === bookMove.from[0] && m.from[1] === bookMove.from[1] && m.to[0] === bookMove.to[0] && m.to[1] === bookMove.to[1]) ? bookMove : null
+      if (validBookMove) {
+        const afterBook = tryMove(current, aiP.userId, validBookMove.from[0], validBookMove.from[1], validBookMove.to[0], validBookMove.to[1])
+        if (afterBook) { announceCapture(current, { ...afterBook, aiSource: 'local' as const }); publishState({ ...afterBook, aiSource: 'local' as const }); return }
+      }
+      const { annotatedMoves: xqHints, threatSummary: xqThreat } = buildXiangqiHints(current.board, side, xqLegal)
+      const position = { board: current.board, turn: current.turn, round: current.round, lastMove: current.lastMove, history: (current.moveHistory ?? []).slice(-12), threatSummary: xqThreat, annotatedMoves: xqHints }
       let move: Move | null = null
       if ((current.aiMode ?? 'local') === 'cloud') {
-        try { move = await requestCloudMove('xiangqi', current.instanceId, position, legalMoves(current.board, side), () => isGameHostAuthority(channelRef.current, current.hostId) && canSendGameBroadcast(channelRef.current)) } catch { /* use local AI */ }
+        try { move = await requestCloudMove('xiangqi', current.instanceId, position, xqLegal, () => isGameHostAuthority(channelRef.current, current.hostId) && canSendGameBroadcast(channelRef.current)) } catch { /* use local AI */ }
       }
       if (stateRef.current !== current || !isGameHostAuthority(channelRef.current, current.hostId)) return
       const cloudMove = move
@@ -381,7 +394,9 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       if (stateRef.current !== current || !isGameHostAuthority(channelRef.current, current.hostId) || !canSendGameBroadcast(channelRef.current)) return
       const afterCloudCandidate = cloudMove ? tryMove(current, aiP.userId, cloudMove.from[0], cloudMove.from[1], cloudMove.to[0], cloudMove.to[1]) : null
       const afterLocalCandidate = afterCloudCandidate || !move ? null : tryMove(current, aiP.userId, move.from[0], move.from[1], move.to[0], move.to[1])
-      const fallbackMove = afterCloudCandidate || afterLocalCandidate ? null : chooseAiMove(current.board, aiP.color, 1000)
+      const pieceCount = current.board.flat().filter((p) => p !== 0).length
+      const endgameBonus = pieceCount <= 10 ? 1000 : 0
+      const fallbackMove = afterCloudCandidate || afterLocalCandidate ? null : chooseAiMove(current.board, aiP.color, 1500 + endgameBonus)
       const afterAi = afterCloudCandidate ?? afterLocalCandidate ?? (fallbackMove ? tryMove(current, aiP.userId, fallbackMove.from[0], fallbackMove.from[1], fallbackMove.to[0], fallbackMove.to[1]) : null)
       if (!afterAi) return
       const usedCloud = Boolean(afterCloudCandidate)
@@ -410,7 +425,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   const isRealtimeReady = () => channelReady && canSendGameBroadcast(channelRef.current)
 
   useEffect(() => {
-    if (!isSupabaseConfigured() || !selfId) return
+    if (!isSupabaseConfigured() || !selfId || !isVisible) return
     let cancelled = false
     let stateSyncTimer: number | null = null
     let cloudPollTimer: number | null = null
@@ -779,7 +794,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         releaseSlot()
       }
     }
-  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, channelAttempt, presenceKey, announceCapture, publishState, scheduleAiTurn, showStartToast])
+  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, channelAttempt, presenceKey, announceCapture, publishState, scheduleAiTurn, showStartToast, isVisible])
 
   const sendMove = (fromR: number, fromC: number, toR: number, toC: number) => {
     if (!selfId || !isRealtimeReady()) return
@@ -1014,7 +1029,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
                 aria-label={p.color === 1 ? t('红方棋子', 'Red pieces') : t('黑方棋子', 'Black pieces')}
                 title={p.color === 1 ? t('红方', 'Red side') : t('黑方', 'Black side')}
               />
-              <span className="xiangqi-player-name" title={p.displayName}>{p.displayName}{p.isAI && <AiSourceIcon source={state.aiMode ?? state.aiSource ?? 'local'} />}{p.isAI && aiIsThinking && p.color === state.turn && <span className="game-ai-thinking-spinner" aria-label={t('AI 正在思考', 'AI is thinking')} />}</span>
+              <span className="xiangqi-player-name" title={p.displayName}>{p.displayName}{p.isAI && <AiSourceIcon source={state.aiMode ?? state.aiSource ?? 'local'} />}{p.isAI && <AiThinkingTimer active={aiIsThinking && p.color === state.turn} />}</span>
               <span className="xiangqi-player-score">{p.score}</span>
             </div>
           </div>
@@ -1022,7 +1037,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       </div>
 
 
-      {state.status === 'result' && <div className="xiangqi-result">{resultText()}</div>}
+      <div className="xiangqi-result">{state.status === 'result' ? resultText() : ''}</div>
 
       <div ref={boardElementRef} className={`xiangqi-board xiangqi-board--${boardStyle}${myColor === 2 ? ' xiangqi-board--flipped' : ''}`} role="grid" aria-label={t('中国象棋棋盘', 'Chinese Chess board')}>
         {boardStyle === 'concave' && (

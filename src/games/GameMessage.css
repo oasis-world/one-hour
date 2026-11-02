@@ -1,20 +1,113 @@
 .game-message-inview {
   width: 100%;
   max-width: 440px;
+  content-visibility: auto;
+  contain-intrinsic-size: 560px 560px;
+  contain: layout style paint;
+  isolation: isolate;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.game-message-inview.is-mounted {
+  content-visibility: visible;
+}
+
+.game-card-keepalive.is-offscreen {
+  content-visibility: auto;
+  contain-intrinsic-size: 540px 540px;
+}
+
+/* Keep mounted DOM height stable when offscreen — card is hidden but layout preserved via keepalive wrapper */
+.game-card-keepalive.is-offscreen > * {
+  pointer-events: none;
 }
 
 .game-message-placeholder {
   box-sizing: border-box;
   width: 100%;
-  min-height: 410px;
+  min-height: 545px;
   margin: 6px 0;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  contain: layout paint;
+}
+
+.game-message-placeholder[data-game-type='chess'] {
+  min-height: 548px;
+}
+
+.game-message-placeholder[data-game-type='gomoku'] {
+  min-height: 538px;
+}
+
+.game-message-placeholder[data-game-type='xiangqi'] {
+  min-height: 578px;
 }
 
 @media (max-width: 600px) {
-  .game-message-placeholder {
-    min-height: 330px;
+  .game-message-inview {
+    contain-intrinsic-size: 500px 520px;
   }
+
+  .game-message-placeholder {
+    min-height: 495px;
+  }
+
+  .game-message-placeholder[data-game-type='chess'] {
+    min-height: 498px;
+  }
+
+  .game-message-placeholder[data-game-type='gomoku'] {
+    min-height: 486px;
+  }
+
+  .game-message-placeholder[data-game-type='xiangqi'] {
+    min-height: 518px;
+  }
+}
+
+.msg-row:has(.game-message-inview) {
+  overflow-anchor: auto;
+  contain: layout;
+}
+
+.chat-log {
+  overflow-anchor: none;
+}
+
+/* Stable card layout: reserve space for players/result/actions so state transitions don't collapse height */
+.chess-players,
+.gomoku-players,
+.xiangqi-players {
+  min-height: 42px;
+}
+
+.chess-result,
+.gomoku-result,
+.xiangqi-result {
+  min-height: 22px;
+}
+
+.chess-result:empty,
+.gomoku-result:empty,
+.xiangqi-result:empty {
+  visibility: hidden;
+}
+
+.chess-actions,
+.gomoku-actions,
+.xiangqi-actions {
+  min-height: 44px;
+  align-items: center;
+}
+
+.chess-actions:empty,
+.gomoku-actions:empty,
+.xiangqi-actions:empty {
+  visibility: hidden;
+  min-height: 44px;
 }

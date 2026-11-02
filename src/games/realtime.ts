@@ -51,7 +51,7 @@ export function isGameHostAuthority(channel: GameChannel | null | undefined, use
 /** Preserve the server's close payload, which Supabase omits from CLOSED callbacks. */
 export function watchGameChannelClose(
   channel: GameChannel,
-  game: 'Gomoku' | 'Xiangqi',
+  game: 'Gomoku' | 'Xiangqi' | 'Chess',
   instanceId: string,
   shouldLog: () => boolean,
 ): void {
@@ -63,7 +63,7 @@ export function watchGameChannelClose(
   })
 }
 
-const MAX_ACTIVE_GAME_CHANNELS = 2
+const MAX_ACTIVE_GAME_CHANNELS = 3
 let activeGameChannels = 0
 const waitingForGameChannel: Array<{
   signal: AbortSignal

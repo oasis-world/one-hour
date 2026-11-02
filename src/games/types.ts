@@ -5,6 +5,7 @@ export interface GameComponentProps {
   instanceId: string
   hostUserId: string
   onlineMembers?: PresenceMember[]
+  isVisible?: boolean
 }
 
 export interface GameDefinition {

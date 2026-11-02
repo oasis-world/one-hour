@@ -11,11 +11,13 @@ import { ChessCrownIcon } from '../../components/icons'
 import OnlineList from '../../components/OnlineList'
 import { setPopoverOpen } from '../../lib/popoverGuard'
 import { recordGameResult, recordInteraction } from '../../lib/lifetimeStats'
-import { getGamePresenceKey, isGameHostAuthority, removeStaleGameChannel } from '../realtime'
-import { createInitialState, isChessState, joinChess, addChessAi, inCheck, legalMoves, removeChessPlayer, restartChessRound, tryMove, type ChessState, type Color, type Piece } from './logic'
+import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, isGameHostAuthority, removeStaleGameChannel, watchGameChannelClose } from '../realtime'
+import { createInitialState, isChessState, joinChess, addChessAi, inCheck, legalMoves, removeChessPlayer, restartChessRound, tryMove, type ChessState, type Color, type Piece, type Square } from './logic' // Square imported via logic
 import { chooseChessAiMove } from './ai'
 import { requestCloudMove } from '../cloudAi'
+import { buildChessHints } from './cloudHints'
 import AiSourceIcon from '../AiSourceIcon'
+import { AiThinkingTimer } from '../AiThinkingTimer'
 import GameCardMenu from '../GameCardMenu'
 import { getCachedAiMode, setCachedAiMode } from '../aiModePreference'
 import { loadChessState, saveChessState } from './cloudState'
@@ -23,7 +25,7 @@ import './ChessGame.css'
 import '../GameCardMenu.css'
 
 type GameChannel = ReturnType<Awaited<ReturnType<typeof getSupabaseClient>>['channel']>
-interface Props { instanceId:string; hostUserId:string; onlineMembers?:PresenceMember[] }
+interface Props { instanceId:string; hostUserId:string; onlineMembers?:PresenceMember[]; isVisible?: boolean }
 const pieceAsset=(piece:Piece)=>piece?`/games/chess-pieces/${piece[0]==='w'?'l':'d'}${piece[1]}.png`:''
 const PIECE_NAMES:Record<string,[string,string]>={
   wk:['王','King'],wq:['后','Queen'],wr:['车','Rook'],wb:['象','Bishop'],wn:['马','Knight'],wp:['兵','Pawn'],
@@ -39,7 +41,7 @@ function AiAvatar() {
   return <span className="chess-ai-avatar" aria-label="AI"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3M9 3h6M7 8h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3Z"/><path d="M8.5 13h.01M15.5 13h.01M9 17h6"/></svg></span>
 }
 
-export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props) {
+export default function ChessGame({instanceId,hostUserId,onlineMembers=[], isVisible = true}:Props) {
   useLang()
   const account=useAccount(),identity=resolveChatIdentity(account),profile=loadUserProfile()
   const selfId=identity?.userId??null,displayName=profile?.nickname??identity?.displayName??'Player'
@@ -178,15 +180,20 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
   },[])
 
   useEffect(()=>{
-    if(!selfId||!isSupabaseConfigured())return
+    if(!selfId||!isSupabaseConfigured()||!isVisible)return
     let cancelled=false,ch:GameChannel|null=null
     const abort=new AbortController()
+    const slotCtrl=new AbortController()
+    let releaseSlot:(()=>void)|null=null
     void (async()=>{
       const client=await getSupabaseClient();if(cancelled)return
+      const slot=await acquireGameChannelSlot(slotCtrl.signal);if(cancelled||!slot)return
+      releaseSlot=slot
       const topic=`game:chess:${instanceId}`
       await removeStaleGameChannel(client,topic);if(cancelled)return
       const active=client.channel(topic,{config:{presence:{key:getGamePresenceKey(selfId)}}})
       ch=active;channelRef.current=active
+      watchGameChannelClose(active,'Chess',instanceId,()=>!cancelled)
       active.on('broadcast',{event:'state'},({payload}:{payload:unknown})=>{if(isChessState(payload,instanceId)){if(!stateHydratedRef.current){renderedBoardRef.current=payload.board;stateHydratedRef.current=true}stateRef.current=payload;setState(payload);setReady(true);if(payload.players.some(player=>player.userId===selfId))setJoinStatus('idle')}})
       active.on('broadcast',{event:'join'},({payload}:{payload:unknown})=>{
         if(stateRef.current.hostId!==selfId||!payload||typeof payload!=='object')return
@@ -208,29 +215,33 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
         const next=removeChessPlayer(stateRef.current,(payload as {userId:string}).userId);if(next)applyState(next)
       })
       active.on('broadcast',{event:'rematch'},()=>{if(stateRef.current.hostId===selfId)applyState(restartChessRound(stateRef.current))})
-      active.on('broadcast',{event:'state-request'},()=>{if(stateRef.current.hostId===selfId)void active.send({type:'broadcast',event:'state',payload:stateRef.current})})
+      active.on('broadcast',{event:'state-request'},()=>{if(stateRef.current.hostId===selfId&&canSendGameBroadcast(active))void active.send({type:'broadcast',event:'state',payload:stateRef.current})})
       active.subscribe(async(status)=>{
         if(status!=='SUBSCRIBED'||cancelled)return
         await active.track({userId:selfId})
+        // Reuse in-memory state if we already have hydrated players (keep-alive path), avoid empty flash
+        if(stateHydratedRef.current&&stateRef.current.players.length>0){setReady(true);void active.send({type:'broadcast',event:'state-request',payload:{}});return}
         const loaded=await loadChessState(instanceId,abort.signal);if(cancelled)return
         if(loaded.state){renderedBoardRef.current=loaded.state.board;stateHydratedRef.current=true;stateRef.current=loaded.state;setState(loaded.state)}
-        else if(selfId===hostUserId){const initial=createInitialState(instanceId,selfId);renderedBoardRef.current=initial.board;stateHydratedRef.current=true;stateRef.current=initial;setState(initial);void saveChessState(instanceId,initial)}
+        else if(selfId===hostUserId&&!stateHydratedRef.current){const initial=createInitialState(instanceId,selfId);renderedBoardRef.current=initial.board;stateHydratedRef.current=true;stateRef.current=initial;setState(initial);void saveChessState(instanceId,initial)}
         setReady(true);void active.send({type:'broadcast',event:'state-request',payload:{}})
       })
     })()
-    return()=>{cancelled=true;abort.abort();channelRef.current=null;const old=ch;if(old)void getSupabaseClient().then(client=>client.removeChannel(old))}
-  },[instanceId,selfId,hostUserId,applyState])
+    return()=>{cancelled=true;abort.abort();slotCtrl.abort();releaseSlot?.();channelRef.current=null;const old=ch;if(old)void getSupabaseClient().then(client=>client.removeChannel(old))}
+  },[instanceId,selfId,hostUserId,applyState,isVisible])
 
   useEffect(()=>{
-    if(state.status!=='playing'||!state.players.some(p=>p.isAI&&p.color===state.turn)||state.hostId!==selfId||!isGameHostAuthority(channelRef.current,state.hostId))return
+    if(!isVisible||state.status!=='playing'||!state.players.some(p=>p.isAI&&p.color===state.turn)||state.hostId!==selfId||!isGameHostAuthority(channelRef.current,state.hostId))return
     let cancelled=false
     const timer=window.setTimeout(async()=>{
       const current=stateRef.current,ai=current.players.find(p=>p.isAI&&p.color===current.turn)
       if(!ai)return
-      const position={board:current.board,turn:current.turn,castling:current.castling,enPassant:current.enPassant,halfmove:current.halfmove,round:current.round,lastMove:current.lastMove}
+      const chessLegal=legalMoves(current) as { from: Square; to: Square; promotion?: string }[]
+      const {annotatedMoves: chessHints2, threatSummary: chessThreat2}=buildChessHints(current, chessLegal)
+      const position={board:current.board,turn:current.turn,castling:current.castling,enPassant:current.enPassant,halfmove:current.halfmove,round:current.round,lastMove:current.lastMove,history:(current.moveHistory??[]).slice(-12),threatSummary: chessThreat2, annotatedMoves: chessHints2}
       let move: ReturnType<typeof chooseChessAiMove> = null
       if((current.aiMode??'local')==='cloud'){
-        try { move=await requestCloudMove('chess',current.instanceId,position,legalMoves(current),()=>isGameHostAuthority(channelRef.current,current.hostId)) } catch { /* use local AI */ }
+        try { move=await requestCloudMove('chess',current.instanceId,position,chessLegal,()=>isGameHostAuthority(channelRef.current,current.hostId)) } catch { /* use local AI */ }
       }
       if(cancelled||stateRef.current!==current||current.hostId!==selfId||!isGameHostAuthority(channelRef.current,current.hostId))return
       const afterCandidate=move?tryMove(current,ai.userId,move.from,move.to):null
@@ -239,7 +250,7 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
       if(next){if(!afterCandidate)console.info('[game-ai] Applying local AI move for chess.');applyState({...next,aiSource:afterCandidate?'cloud':'local'})}
     },520)
     return()=>{cancelled=true;window.clearTimeout(timer)}
-  },[state,selfId,applyState])
+  },[state,selfId,applyState,isVisible])
 
   const myColor=state.players.find(player=>player.userId===selfId)?.color??null
   const isPlayer=myColor!==null
@@ -328,16 +339,15 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
       )}
     </div>
 
-    {state.players.length>0&&<div className="chess-players">{state.players.map(player=><div key={player.userId} className="chess-player-slot">
+    <div className="chess-players">{state.players.map(player=><div key={player.userId} className="chess-player-slot">
       {player.isAI?<AiAvatar/>:<AvatarBadge className="chess-player-avatar" size={30} look={{style:player.avatarStyle||'thumbs',seed:player.avatarSeed||player.userId,url:player.avatarUrl}}/>}
       <div className={`chess-player${player.userId===selfId?' is-self':''}${state.turn===player.color&&state.status==='playing'?' is-turn':''}`}>
         <span className={`chess-side-indicator${player.color==='w'?' is-white':' is-black'}`} role="img" aria-label={player.color==='w'?t('白方棋子','White pieces'):t('黑方棋子','Black pieces')} title={player.color==='w'?t('白方','White side'):t('黑方','Black side')}/>
-        <span className="chess-player-name" title={player.displayName}>{player.displayName}{player.isAI&&<AiSourceIcon source={state.aiMode??state.aiSource??'local'}/>}{player.isAI && aiIsThinking && player.color===state.turn && <span className="game-ai-thinking-spinner" aria-label={t('AI 正在思考', 'AI is thinking')} />}</span><span className="chess-player-score">{player.score}</span>
+        <span className="chess-player-name" title={player.displayName}>{player.displayName}{player.isAI&&<AiSourceIcon source={state.aiMode??state.aiSource??'local'}/>}{player.isAI && <AiThinkingTimer active={aiIsThinking && player.color===state.turn} />}</span><span className="chess-player-score">{player.score}</span>
       </div>
-    </div>)}</div>}
+    </div>)}</div>
 
-
-    {state.status==='result'&&<div className="chess-result">{winner?t('获胜：','Winner: ')+winner.displayName:t('平局','Draw')}</div>}
+    <div className="chess-result">{state.status==='result'?(winner?t('获胜：','Winner: ')+winner.displayName:t('平局','Draw')):''}</div>
     <div ref={boardRef} className={`chess-board${myColor==='b'?' chess-board--flipped':''}`} role="grid" aria-label={t('国际象棋棋盘','Chess board')}>
       {state.board.map((row,r)=>row.map((piece,c)=>{
         const isLast=state.lastMove?.from[0]===r&&state.lastMove.from[1]===c||state.lastMove?.to[0]===r&&state.lastMove.to[1]===c

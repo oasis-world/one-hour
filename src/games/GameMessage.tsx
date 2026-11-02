@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { parseGameRef } from './types'
 import { getGameById } from './registry'
 import type { PresenceMember } from '../lib/chatTypes'
@@ -10,15 +10,22 @@ interface Props {
   content: string
   hostUserId: string
   onlineMembers?: PresenceMember[]
-  /** On a fresh load the latest row is immediately scrolled into view. */
   initiallyVisible?: boolean
 }
 
 export default function GameMessage({ content, hostUserId, onlineMembers = [], initiallyVisible = false }: Props) {
   const [isInView, setIsInView] = useState(initiallyVisible)
+  const [hasEverMounted, setHasEverMounted] = useState(initiallyVisible)
   const elementRef = useRef<HTMLDivElement>(null)
   const gameRef = parseGameRef(content)
   const instanceId = gameRef?.instanceId
+
+  useEffect(() => {
+    if (isInView) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setHasEverMounted(true)
+    }
+  }, [isInView])
 
   useLayoutEffect(() => {
     const element = elementRef.current
@@ -26,21 +33,37 @@ export default function GameMessage({ content, hostUserId, onlineMembers = [], i
     const root = element.closest('.chat-log')
     const column = element.closest('.chat-column')
     let frame = 0
+    let pendingDelta = 0
+    let pendingRaf = 0
     let lastHeight = element.getBoundingClientRect().height
     let lastBottom = element.getBoundingClientRect().bottom
     const settleTimers: number[] = []
+
+    const flushScrollDelta = () => {
+      pendingRaf = 0
+      if (!root || Math.abs(pendingDelta) < 0.5) {
+        pendingDelta = 0
+        return
+      }
+      const delta = pendingDelta
+      pendingDelta = 0
+      root.scrollTop += delta
+      lastBottom += delta
+    }
+
+    const queueDelta = (delta: number) => {
+      pendingDelta += delta
+      if (pendingRaf) return
+      pendingRaf = window.requestAnimationFrame(flushScrollDelta)
+    }
+
     const measureVisibility = () => {
       frame = 0
-      // A background tab is not evidence that this game left the viewport.
-      // Keep mounted games (and their live state) intact while the page is
-      // hidden; visibility is measured again as soon as it becomes active.
       if (document.hidden) return
       const bounds = element.getBoundingClientRect()
       const rootBounds = root?.getBoundingClientRect()
       const left = Math.max(bounds.left, rootBounds?.left ?? 0, 0)
       const right = Math.min(bounds.right, rootBounds?.right ?? window.innerWidth, window.innerWidth)
-      // Match the observer's pre-mount margin. Using the unexpanded viewport
-      // here immediately unmounted cards that were just mounted 120px early.
       const rootTop = rootBounds ? Math.max(0, rootBounds.top - GAME_VISIBILITY_MARGIN) : -GAME_VISIBILITY_MARGIN
       const rootBottom = rootBounds ? Math.min(window.innerHeight, rootBounds.bottom + GAME_VISIBILITY_MARGIN) : window.innerHeight + GAME_VISIBILITY_MARGIN
       const top = Math.max(bounds.top, rootTop)
@@ -70,9 +93,6 @@ export default function GameMessage({ content, hostUserId, onlineMembers = [], i
     }
     const measureAfterUnfold = (event: Event) => {
       if ((event as AnimationEvent).animationName !== 'fold-back') return
-      // The chat column enters the viewport through a transform animation.
-      // ResizeObserver does not report transforms, so explicitly remeasure
-      // while it unfolds and once the final geometry has settled.
       for (const delay of [120, 280, 540]) {
         settleTimers.push(window.setTimeout(scheduleMeasure, delay))
       }
@@ -92,27 +112,20 @@ export default function GameMessage({ content, hostUserId, onlineMembers = [], i
         const rootBounds = root?.getBoundingClientRect()
         const nextHeight = bounds.height
         const heightDelta = nextHeight - lastHeight
-        let scrollAdjustment = 0
-        // Keep the reader's scroll position stable when a prefetched card
-        // above the viewport swaps its placeholder for the real game.
-        if (root && rootBounds && lastBottom <= rootBounds.top && Math.abs(heightDelta) > 0.5) {
-          scrollAdjustment = heightDelta
-          root.scrollTop += heightDelta
+        const distFromBottom = root ? root.scrollHeight - root.scrollTop - root.clientHeight : Infinity
+        const isAtBottom = distFromBottom <= 56
+        if (root && rootBounds && !isAtBottom && lastBottom <= rootBounds.top + 1 && Math.abs(heightDelta) > 0.5) {
+          queueDelta(heightDelta)
         }
         lastHeight = nextHeight
-        lastBottom = bounds.bottom - scrollAdjustment
+        lastBottom = bounds.bottom
       }
       scheduleMeasure()
     })
     resizeObserver?.observe(element)
     if (root) resizeObserver?.observe(root)
-    // Measure before paint so an already-visible game never flashes the
-    // empty placeholder while waiting for IntersectionObserver's first tick.
     measureVisibility()
     scheduleMeasure()
-    // Mobile browsers can restore scroll position after the first layout and
-    // after passive effects run. Recheck as that restoration settles so a
-    // visible game doesn't remain stuck on its placeholder after refresh.
     for (const delay of [80, 240, 700, 1400]) {
       settleTimers.push(window.setTimeout(scheduleMeasure, delay))
     }
@@ -129,6 +142,7 @@ export default function GameMessage({ content, hostUserId, onlineMembers = [], i
       viewport?.removeEventListener('resize', scheduleMeasure)
       viewport?.removeEventListener('scroll', scheduleMeasure)
       if (frame) window.cancelAnimationFrame(frame)
+      if (pendingRaf) window.cancelAnimationFrame(pendingRaf)
       for (const timer of settleTimers) window.clearTimeout(timer)
     }
   }, [instanceId])
@@ -137,15 +151,19 @@ export default function GameMessage({ content, hostUserId, onlineMembers = [], i
   const def = getGameById(gameRef.type)
   if (!def) return null
   const Component = def.Component
-  // The newest row is bottom-anchored on a fresh load. Mount its game
-  // immediately instead of waiting for an observer callback that may race
-  // scroll restoration on desktop and mobile browsers alike.
-  const active = initiallyVisible || typeof IntersectionObserver === 'undefined' || isInView
+  const isVisible = initiallyVisible || typeof IntersectionObserver === 'undefined' || isInView
+
+  // Keep mounted after first visibility: no more placeholder↔card swaps that jitter scroll.
+  // Offscreen cards stay in DOM with content-visibility:auto, but pause their Supabase channel via isVisible.
   return (
-    <div ref={elementRef} className="game-message-inview">
-      {active
-        ? <Component instanceId={gameRef.instanceId} hostUserId={hostUserId} onlineMembers={onlineMembers} />
-        : <div className="game-message-placeholder" aria-hidden="true" />}
+    <div ref={elementRef} className={`game-message-inview${isVisible ? ' is-mounted' : ''}${hasEverMounted ? ' has-mounted' : ''}`}>
+      {hasEverMounted ? (
+        <div className={`game-card-keepalive${isVisible ? ' is-inview' : ' is-offscreen'}`}>
+          <Component instanceId={gameRef.instanceId} hostUserId={hostUserId} onlineMembers={onlineMembers} isVisible={isVisible} />
+        </div>
+      ) : (
+        <div className="game-message-placeholder" data-game-type={gameRef.type} aria-hidden="true" />
+      )}
     </div>
   )
 }

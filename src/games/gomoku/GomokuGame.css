@@ -412,3 +412,5 @@
   .gomoku-player { gap: 4px; padding: 4px 5px; font-size: 11px; }
   .gomoku-stone { width: 10px; height: 10px; flex-basis: 10px; }
 }
+
+.gomoku-card { isolation: isolate; contain: layout paint; transform: translateZ(0); backface-visibility: hidden; }

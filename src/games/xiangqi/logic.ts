@@ -44,6 +44,7 @@ export interface XiangqiState {
   round: number
   aiSource?: 'cloud' | 'local'
   aiMode?: 'cloud' | 'local'
+  moveHistory?: Move[]
 }
 
 export function emptyBoard(): number[][] {
@@ -305,6 +306,7 @@ export function tryMove(state: XiangqiState, userId: string, fromR: number, from
     ...state,
     board,
     lastMove: { from: [fromR, fromC], to: [toR, toC] },
+    moveHistory: [...(state.moveHistory ?? []), { from: [fromR, fromC], to: [toR, toC] }],
     winnerId,
     status,
     turn: status === 'result' ? state.turn : (state.turn === 1 ? 2 : 1),
@@ -352,6 +354,7 @@ export function restartXiangqiRound(state: XiangqiState): XiangqiState {
     status: state.players.length === 2 ? 'playing' : 'waiting',
     winnerId: null,
     lastMove: null,
+    moveHistory: [],
     round,
   }
 }
@@ -369,6 +372,7 @@ export function removeXiangqiPlayer(state: XiangqiState, userId: string): Xiangq
     status: players.length === 2 ? 'playing' : 'waiting',
     winnerId: null,
     lastMove: null,
+    moveHistory: [],
     round,
   }
 }

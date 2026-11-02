@@ -144,7 +144,18 @@ export function useChatScroll(opts: {
         if (atBottomRef.current) scrollTo(el.scrollHeight)
       })
     }
-    const mo = new MutationObserver(schedule)
+    const onMutate: MutationCallback = (mutations) => {
+      // AiThinkingTimer ticks every second (0s→1s…) inside .game-ai-thinking-wrap — not a scroll-relevant layout change.
+      const relevant = mutations.some((m) => {
+        const target = m.target as Element | null
+        if (target instanceof Element && target.closest?.('.game-ai-thinking-wrap')) return false
+        if (m.type === 'characterData' && (m.target as Text).parentElement?.closest?.('.game-ai-thinking-wrap')) return false
+        return true
+      })
+      if (!relevant) return
+      schedule()
+    }
+    const mo = new MutationObserver(onMutate)
     mo.observe(el, { childList: true, subtree: true, characterData: true })
     return () => {
       mo.disconnect()

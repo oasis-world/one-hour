@@ -5,7 +5,7 @@ const MATE = 100000
 const MAX_PLY = 64
 type Bound = 'exact' | 'lower' | 'upper'
 type Entry = { depth: number; score: number; bound: Bound; move?: Move }
-type ScoredMove = { move: Move; score: number }
+// ScoredMove removed - deterministic best only
 
 const zobristA: Uint32Array[] = []
 const zobristB: Uint32Array[] = []
@@ -67,7 +67,6 @@ export function chooseAiMove(board: number[][], color: 1 | 2, timeLimitMs = 2800
   const deadline = Date.now() + timeLimitMs
   let nodes = 0, stopped = false
   let bestMove = rootMoves[0]
-  let completedScores: ScoredMove[] = []
 
   function orderMoves(moves: Move[], position: number[][], side: Side, ply: number, preferred?: Move): Move[] {
     const killer = killers[Math.min(ply, MAX_PLY - 1)] ?? []
@@ -162,32 +161,17 @@ export function chooseAiMove(board: number[][], color: 1 | 2, timeLimitMs = 2800
     const moves = orderMoves(rootMoves.slice(), board, rootSide, 0, bestMove)
     let iterationBest = bestMove
     let iterationScore = rootSide === 'red' ? -Infinity : Infinity
-    const iterationScores: ScoredMove[] = []
     for (const move of moves) {
       if (Date.now() >= deadline) { stopped = true; break }
       const [nextA, nextB] = childHash(rootHashA, rootHashB, board, move)
       const score = search(applyMove(board, move), rootSide === 'red' ? 'black' : 'red', depth - 1, -Infinity, Infinity, 1, nextA, nextB)
       if (stopped) break
-      iterationScores.push({ move, score })
+
       if (rootSide === 'red' ? score > iterationScore : score < iterationScore) { iterationScore = score; iterationBest = move }
     }
     if (stopped) break
     bestMove = iterationBest
-    completedScores = iterationScores
   }
 
-  if (completedScores.length < 2) return bestMove
-  const strongest = rootSide === 'red'
-    ? Math.max(...completedScores.map((candidate) => candidate.score))
-    : Math.min(...completedScores.map((candidate) => candidate.score))
-  // Keep variety only among independently full-window-scored near ties.
-  const shortlist = completedScores.filter((candidate) => Math.abs(candidate.score - strongest) <= 8)
-  if (shortlist.length < 2) return bestMove
-  const total = shortlist.reduce((sum, candidate) => sum + Math.exp(-Math.abs(candidate.score - strongest) / 3), 0)
-  let pick = Math.random() * total
-  for (const candidate of shortlist) {
-    pick -= Math.exp(-Math.abs(candidate.score - strongest) / 3)
-    if (pick <= 0) return candidate.move
-  }
   return bestMove
 }

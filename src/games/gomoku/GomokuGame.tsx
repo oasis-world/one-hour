@@ -15,7 +15,9 @@ import { withTimeout } from '../../lib/withTimeout'
 import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGamePresenceUsers, isGameHostAuthority, removeStaleGameChannel, sendGameBroadcast, watchGameChannelClose } from '../realtime'
 import { chooseAiMove } from './ai'
 import { requestCloudMove } from '../cloudAi'
+import { buildGomokuHints } from './cloudHints'
 import AiSourceIcon from '../AiSourceIcon'
+import { AiThinkingTimer } from '../AiThinkingTimer'
 import GameCardMenu from '../GameCardMenu'
 import { getCachedAiMode, setCachedAiMode } from '../aiModePreference'
 import { loadGomokuState, saveGomokuState } from './cloudState'
@@ -43,9 +45,10 @@ interface Props {
   instanceId: string
   hostUserId: string
   onlineMembers?: PresenceMember[]
+  isVisible?: boolean
 }
 
-export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] }: Props) {
+export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [], isVisible = true }: Props) {
   useLang()
   const account = useAccount()
   const identity = resolveChatIdentity(account)
@@ -182,7 +185,8 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
       const current = stateRef.current
       if (current.status !== 'playing' || current.turn !== ai.color) return
       const legalMoves = current.board.flatMap((row, r) => row.flatMap((cell, c) => cell === 0 ? [{ r, c }] : []))
-      const position = { board: current.board, turn: current.turn, round: current.round, lastMove: current.lastMove }
+      const { annotatedMoves: gomokuHints, threatSummary: gomokuThreat } = buildGomokuHints(current.board, current.turn, legalMoves)
+      const position = { board: current.board, turn: current.turn, round: current.round, lastMove: current.lastMove, history: (current.moveHistory ?? []).slice(-12), threatSummary: gomokuThreat, annotatedMoves: gomokuHints }
       let move: { r: number; c: number } | null = null
       if ((current.aiMode ?? 'local') === 'cloud') {
         try { move = await requestCloudMove('gomoku', current.instanceId, position, legalMoves, () => isGameHostAuthority(channelRef.current, current.hostId) && canSendGameBroadcast(channelRef.current)) } catch { /* use local AI */ }
@@ -260,7 +264,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   const isRealtimeReady = () => channelReady && canSendGameBroadcast(channelRef.current)
 
   useEffect(() => {
-    if (!isSupabaseConfigured() || !selfId) return
+    if (!isSupabaseConfigured() || !selfId || !isVisible) return
     let cancelled = false
     let stateSyncTimer: number | null = null
     let cloudPollTimer: number | null = null
@@ -637,7 +641,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         releaseSlot()
       }
     }
-  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, channelAttempt, presenceKey, publishState, scheduleAiTurn, showStartToast])
+  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, channelAttempt, presenceKey, publishState, scheduleAiTurn, showStartToast, isVisible])
 
   const sendMove = (r: number, c: number) => {
     if (!selfId || !isRealtimeReady()) return
@@ -900,7 +904,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
             )}
             <div className={`gomoku-player${p.userId === selfId ? ' is-self' : ''}${state.turn === p.color && state.status === 'playing' ? ' is-turn' : ''}`}>
               <span className="gomoku-stone" data-color={p.color} />
-              <span className="gomoku-player-name" title={p.displayName}>{p.displayName}{p.isAI && <AiSourceIcon source={state.aiMode ?? state.aiSource ?? 'local'} />}{p.isAI && aiIsThinking && p.color === state.turn && <span className="game-ai-thinking-spinner" aria-label={t('AI 正在思考', 'AI is thinking')} />}</span>
+              <span className="gomoku-player-name" title={p.displayName}>{p.displayName}{p.isAI && <AiSourceIcon source={state.aiMode ?? state.aiSource ?? 'local'} />}{p.isAI && <AiThinkingTimer active={aiIsThinking && p.color === state.turn} />}</span>
               <span className="gomoku-player-score">{p.score}</span>
             </div>
           </div>
@@ -908,9 +912,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
       </div>
 
 
-      {state.status === 'result' && (
-        <div className="gomoku-result">{resultText()}</div>
-      )}
+      <div className="gomoku-result">{state.status === 'result' ? resultText() : ''}</div>
 
       <div className={`gomoku-board gomoku-board--${boardStyle}`} role="grid" aria-label={t('五子棋棋盘', 'Gomoku board')}>
         <span className="gomoku-grid-lines" aria-hidden="true" />
