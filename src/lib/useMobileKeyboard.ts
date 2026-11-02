@@ -77,10 +77,26 @@ export function useMobileKeyboard(shellRef: RefObject<HTMLElement | null>): void
     }
     const onGesture = (e: Event) => e.preventDefault()
 
+    // Mobile keyboards open asynchronously: the visualViewport may not
+    // reflect the keyboard until well after `focusin` fires. Retry apply()
+    // a few times so the shell lifts on the *first* focus, not only on a
+    // later tap (which is what happened after clearing a field).
+    const onFocusIn = () => {
+      apply()
+      window.setTimeout(apply, 50)
+      window.setTimeout(apply, 150)
+      window.setTimeout(apply, 350)
+      window.setTimeout(apply, 700)
+    }
+    const onFocusOut = () => {
+      window.setTimeout(apply, 50)
+      window.setTimeout(apply, 200)
+    }
+
     vv.addEventListener('resize', apply)
     vv.addEventListener('scroll', apply)
-    document.addEventListener('focusin', apply)
-    document.addEventListener('focusout', apply)
+    document.addEventListener('focusin', onFocusIn)
+    document.addEventListener('focusout', onFocusOut)
     document.addEventListener('pointerdown', onDown)
     document.addEventListener('touchmove', onMove)
     document.addEventListener('gesturestart', onGesture)
@@ -89,8 +105,8 @@ export function useMobileKeyboard(shellRef: RefObject<HTMLElement | null>): void
     return () => {
       vv.removeEventListener('resize', apply)
       vv.removeEventListener('scroll', apply)
-      document.removeEventListener('focusin', apply)
-      document.removeEventListener('focusout', apply)
+      document.removeEventListener('focusin', onFocusIn)
+      document.removeEventListener('focusout', onFocusOut)
       document.removeEventListener('pointerdown', onDown)
       document.removeEventListener('touchmove', onMove)
       document.removeEventListener('gesturestart', onGesture)

@@ -183,6 +183,12 @@ export default function WelcomeModal({
                   setDraft({ ...draft, nickname: e.target.value })
                   setError(null)
                 }}
+                onFocus={(e) => {
+                  const el = e.currentTarget
+                  window.setTimeout(() => {
+                    try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }) } catch { /* noop */ }
+                  }, 300)
+                }}
                 onKeyDown={onNickEnter}
                 {...ime.imeProps}
               />
@@ -222,6 +228,12 @@ export default function WelcomeModal({
                 onChange={(e) => {
                   setDraft({ ...draft, role: e.target.value })
                   setError(null)
+                }}
+                onFocus={(e) => {
+                  const el = e.currentTarget
+                  window.setTimeout(() => {
+                    try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }) } catch { /* noop */ }
+                  }, 300)
                 }}
                 onKeyDown={onRoleEnter}
                 {...ime.imeProps}

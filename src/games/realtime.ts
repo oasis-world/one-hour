@@ -3,6 +3,37 @@ import { getSupabaseClient } from '../lib/supabaseClient'
 type GameChannel = ReturnType<Awaited<ReturnType<typeof getSupabaseClient>>['channel']>
 type ReleaseSlot = () => void
 
+const pageId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+  ? crypto.randomUUID()
+  : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+
+/** Distinguish tabs sharing one account so only one tab acts as a game's host. */
+export function getGamePresenceKey(userId: string): string {
+  return `${userId}:${pageId}`
+}
+
+export function getGamePresenceUsers(channel: GameChannel | null | undefined): string[] {
+  const presence = channel?.presenceState() ?? {}
+  const users = new Set<string>()
+  for (const metas of Object.values(presence) as Array<Array<{ userId?: unknown }>>) {
+    for (const meta of metas) {
+      if (typeof meta.userId === 'string') users.add(meta.userId)
+    }
+  }
+  return [...users].sort()
+}
+
+/** Elect one live tab as host authority when the same account has many pages open. */
+export function isGameHostAuthority(channel: GameChannel | null | undefined, userId: string): boolean {
+  if (!channel) return false
+  const presence = channel.presenceState() as Record<string, Array<{ userId?: unknown }>>
+  const hostKeys = Object.entries(presence)
+    .filter(([, metas]) => metas.some((meta) => meta.userId === userId))
+    .map(([key]) => key)
+    .sort()
+  return hostKeys[0] === getGamePresenceKey(userId)
+}
+
 const MAX_ACTIVE_GAME_CHANNELS = 2
 let activeGameChannels = 0
 const waitingForGameChannel: Array<{
