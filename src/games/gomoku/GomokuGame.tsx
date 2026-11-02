@@ -237,6 +237,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
     let stateSyncTimer: number | null = null
     let cloudPollTimer: number | null = null
     let reconnectTimer: number | null = null
+    let channelStableTimer: number | null = null
     let cloudStateChecked = false
     const cloudRequestController = new AbortController()
     const channelSlotController = new AbortController()
@@ -249,7 +250,8 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
     }
     const retryChannel = (reason: string, error?: unknown) => {
       if (cancelled || reconnectTimer !== null) return
-      console.error(`Gomoku channel ${reason}:`, error)
+      if (channelStableTimer !== null) window.clearTimeout(channelStableTimer)
+      channelStableTimer = null
       if (stateSyncTimer !== null) window.clearInterval(stateSyncTimer)
       stateSyncTimer = null
       if (cloudPollTimer !== null) window.clearTimeout(cloudPollTimer)
@@ -258,8 +260,17 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
       joinTimeoutRef.current = null
       setJoinStatus((status) => status === 'joining' ? 'retry' : status)
       setReadyChannelKey('')
-      const delays = [1000, 2000, 5000, 10000]
-      const delay = delays[Math.min(channelRetryCountRef.current, delays.length - 1)]
+      const delays = [1000, 2000, 5000, 10000, 30000, 60000]
+      const baseDelay = delays[Math.min(channelRetryCountRef.current, delays.length - 1)]
+      const delay = Math.round(baseDelay * (0.8 + Math.random() * 0.4))
+      console.warn(`Gomoku channel ${reason}; retrying in ${delay}ms`, {
+        instanceId,
+        attempt: channelRetryCountRef.current + 1,
+        channelState: channel?.state ?? 'not created',
+        socketConnected: channel?.socket.isConnected() ?? false,
+        visibility: document.visibilityState,
+        error,
+      })
       channelRetryCountRef.current++
       reconnectTimer = window.setTimeout(() => {
         reconnectTimer = null
@@ -292,7 +303,6 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         if (expectedHost !== selfId || !isGameHostAuthority(channel, selfId)) return
         const init = createInitialState(instanceId, selfId)
         stateLoadedRef.current = true
-        channelRetryCountRef.current = 0
         stateRef.current = init
         setState(init)
         setReadyChannelKey(channelKey)
@@ -304,7 +314,6 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
           if (stateSyncTimer !== null) window.clearInterval(stateSyncTimer)
           stateSyncTimer = null
           stateLoadedRef.current = true
-          channelRetryCountRef.current = 0
           const prev = stateRef.current
           stateRef.current = payload
           setState(payload)
@@ -476,7 +485,6 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
               if (cancelled || stateLoadedRef.current) return
               cloudStateChecked = true
               cloudPollAttempt = 0
-              channelRetryCountRef.current = 0
               if (saved) {
                 stateLoadedRef.current = true
                 stateRef.current = saved
@@ -511,6 +519,11 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         if (status === 'SUBSCRIBED') {
           if (reconnectTimer !== null) window.clearTimeout(reconnectTimer)
           reconnectTimer = null
+          if (channelStableTimer !== null) window.clearTimeout(channelStableTimer)
+          channelStableTimer = window.setTimeout(() => {
+            channelRetryCountRef.current = 0
+            channelStableTimer = null
+          }, 30000)
           if (stateLoading) return
           stateLoading = true
           try {
@@ -566,12 +579,12 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
       if (stateSyncTimer !== null) window.clearInterval(stateSyncTimer)
       if (cloudPollTimer !== null) window.clearTimeout(cloudPollTimer)
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer)
+      if (channelStableTimer !== null) window.clearTimeout(channelStableTimer)
       if (aiTimerRef.current !== null) window.clearTimeout(aiTimerRef.current)
       channelRef.current = null
       if (channel) {
-        const releaseTimeout = window.setTimeout(releaseSlot, 1500)
-        void channel.unsubscribe().catch(() => undefined).finally(() => {
-          window.clearTimeout(releaseTimeout)
+        void channel.unsubscribe(1500).catch(() => undefined).finally(() => {
+          channel?.teardown()
           releaseSlot()
         })
       } else {
