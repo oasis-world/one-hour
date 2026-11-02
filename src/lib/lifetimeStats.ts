@@ -9,10 +9,13 @@ export interface LifetimeStats {
   messagesSent: number
   gomokuPlayed: number
   xiangqiPlayed: number
+  chessPlayed: number
   gomokuWins: number
   gomokuLosses: number
   xiangqiWins: number
   xiangqiLosses: number
+  chessWins: number
+  chessLosses: number
   wins: number
   losses: number
   interactions: Record<string, string>
@@ -28,10 +31,13 @@ const EMPTY_STATS: LifetimeStats = {
   messagesSent: 0,
   gomokuPlayed: 0,
   xiangqiPlayed: 0,
+  chessPlayed: 0,
   gomokuWins: 0,
   gomokuLosses: 0,
   xiangqiWins: 0,
   xiangqiLosses: 0,
+  chessWins: 0,
+  chessLosses: 0,
   wins: 0,
   losses: 0,
   interactions: {},
@@ -69,10 +75,13 @@ function parseStats(raw: string | null): LifetimeStats {
       messagesSent: typeof data.messagesSent === 'number' ? data.messagesSent : 0,
       gomokuPlayed: typeof data.gomokuPlayed === 'number' ? data.gomokuPlayed : 0,
       xiangqiPlayed: typeof data.xiangqiPlayed === 'number' ? data.xiangqiPlayed : 0,
+      chessPlayed: typeof data.chessPlayed === 'number' ? data.chessPlayed : 0,
       gomokuWins: typeof data.gomokuWins === 'number' ? data.gomokuWins : 0,
       gomokuLosses: typeof data.gomokuLosses === 'number' ? data.gomokuLosses : 0,
       xiangqiWins: typeof data.xiangqiWins === 'number' ? data.xiangqiWins : 0,
       xiangqiLosses: typeof data.xiangqiLosses === 'number' ? data.xiangqiLosses : 0,
+      chessWins: typeof data.chessWins === 'number' ? data.chessWins : 0,
+      chessLosses: typeof data.chessLosses === 'number' ? data.chessLosses : 0,
       wins: typeof data.wins === 'number' ? data.wins : 0,
       losses: typeof data.losses === 'number' ? data.losses : 0,
       interactions:
@@ -110,7 +119,7 @@ export function recordMessageSent(): void {
 }
 
 export function recordGameResult(
-  gameType: 'gomoku' | 'xiangqi',
+  gameType: 'gomoku' | 'xiangqi' | 'chess',
   selfId: string,
   winnerId: string | null,
   playerIds: string[],
@@ -121,10 +130,14 @@ export function recordGameResult(
     stats.gomokuPlayed += 1
     if (winnerId && winnerId === selfId) stats.gomokuWins += 1
     else if (winnerId && winnerId !== selfId) stats.gomokuLosses += 1
-  } else {
+  } else if (gameType === 'xiangqi') {
     stats.xiangqiPlayed += 1
     if (winnerId && winnerId === selfId) stats.xiangqiWins += 1
     else if (winnerId && winnerId !== selfId) stats.xiangqiLosses += 1
+  } else {
+    stats.chessPlayed += 1
+    if (winnerId && winnerId === selfId) stats.chessWins += 1
+    else if (winnerId && winnerId !== selfId) stats.chessLosses += 1
   }
   if (winnerId && winnerId === selfId) stats.wins += 1
   else if (winnerId && winnerId !== selfId) stats.losses += 1

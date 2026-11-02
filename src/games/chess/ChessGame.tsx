@@ -10,6 +10,7 @@ import AvatarBadge from '../../components/AvatarBadge'
 import { ChessCrownIcon } from '../../components/icons'
 import OnlineList from '../../components/OnlineList'
 import { setPopoverOpen } from '../../lib/popoverGuard'
+import { recordGameResult, recordInteraction } from '../../lib/lifetimeStats'
 import { getGamePresenceKey } from '../realtime'
 import { createInitialState, isChessState, joinChess, addChessAi, inCheck, legalMoves, removeChessPlayer, restartChessRound, tryMove, type ChessState, type Color, type Piece } from './logic'
 import { chooseChessAiMove } from './ai'
@@ -55,6 +56,7 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
   const moveCleanupRef=useRef<(()=>void)|null>(null)
   const toastStateRef=useRef<ChessState|null>(null)
   const stateHydratedRef=useRef(false)
+  const recordedRoundRef=useRef<string|null>(null)
   const moveToastTimerRef=useRef<number|null>(null)
   const startToastTimerRef=useRef<number|null>(null)
   useLayoutEffect(()=>{stateRef.current=state},[state])
@@ -140,6 +142,21 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
     const pieceName=t(piece[0],piece[1])
     window.setTimeout(()=>showMoveToast(t('{{attacker}} 吃掉了 {{victim}} 的 {{piece}}','{{attacker}} captured {{victim}}’s {{piece}}').replace('{{attacker}}',attacker).replace('{{victim}}',victim).replace('{{piece}}',pieceName),'',3400),0)
   },[state,ready,showMoveToast,showStartToast])
+
+  useEffect(()=>{
+    if(!selfId||!state.players.some(player=>player.userId===selfId))return
+    for(const player of state.players){
+      if(player.userId!==selfId&&!player.isAI)recordInteraction(player.userId,player.displayName,selfId)
+    }
+  },[selfId,state.players])
+
+  useEffect(()=>{
+    if(!selfId||state.status!=='result')return
+    const key=`${instanceId}:${state.round}`
+    if(recordedRoundRef.current===key||!state.players.some(player=>player.userId===selfId))return
+    recordedRoundRef.current=key
+    recordGameResult('chess',selfId,state.winnerId,state.players.map(player=>player.userId))
+  },[instanceId,selfId,state.status,state.round,state.winnerId,state.players])
 
   useEffect(()=>()=>{
     moveCleanupRef.current?.()

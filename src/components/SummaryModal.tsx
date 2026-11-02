@@ -97,6 +97,15 @@ export default function SummaryModal({ stats, presence, selfId, startedAt, onCom
               </span>
             </span>
           </div>
+          <div className="summary-stat-row">
+            <span className="summary-stat-label">{copy.chess}</span>
+            <span className="summary-stat-value">
+              {copy.play} {stats.chessPlayed}
+              <span className="summary-stat-sub">
+                {copy.wins} {stats.chessWins} · {copy.losses} {stats.chessLosses}
+              </span>
+            </span>
+          </div>
           <div className="summary-interactions">
             <div className="summary-stat-label">{copy.interactions}</div>
             {interactions.length > 0 ? (
