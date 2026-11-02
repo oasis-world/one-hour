@@ -6,6 +6,8 @@ export interface ChessState {
   instanceId: string; hostId: string; players: ChessPlayer[]; board: Piece[][]; turn: Color
   status: 'waiting' | 'playing' | 'result'; winnerId: string | null; lastMove: { from: Square; to: Square } | null
   castling: string; enPassant: Square | null; halfmove: number; round: number; positionHistory?: string[]
+  aiSource?: 'cloud' | 'local'
+  aiMode?: 'cloud' | 'local'
 }
 export interface ChessPlayer { userId: string; displayName: string; avatarUrl: string | null; avatarStyle?: string | null; avatarSeed?: string | null; color: Color; score: number; isAI?: boolean }
 
@@ -105,7 +107,7 @@ export function tryMove(state:ChessState,userId:string,from:Square,to:Square):Ch
 export function restartChessRound(state:ChessState):ChessState {
   const round=state.round+1
   const board=initialBoard(),turn:Color=round%2===0?'b':'w'
-  return {...state,board,turn,status:state.players.length===2?'playing':'waiting',winnerId:null,lastMove:null,castling:'KQkq',enPassant:null,halfmove:0,round,positionHistory:[positionKey(board,turn,'KQkq',null)]}
+  return {...state,board,turn,status:state.players.length===2?'playing':'waiting',winnerId:null,lastMove:null,castling:'KQkq',enPassant:null,halfmove:0,round,aiSource:undefined,positionHistory:[positionKey(board,turn,'KQkq',null)]}
 }
 export function joinChess(state:ChessState, player:ChessPlayer):ChessState {
   if(state.players.some(p=>p.userId===player.userId)||state.players.length>=2)return state
@@ -115,13 +117,14 @@ export function joinChess(state:ChessState, player:ChessPlayer):ChessState {
   return {...state,players,board,turn,
     status:players.length===2?'playing':'waiting',winnerId:restarting?null:state.winnerId,lastMove:restarting?null:state.lastMove,
     castling:restarting?'KQkq':state.castling,enPassant:restarting?null:state.enPassant,halfmove:restarting?0:state.halfmove,round,
+    aiSource:restarting?undefined:state.aiSource,
     positionHistory:restarting?[positionKey(board,turn,'KQkq',null)]:state.positionHistory}
 }
 export function addChessAi(state:ChessState):ChessState|null {
   if(state.status!=='waiting'||state.players.length!==1||state.players[0].isAI)return null
   const human={...state.players[0],color:'w' as const}
   const ai:ChessPlayer={userId:`chess-ai:${state.instanceId}`,displayName:'AI',avatarUrl:null,color:'b',score:0,isAI:true}
-  return {...state,players:[human,ai],turn:'w',status:'playing'}
+  return {...state,players:[human,ai],turn:'w',status:'playing',aiMode:'cloud',aiSource:undefined}
 }
 export function removeChessPlayer(state:ChessState,userId:string):ChessState|null {
   const leaving=state.players.find(p=>p.userId===userId&&!p.isAI)

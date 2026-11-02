@@ -4,6 +4,7 @@ export type TranslationDict = Partial<Record<Lang, Record<string, string>>>
 
 export const TRANSLATIONS: TranslationDict = {
   'zh-TW': {
+    'AI opponent mode': 'AI 對戰模式', 'Cloud': '雲端', 'Local': '本機', 'AI is thinking': 'AI 正在思考',
     'King': '王', 'Queen': '后', 'Rook': '城堡', 'Bishop': '主教', 'Knight': '騎士', 'Pawn': '兵',
     'Games': '遊戲', 'Gomoku': '五子棋', 'Chinese Chess': '中國象棋', 'Chess': '國際象棋', 'Chess board': '國際象棋棋盤', 'White pieces': '白方棋子', 'Black pieces': '黑方棋子', 'White side': '白方', 'Black side': '黑方', 'Spectators': '觀戰玩家', 'No spectators currently': '暫無觀戰玩家', 'Edit Message': '編輯訊息',
     'Games require an online connection': '遊戲需要網路連線',
@@ -132,6 +133,7 @@ export const TRANSLATIONS: TranslationDict = {
     'Activities': '活動與遊戲', 'Travel & Places': '旅行與地點', 'Objects': '物品與科技', 'Symbols': '符號', 'Flags': '旗幟',
   },
   ja: {
+    'AI opponent mode': 'AI対戦モード', 'Cloud': 'クラウド', 'Local': 'ローカル', 'AI is thinking': 'AIが考えています',
     'King': 'キング', 'Queen': 'クイーン', 'Rook': 'ルーク', 'Bishop': 'ビショップ', 'Knight': 'ナイト', 'Pawn': 'ポーン',
     'Games': 'ゲーム', 'Gomoku': '五目並べ', 'Chinese Chess': '中国象棋', 'Chess': 'チェス', 'Chess board': 'チェス盤', 'White pieces': '白の駒', 'Black pieces': '黒の駒', 'White side': '白', 'Black side': '黒', 'Spectators': '観戦者', 'No spectators currently': '現在、観戦者はいません', 'Edit Message': 'メッセージを編集',
     'Games require an online connection': 'ゲームにはインターネット接続が必要です',
@@ -260,6 +262,7 @@ export const TRANSLATIONS: TranslationDict = {
     'Activities': 'アクティビティ', 'Travel & Places': '旅行と場所', 'Objects': '物', 'Symbols': '記号', 'Flags': '旗',
   },
   fr: {
+    'AI opponent mode': 'Mode de jeu contre l’IA', 'Cloud': 'En ligne', 'Local': 'Local', 'AI is thinking': 'L’IA réfléchit',
     'King': 'roi', 'Queen': 'reine', 'Rook': 'tour', 'Bishop': 'fou', 'Knight': 'cavalier', 'Pawn': 'pion',
     'Games': 'Jeux', 'Gomoku': 'Gomoku', 'Chinese Chess': 'Échecs chinois', 'Chess': 'Échecs', 'Chess board': 'Échiquier', 'White pieces': 'Pièces blanches', 'Black pieces': 'Pièces noires', 'White side': 'Blanc', 'Black side': 'Noir', 'Spectators': 'Spectateurs', 'No spectators currently': 'Aucun spectateur pour le moment', 'Edit Message': 'Modifier le message',
     'Games require an online connection': 'Les jeux nécessitent une connexion Internet',
@@ -389,6 +392,7 @@ export const TRANSLATIONS: TranslationDict = {
     'Activities': 'Activités', 'Travel & Places': 'Voyages et lieux', 'Objects': 'Objets', 'Symbols': 'Symboles', 'Flags': 'Drapeaux',
   },
   es: {
+    'AI opponent mode': 'Modo de juego contra IA', 'Cloud': 'Nube', 'Local': 'Local', 'AI is thinking': 'La IA está pensando',
     'King': 'rey', 'Queen': 'reina', 'Rook': 'torre', 'Bishop': 'alfil', 'Knight': 'caballo', 'Pawn': 'peón',
     'Games': 'Juegos', 'Gomoku': 'Gomoku', 'Chinese Chess': 'Ajedrez chino', 'Chess': 'Ajedrez', 'Chess board': 'Tablero de ajedrez', 'White pieces': 'Piezas blancas', 'Black pieces': 'Piezas negras', 'White side': 'Blancas', 'Black side': 'Negras', 'Spectators': 'Espectadores', 'No spectators currently': 'No hay espectadores por ahora', 'Edit Message': 'Editar mensaje',
     'Games require an online connection': 'Los juegos requieren conexión a Internet',
@@ -518,6 +522,7 @@ export const TRANSLATIONS: TranslationDict = {
     'Activities': 'Actividades', 'Travel & Places': 'Viajes y lugares', 'Objects': 'Objetos', 'Symbols': 'Símbolos', 'Flags': 'Banderas',
   },
   de: {
+    'AI opponent mode': 'KI-Spielmodus', 'Cloud': 'Cloud', 'Local': 'Lokal', 'AI is thinking': 'KI denkt nach',
     'King': 'König', 'Queen': 'Dame', 'Rook': 'Turm', 'Bishop': 'Läufer', 'Knight': 'Springer', 'Pawn': 'Bauer',
     'Games': 'Spiele', 'Gomoku': 'Gomoku', 'Chinese Chess': 'Chinesisches Schach', 'Chess': 'Schach', 'Chess board': 'Schachbrett', 'White pieces': 'Weiße Figuren', 'Black pieces': 'Schwarze Figuren', 'White side': 'Weiß', 'Black side': 'Schwarz', 'Spectators': 'Zuschauer', 'No spectators currently': 'Zurzeit keine Zuschauer', 'Edit Message': 'Nachricht bearbeiten',
     'Games require an online connection': 'Für Spiele ist eine Internetverbindung erforderlich',
@@ -647,6 +652,7 @@ export const TRANSLATIONS: TranslationDict = {
     'Activities': 'Aktivitäten', 'Travel & Places': 'Reisen & Orte', 'Objects': 'Objekte', 'Symbols': 'Symbole', 'Flags': 'Flaggen',
   },
   ko: {
+    'AI opponent mode': 'AI 대전 모드', 'Cloud': '클라우드', 'Local': '로컬', 'AI is thinking': 'AI가 생각 중입니다',
     'King': '킹', 'Queen': '퀸', 'Rook': '룩', 'Bishop': '비숍', 'Knight': '나이트', 'Pawn': '폰',
     'Games': '게임', 'Gomoku': '오목', 'Chinese Chess': '중국 장기', 'Chess': '체스', 'Chess board': '체스판', 'White pieces': '백 기물', 'Black pieces': '흑 기물', 'White side': '백', 'Black side': '흑', 'Spectators': '관전자', 'No spectators currently': '현재 관전자가 없습니다', 'Edit Message': '메시지 수정',
     'Games require an online connection': '게임을 하려면 인터넷 연결이 필요합니다',
@@ -776,6 +782,7 @@ export const TRANSLATIONS: TranslationDict = {
     'Activities': '활동', 'Travel & Places': '여행 및 장소', 'Objects': '사물', 'Symbols': '기호', 'Flags': '깃발',
   },
   it: {
+    'AI opponent mode': 'Modalità di gioco contro IA', 'Cloud': 'Cloud', 'Local': 'Locale', 'AI is thinking': 'L’IA sta pensando',
     'King': 're', 'Queen': 'regina', 'Rook': 'torre', 'Bishop': 'alfiere', 'Knight': 'cavallo', 'Pawn': 'pedone',
     'Games': 'Giochi', 'Gomoku': 'Gomoku', 'Chinese Chess': 'Scacchi cinesi', 'Chess': 'Scacchi', 'Chess board': 'Scacchiera', 'White pieces': 'Pezzi bianchi', 'Black pieces': 'Pezzi neri', 'White side': 'Bianco', 'Black side': 'Nero', 'Spectators': 'Spettatori', 'No spectators currently': 'Nessuno spettatore al momento', 'Edit Message': 'Modifica messaggio',
     'Games require an online connection': 'I giochi richiedono una connessione Internet',
@@ -905,6 +912,7 @@ export const TRANSLATIONS: TranslationDict = {
     'Activities': 'Attività', 'Travel & Places': 'Viaggi e luoghi', 'Objects': 'Oggetti', 'Symbols': 'Simboli', 'Flags': 'Bandiere',
   },
   ar: {
+    'AI opponent mode': 'وضع اللعب ضد الذكاء الاصطناعي', 'Cloud': 'سحابي', 'Local': 'محلي', 'AI is thinking': 'الذكاء الاصطناعي يفكر',
     'King': 'الملك', 'Queen': 'الملكة', 'Rook': 'القلعة', 'Bishop': 'الفيل', 'Knight': 'الحصان', 'Pawn': 'الجندي',
     'Games': 'الألعاب', 'Gomoku': 'غوموكو', 'Chinese Chess': 'شطرنج صيني', 'Chess': 'الشطرنج', 'Chess board': 'رقعة الشطرنج', 'White pieces': 'القطع البيضاء', 'Black pieces': 'القطع السوداء', 'White side': 'الأبيض', 'Black side': 'الأسود', 'Spectators': 'المتفرجون', 'No spectators currently': 'لا يوجد متفرجون حاليًا', 'Edit Message': 'تعديل الرسالة',
     'Games require an online connection': 'تتطلب الألعاب اتصالاً بالإنترنت',

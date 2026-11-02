@@ -12,8 +12,11 @@ import OnlineList from '../../components/OnlineList'
 import type { PresenceMember } from '../../lib/chatTypes'
 import { setPopoverOpen } from '../../lib/popoverGuard'
 import { withTimeout } from '../../lib/withTimeout'
-import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGamePresenceUsers, isGameHostAuthority, sendGameBroadcast, watchGameChannelClose } from '../realtime'
+import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGamePresenceUsers, isGameHostAuthority, removeStaleGameChannel, sendGameBroadcast, watchGameChannelClose } from '../realtime'
 import { chooseAiMove } from './ai'
+import { requestCloudMove } from '../cloudAi'
+import AiSourceIcon from '../AiSourceIcon'
+import { AiModeSwitch } from '../AiControls'
 import { loadXiangqiState, saveXiangqiState } from './cloudState'
 import { PaletteIcon, XiangqiGeneralIcon } from '../../components/icons'
 import './XiangqiGame.css'
@@ -356,12 +359,26 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       if (current.status !== 'playing') return
       const aiP = current.players.find((player) => player.isAI && player.color === current.turn)
       if (!aiP || current.turn !== aiP.color) return
-      const move = await requestAiMove(current.board, aiP.color)
+      const side = sideOfColor(aiP.color)
+      const position = { board: current.board, turn: current.turn, round: current.round, lastMove: current.lastMove }
+      let move: Move | null = null
+      if ((current.aiMode ?? 'cloud') === 'cloud') {
+        try { move = await requestCloudMove('xiangqi', current.instanceId, position, legalMoves(current.board, side), () => isGameHostAuthority(channelRef.current, current.hostId) && canSendGameBroadcast(channelRef.current)) } catch { /* use local AI */ }
+      }
+      if (stateRef.current !== current || !isGameHostAuthority(channelRef.current, current.hostId)) return
+      const cloudMove = move
+      if (!move) move = await requestAiMove(current.board, aiP.color)
       if (stateRef.current !== current || !isGameHostAuthority(channelRef.current, current.hostId) || !canSendGameBroadcast(channelRef.current)) return
-      const selectedMove = move ?? chooseAiMove(current.board, aiP.color, 1000)
-      if (!selectedMove) return
-      const afterAi = tryMove(current, aiP.userId, selectedMove.from[0], selectedMove.from[1], selectedMove.to[0], selectedMove.to[1])
-      if (afterAi) { announceCapture(current, afterAi); publishState(afterAi) }
+      const afterCloudCandidate = cloudMove ? tryMove(current, aiP.userId, cloudMove.from[0], cloudMove.from[1], cloudMove.to[0], cloudMove.to[1]) : null
+      const afterLocalCandidate = afterCloudCandidate || !move ? null : tryMove(current, aiP.userId, move.from[0], move.from[1], move.to[0], move.to[1])
+      const fallbackMove = afterCloudCandidate || afterLocalCandidate ? null : chooseAiMove(current.board, aiP.color, 1000)
+      const afterAi = afterCloudCandidate ?? afterLocalCandidate ?? (fallbackMove ? tryMove(current, aiP.userId, fallbackMove.from[0], fallbackMove.from[1], fallbackMove.to[0], fallbackMove.to[1]) : null)
+      if (!afterAi) return
+      const usedCloud = Boolean(afterCloudCandidate)
+      if (!usedCloud) console.info('[game-ai] Applying local AI move for xiangqi.')
+      const sourced = { ...afterAi, aiSource: usedCloud ? 'cloud' as const : 'local' as const }
+      announceCapture(current, sourced)
+      publishState(sourced)
     }, 400)
   }, [announceCapture, publishState, requestAiMove])
 
@@ -439,7 +456,13 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         releaseSlot()
         return
       }
-      channel = client.channel(`game:xiangqi:${instanceId}`, { config: { presence: { key: presenceKey } } })
+      const topic = `game:xiangqi:${instanceId}`
+      await removeStaleGameChannel(client, topic)
+      if (cancelled) {
+        releaseSlot()
+        return
+      }
+      channel = client.channel(topic, { config: { presence: { key: presenceKey } } })
       channelRef.current = channel
       watchGameChannelClose(channel, 'Xiangqi', instanceId, () => !cancelled)
 
@@ -550,6 +573,14 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
             }
           }
         }
+      })
+      channel.on('broadcast', { event: 'ai-mode' }, ({ payload }: { payload: unknown }) => {
+        if (selfIdRef.current !== stateRef.current.hostId || !isGameHostAuthority(channel, stateRef.current.hostId)) return
+        const mode = (payload as { mode?: unknown } | null)?.mode
+        if (mode !== 'cloud' && mode !== 'local') return
+        const next = { ...stateRef.current, aiMode: mode as 'cloud' | 'local' }
+        publishState(next)
+        scheduleAiTurn(next)
       })
       channel.on('broadcast', { event: 'leave' }, ({ payload }: { payload: unknown }) => {
         if (selfIdRef.current !== stateRef.current.hostId || !isGameHostAuthority(channel, stateRef.current.hostId)) return
@@ -843,6 +874,16 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     }
   }
 
+  const changeAiMode = (aiMode: 'cloud' | 'local') => {
+    const current = stateRef.current
+    if (!selfId || current.hostId !== selfId || !canSendGameBroadcast(channelRef.current) || current.aiMode === aiMode) return
+    const next = { ...current, aiMode }
+    if (isGameHostAuthority(channelRef.current, current.hostId)) {
+      publishState(next)
+      scheduleAiTurn(next)
+    } else sendGameBroadcast(channelRef.current, 'ai-mode', { mode: aiMode })
+  }
+
   // selection handling
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -886,6 +927,9 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   const canJoin = !isPlayer && state.players.length < 2 && (state.status === 'waiting' || state.status === 'result')
   const canJoinAI = isPlayer && state.players.length === 1 && state.status === 'waiting'
   const hasAiOpponent = state.players.some((player) => player.isAI)
+  const canChangeAiMode = hasAiOpponent && state.hostId === selfId
+  const reserveAiModeRow = !channelReady || canJoinAI || canChangeAiMode
+  const aiIsThinking = state.status === 'playing' && state.players.some((player) => player.isAI && player.color === state.turn)
   const hasHumanOpponent = state.players.some((player) => !player.isAI && player.userId !== selfId)
   const waitingSolo = state.status === 'waiting' && state.players.length === 1
   const canRestart = isPlayer && (hasAiOpponent || state.status === 'result')
@@ -950,12 +994,14 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
                 aria-label={p.color === 1 ? t('红方棋子', 'Red pieces') : t('黑方棋子', 'Black pieces')}
                 title={p.color === 1 ? t('红方', 'Red side') : t('黑方', 'Black side')}
               />
-              <span className="xiangqi-player-name" title={p.displayName}>{p.displayName}</span>
+              <span className="xiangqi-player-name" title={p.displayName}>{p.displayName}{p.isAI && <AiSourceIcon source={state.aiMode ?? state.aiSource ?? 'local'} />}</span>
               <span className="xiangqi-player-score">{p.score}</span>
             </div>
           </div>
         ))}
       </div>
+
+      {reserveAiModeRow && <div className="game-ai-mode-slot">{canChangeAiMode && <AiModeSwitch mode={state.aiMode ?? 'cloud'} onChange={changeAiMode} thinking={aiIsThinking} />}</div>}
 
       {state.status === 'result' && <div className="xiangqi-result">{resultText()}</div>}
 

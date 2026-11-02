@@ -12,8 +12,11 @@ import OnlineList from '../../components/OnlineList'
 import type { PresenceMember } from '../../lib/chatTypes'
 import { setPopoverOpen } from '../../lib/popoverGuard'
 import { withTimeout } from '../../lib/withTimeout'
-import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGamePresenceUsers, isGameHostAuthority, sendGameBroadcast, watchGameChannelClose } from '../realtime'
+import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGamePresenceUsers, isGameHostAuthority, removeStaleGameChannel, sendGameBroadcast, watchGameChannelClose } from '../realtime'
 import { chooseAiMove } from './ai'
+import { requestCloudMove } from '../cloudAi'
+import AiSourceIcon from '../AiSourceIcon'
+import { AiModeSwitch } from '../AiControls'
 import { loadGomokuState, saveGomokuState } from './cloudState'
 import { GomokuIcon, PaletteIcon } from '../../components/icons'
 import './GomokuGame.css'
@@ -170,13 +173,25 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
     const ai = next.players.find((player) => player.isAI && player.color === next.turn)
     if (!ai || next.status !== 'playing') return
     if (aiTimerRef.current !== null) window.clearTimeout(aiTimerRef.current)
-    aiTimerRef.current = window.setTimeout(() => {
+    aiTimerRef.current = window.setTimeout(async () => {
       if (!isGameHostAuthority(channelRef.current, next.hostId) || !canSendGameBroadcast(channelRef.current)) return
       const current = stateRef.current
       if (current.status !== 'playing' || current.turn !== ai.color) return
-      const { r, c } = chooseAiMove(current.board, ai.color)
-      const afterAi = tryMove(current, ai.userId, r, c)
-      if (afterAi) publishState(afterAi)
+      const legalMoves = current.board.flatMap((row, r) => row.flatMap((cell, c) => cell === 0 ? [{ r, c }] : []))
+      const position = { board: current.board, turn: current.turn, round: current.round, lastMove: current.lastMove }
+      let move: { r: number; c: number } | null = null
+      if ((current.aiMode ?? 'cloud') === 'cloud') {
+        try { move = await requestCloudMove('gomoku', current.instanceId, position, legalMoves, () => isGameHostAuthority(channelRef.current, current.hostId) && canSendGameBroadcast(channelRef.current)) } catch { /* use local AI */ }
+      }
+      if (stateRef.current !== current || !isGameHostAuthority(channelRef.current, current.hostId)) return
+      const candidate = move && current.board[move.r]?.[move.c] === 0 ? move : null
+      const afterCandidate = candidate ? tryMove(current, ai.userId, candidate.r, candidate.c) : null
+      const fallback = afterCandidate ? null : chooseAiMove(current.board, ai.color)
+      const afterAi = afterCandidate ?? (fallback ? tryMove(current, ai.userId, fallback.r, fallback.c) : null)
+      if (afterAi) {
+        if (!afterCandidate) console.info('[game-ai] Applying local AI move for gomoku.')
+        publishState({ ...afterAi, aiSource: afterCandidate ? 'cloud' : 'local' })
+      }
     }, 350)
   }, [publishState])
 
@@ -291,7 +306,13 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         releaseSlot()
         return
       }
-      channel = client.channel(`game:gomoku:${instanceId}`, {
+      const topic = `game:gomoku:${instanceId}`
+      await removeStaleGameChannel(client, topic)
+      if (cancelled) {
+        releaseSlot()
+        return
+      }
+      channel = client.channel(topic, {
         config: { presence: { key: presenceKey } },
       })
       channelRef.current = channel
@@ -408,6 +429,14 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
             }
           }
         }
+      })
+      channel.on('broadcast', { event: 'ai-mode' }, ({ payload }) => {
+        if (selfIdRef.current !== stateRef.current.hostId || !isGameHostAuthority(channel, stateRef.current.hostId)) return
+        const mode = (payload as { mode?: unknown } | null)?.mode
+        if (mode !== 'cloud' && mode !== 'local') return
+        const next = { ...stateRef.current, aiMode: mode as 'cloud' | 'local' }
+        publishState(next)
+        scheduleAiTurn(next)
       })
       channel.on('broadcast', { event: 'leave' }, ({ payload }) => {
         if (selfIdRef.current !== stateRef.current.hostId || !isGameHostAuthority(channel, stateRef.current.hostId)) return
@@ -728,6 +757,16 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
     }
   }
 
+  const changeAiMode = (aiMode: 'cloud' | 'local') => {
+    const current = stateRef.current
+    if (!selfId || current.hostId !== selfId || !canSendGameBroadcast(channelRef.current) || current.aiMode === aiMode) return
+    const next = { ...current, aiMode }
+    if (isGameHostAuthority(channelRef.current, current.hostId)) {
+      publishState(next)
+      scheduleAiTurn(next)
+    } else sendGameBroadcast(channelRef.current, 'ai-mode', { mode: aiMode })
+  }
+
   if (!isSupabaseConfigured()) {
     return (
       <div className="gomoku-card">
@@ -741,6 +780,9 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   const canJoin = !isPlayer && state.players.length < 2 && (state.status === 'waiting' || state.status === 'result')
   const canJoinAI = isPlayer && state.players.length === 1 && state.status === 'waiting'
   const hasAiOpponent = state.players.some((player) => player.isAI)
+  const canChangeAiMode = hasAiOpponent && state.hostId === selfId
+  const reserveAiModeRow = !channelReady || canJoinAI || canChangeAiMode
+  const aiIsThinking = state.status === 'playing' && state.players.some((player) => player.isAI && player.color === state.turn)
   const hasHumanOpponent = state.players.some((player) => !player.isAI && player.userId !== selfId)
   const waitingSolo = state.status === 'waiting' && state.players.length === 1
   const canRestart = isPlayer && (hasAiOpponent || state.status === 'result')
@@ -838,12 +880,14 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
             )}
             <div className={`gomoku-player${p.userId === selfId ? ' is-self' : ''}${state.turn === p.color && state.status === 'playing' ? ' is-turn' : ''}`}>
               <span className="gomoku-stone" data-color={p.color} />
-              <span className="gomoku-player-name" title={p.displayName}>{p.displayName}</span>
+              <span className="gomoku-player-name" title={p.displayName}>{p.displayName}{p.isAI && <AiSourceIcon source={state.aiMode ?? state.aiSource ?? 'local'} />}</span>
               <span className="gomoku-player-score">{p.score}</span>
             </div>
           </div>
         ))}
       </div>
+
+      {reserveAiModeRow && <div className="game-ai-mode-slot">{canChangeAiMode && <AiModeSwitch mode={state.aiMode ?? 'cloud'} onChange={changeAiMode} thinking={aiIsThinking} />}</div>}
 
       {state.status === 'result' && (
         <div className="gomoku-result">{resultText()}</div>

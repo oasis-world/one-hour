@@ -4,6 +4,8 @@ import { getGameById } from './registry'
 import type { PresenceMember } from '../lib/chatTypes'
 import './GameMessage.css'
 
+const GAME_VISIBILITY_MARGIN = 360
+
 interface Props {
   content: string
   hostUserId: string
@@ -24,6 +26,8 @@ export default function GameMessage({ content, hostUserId, onlineMembers = [], i
     const root = element.closest('.chat-log')
     const column = element.closest('.chat-column')
     let frame = 0
+    let lastHeight = element.getBoundingClientRect().height
+    let lastBottom = element.getBoundingClientRect().bottom
     const settleTimers: number[] = []
     const measureVisibility = () => {
       frame = 0
@@ -35,8 +39,12 @@ export default function GameMessage({ content, hostUserId, onlineMembers = [], i
       const rootBounds = root?.getBoundingClientRect()
       const left = Math.max(bounds.left, rootBounds?.left ?? 0, 0)
       const right = Math.min(bounds.right, rootBounds?.right ?? window.innerWidth, window.innerWidth)
-      const top = Math.max(bounds.top, rootBounds?.top ?? 0, 0)
-      const bottom = Math.min(bounds.bottom, rootBounds?.bottom ?? window.innerHeight, window.innerHeight)
+      // Match the observer's pre-mount margin. Using the unexpanded viewport
+      // here immediately unmounted cards that were just mounted 120px early.
+      const rootTop = rootBounds ? Math.max(0, rootBounds.top - GAME_VISIBILITY_MARGIN) : -GAME_VISIBILITY_MARGIN
+      const rootBottom = rootBounds ? Math.min(window.innerHeight, rootBounds.bottom + GAME_VISIBILITY_MARGIN) : window.innerHeight + GAME_VISIBILITY_MARGIN
+      const top = Math.max(bounds.top, rootTop)
+      const bottom = Math.min(bounds.bottom, rootBottom)
       const visible = right > left && bottom > top
       setIsInView((current) => current === visible ? current : visible)
     }
@@ -50,7 +58,7 @@ export default function GameMessage({ content, hostUserId, onlineMembers = [], i
           if (document.hidden) return
           if (entry?.isIntersecting) setIsInView(true)
           else scheduleMeasure()
-        }, { root, rootMargin: '120px 0px', threshold: 0 })
+        }, { root, rootMargin: `${GAME_VISIBILITY_MARGIN}px 0px`, threshold: 0 })
     observer?.observe(element)
     root?.addEventListener('scroll', scheduleMeasure, { passive: true })
     window.addEventListener('resize', scheduleMeasure)
@@ -77,7 +85,25 @@ export default function GameMessage({ content, hostUserId, onlineMembers = [], i
     const viewport = window.visualViewport
     viewport?.addEventListener('resize', scheduleMeasure)
     viewport?.addEventListener('scroll', scheduleMeasure)
-    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleMeasure)
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver((entries) => {
+      const entry = entries.find((item) => item.target === element)
+      if (entry) {
+        const bounds = element.getBoundingClientRect()
+        const rootBounds = root?.getBoundingClientRect()
+        const nextHeight = bounds.height
+        const heightDelta = nextHeight - lastHeight
+        let scrollAdjustment = 0
+        // Keep the reader's scroll position stable when a prefetched card
+        // above the viewport swaps its placeholder for the real game.
+        if (root && rootBounds && lastBottom <= rootBounds.top && Math.abs(heightDelta) > 0.5) {
+          scrollAdjustment = heightDelta
+          root.scrollTop += heightDelta
+        }
+        lastHeight = nextHeight
+        lastBottom = bounds.bottom - scrollAdjustment
+      }
+      scheduleMeasure()
+    })
     resizeObserver?.observe(element)
     if (root) resizeObserver?.observe(root)
     // Measure before paint so an already-visible game never flashes the

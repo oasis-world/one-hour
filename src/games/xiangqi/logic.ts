@@ -42,6 +42,8 @@ export interface XiangqiState {
   winnerId: string | null
   lastMove: Move | null
   round: number
+  aiSource?: 'cloud' | 'local'
+  aiMode?: 'cloud' | 'local'
 }
 
 export function emptyBoard(): number[][] {
@@ -327,6 +329,8 @@ export function addAiOpponent(state: XiangqiState): XiangqiState | null {
     players: [human, ai],
     turn: 1,
     status: 'playing',
+    aiMode: 'cloud',
+    aiSource: undefined,
   }
 }
 
@@ -344,6 +348,7 @@ export function restartXiangqiRound(state: XiangqiState): XiangqiState {
     ...normalizeAiColors(state),
     board: initialBoard(),
     turn: round % 2 === 1 ? 1 : 2,
+    aiSource: undefined,
     status: state.players.length === 2 ? 'playing' : 'waiting',
     winnerId: null,
     lastMove: null,

@@ -1,6 +1,7 @@
 import { getSupabaseClient } from '../lib/supabaseClient'
 
 type GameChannel = ReturnType<Awaited<ReturnType<typeof getSupabaseClient>>['channel']>
+type GameClient = Awaited<ReturnType<typeof getSupabaseClient>>
 type ReleaseSlot = () => void
 
 const pageId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -10,6 +11,19 @@ const pageId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
 /** Distinguish tabs sharing one account so only one tab acts as a game's host. */
 export function getGamePresenceKey(userId: string): string {
   return `${userId}:${pageId}`
+}
+
+/** Remove a leftover channel for this exact game before joining the topic again. */
+export async function removeStaleGameChannel(client: GameClient, topic: string): Promise<void> {
+  const stale = client.getChannels().filter((channel) => channel.topic === topic)
+  for (const channel of stale) {
+    console.warn('[game-realtime] Removing a stale channel before rejoining.', { topic, state: channel.state })
+    try {
+      await client.removeChannel(channel)
+    } catch (error) {
+      console.warn('[game-realtime] Could not remove stale channel cleanly.', { topic, error })
+    }
+  }
 }
 
 export function getGamePresenceUsers(channel: GameChannel | null | undefined): string[] {

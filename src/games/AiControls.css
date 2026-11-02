@@ -1,0 +1,61 @@
+.game-ai-mode-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+}
+
+.game-ai-mode {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin: 8px auto 10px;
+  color: inherit;
+  font-size: 12px;
+}
+.game-ai-mode-label { font-weight: 700; margin-right: 3px; }
+.game-ai-mode button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 3px 9px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  color: inherit;
+  background: rgba(0,0,0,.12);
+  font: inherit;
+  cursor: pointer;
+}
+.game-ai-mode button.is-active {
+  border-color: rgba(125,211,252,.7);
+  background: rgba(56,189,248,.17);
+  box-shadow: 0 0 0 1px rgba(56,189,248,.12) inset;
+}
+.game-ai-mode button:hover { background: rgba(255,255,255,.12); }
+.game-ai-mode button.is-active:hover { background: rgba(56,189,248,.23); }
+.game-ai-mode-spinner {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  margin-left: 3px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  opacity: .75;
+  flex: 0 0 15px;
+  border-top-color: #7dd3fc;
+  border-radius: 50%;
+  animation: game-ai-spin .8s linear infinite;
+}
+@keyframes game-ai-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .game-ai-mode-spinner { animation-duration: 2s; }
+}
+@media (hover: none), (pointer: coarse) {
+  .game-ai-mode button:hover { background: rgba(0,0,0,.12); }
+  .game-ai-mode button.is-active:hover { background: rgba(56,189,248,.17); }
+  .app-shell.theme-warm .game-ai-mode button:hover { background: rgba(255,255,255,.45); }
+  .app-shell.theme-warm .game-ai-mode button.is-active:hover { background: rgba(56,189,248,.17); }
+}

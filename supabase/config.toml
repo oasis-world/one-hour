@@ -1,0 +1,3 @@
+[functions.game-ai-move]
+# OPTIONS preflight has no user JWT; the function validates JWTs on POST itself.
+verify_jwt = false

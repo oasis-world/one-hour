@@ -24,6 +24,8 @@ export interface GomokuState {
   winningLine: [number, number][] | null
   lastMove: { r: number; c: number } | null
   round: number
+  aiSource?: 'cloud' | 'local'
+  aiMode?: 'cloud' | 'local'
 }
 
 export function emptyBoard(): Stone[][] {
@@ -62,6 +64,8 @@ export function addAiOpponent(state: GomokuState): GomokuState | null {
     players: [...state.players, ai],
     turn: state.round % 2 === 1 ? 1 : 2,
     status: 'playing',
+    aiMode: 'cloud',
+    aiSource: undefined,
   }
 }
 
@@ -76,6 +80,7 @@ export function restartGomokuRound(state: GomokuState): GomokuState {
     winningLine: null,
     lastMove: null,
     round,
+    aiSource: undefined,
   }
 }
 
@@ -99,6 +104,7 @@ export function removeGomokuPlayer(state: GomokuState, userId: string): GomokuSt
     winningLine: null,
     lastMove: null,
     round,
+    aiSource: undefined,
   }
 }
 

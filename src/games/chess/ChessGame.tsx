@@ -11,9 +11,12 @@ import { ChessCrownIcon } from '../../components/icons'
 import OnlineList from '../../components/OnlineList'
 import { setPopoverOpen } from '../../lib/popoverGuard'
 import { recordGameResult, recordInteraction } from '../../lib/lifetimeStats'
-import { getGamePresenceKey } from '../realtime'
+import { getGamePresenceKey, isGameHostAuthority, removeStaleGameChannel } from '../realtime'
 import { createInitialState, isChessState, joinChess, addChessAi, inCheck, legalMoves, removeChessPlayer, restartChessRound, tryMove, type ChessState, type Color, type Piece } from './logic'
 import { chooseChessAiMove } from './ai'
+import { requestCloudMove } from '../cloudAi'
+import AiSourceIcon from '../AiSourceIcon'
+import { AiModeSwitch } from '../AiControls'
 import { loadChessState, saveChessState } from './cloudState'
 import './ChessGame.css'
 
@@ -170,7 +173,9 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
     const abort=new AbortController()
     void (async()=>{
       const client=await getSupabaseClient();if(cancelled)return
-      const active=client.channel(`game:chess:${instanceId}`,{config:{presence:{key:getGamePresenceKey(selfId)}}})
+      const topic=`game:chess:${instanceId}`
+      await removeStaleGameChannel(client,topic);if(cancelled)return
+      const active=client.channel(topic,{config:{presence:{key:getGamePresenceKey(selfId)}}})
       ch=active;channelRef.current=active
       active.on('broadcast',{event:'state'},({payload}:{payload:unknown})=>{if(isChessState(payload,instanceId)){if(!stateHydratedRef.current){renderedBoardRef.current=payload.board;stateHydratedRef.current=true}stateRef.current=payload;setState(payload);setReady(true);if(payload.players.some(player=>player.userId===selfId))setJoinStatus('idle')}})
       active.on('broadcast',{event:'join'},({payload}:{payload:unknown})=>{
@@ -178,6 +183,11 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
         applyState(joinChess(stateRef.current,payload as ChessState['players'][number]))
       })
       active.on('broadcast',{event:'ai'},()=>{if(stateRef.current.hostId===selfId){const next=addChessAi(stateRef.current);if(next)applyState(next)}})
+      active.on('broadcast',{event:'ai-mode'},({payload}:{payload:unknown})=>{
+        if(stateRef.current.hostId!==selfId||!isGameHostAuthority(active,stateRef.current.hostId)||!payload||typeof payload!=='object')return
+        const mode=(payload as {mode?:unknown}).mode
+        if(mode==='cloud'||mode==='local')applyState({...stateRef.current,aiMode:mode})
+      })
       active.on('broadcast',{event:'move'},({payload}:{payload:unknown})=>{
         if(stateRef.current.hostId!==selfId||!payload||typeof payload!=='object')return
         const move=payload as {userId:string;from:[number,number];to:[number,number]}
@@ -202,12 +212,23 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
   },[instanceId,selfId,hostUserId,applyState])
 
   useEffect(()=>{
-    if(state.status!=='playing'||!state.players.some(p=>p.isAI&&p.color===state.turn)||state.hostId!==selfId)return
-    const timer=window.setTimeout(()=>{
-      const current=stateRef.current,move=chooseChessAiMove(current),ai=current.players.find(p=>p.isAI&&p.color===current.turn)
-      if(move&&ai){const next=tryMove(current,ai.userId,move.from,move.to);if(next)applyState(next)}
+    if(state.status!=='playing'||!state.players.some(p=>p.isAI&&p.color===state.turn)||state.hostId!==selfId||!isGameHostAuthority(channelRef.current,state.hostId))return
+    let cancelled=false
+    const timer=window.setTimeout(async()=>{
+      const current=stateRef.current,ai=current.players.find(p=>p.isAI&&p.color===current.turn)
+      if(!ai)return
+      const position={board:current.board,turn:current.turn,castling:current.castling,enPassant:current.enPassant,halfmove:current.halfmove,round:current.round,lastMove:current.lastMove}
+      let move: ReturnType<typeof chooseChessAiMove> = null
+      if((current.aiMode??'cloud')==='cloud'){
+        try { move=await requestCloudMove('chess',current.instanceId,position,legalMoves(current),()=>isGameHostAuthority(channelRef.current,current.hostId)) } catch { /* use local AI */ }
+      }
+      if(cancelled||stateRef.current!==current||current.hostId!==selfId||!isGameHostAuthority(channelRef.current,current.hostId))return
+      const afterCandidate=move?tryMove(current,ai.userId,move.from,move.to):null
+      const fallbackMove=afterCandidate?null:chooseChessAiMove(current)
+      const next=afterCandidate??(fallbackMove?tryMove(current,ai.userId,fallbackMove.from,fallbackMove.to):null)
+      if(next){if(!afterCandidate)console.info('[game-ai] Applying local AI move for chess.');applyState({...next,aiSource:afterCandidate?'cloud':'local'})}
     },520)
-    return()=>window.clearTimeout(timer)
+    return()=>{cancelled=true;window.clearTimeout(timer)}
   },[state,selfId,applyState])
 
   const myColor=state.players.find(player=>player.userId===selfId)?.color??null
@@ -217,6 +238,9 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
   const canJoin=!isPlayer&&state.players.length<2&&(state.status==='waiting'||state.status==='result')
   const canJoinAi=isPlayer&&state.players.length===1&&state.status==='waiting'
   const hasAi=state.players.some(player=>player.isAI)
+  const canChangeAiMode=hasAi&&state.hostId===selfId
+  const reserveAiModeRow=!ready||canJoinAi||canChangeAiMode
+  const aiIsThinking=state.status==='playing'&&state.players.some(player=>player.isAI&&player.color===state.turn)
   const hasHuman=state.players.some(player=>!player.isAI&&player.userId!==selfId)
   const waitingSolo=state.status==='waiting'&&state.players.length===1
   const canRestart=isPlayer&&(hasAi||state.status==='result')
@@ -239,6 +263,12 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
     if(!selfId||!ready)return
     if(selfId===stateRef.current.hostId){const next=addChessAi(stateRef.current);if(next)applyState(next)}
     else void channelRef.current?.send({type:'broadcast',event:'ai',payload:{}})
+  }
+  const changeAiMode=(aiMode:'cloud'|'local')=>{
+    const current=stateRef.current
+    if(!selfId||current.hostId!==selfId||current.aiMode===aiMode)return
+    if(isGameHostAuthority(channelRef.current,current.hostId))applyState({...current,aiMode})
+    else void channelRef.current?.send({type:'broadcast',event:'ai-mode',payload:{mode:aiMode}})
   }
   const rematch=()=>{if(!selfId||!ready)return;if(selfId===stateRef.current.hostId)applyState(restartChessRound(stateRef.current));else void channelRef.current?.send({type:'broadcast',event:'rematch',payload:{}})}
   const leave=()=>{
@@ -272,9 +302,11 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
       {player.isAI?<AiAvatar/>:<AvatarBadge className="chess-player-avatar" size={30} look={{style:player.avatarStyle||'thumbs',seed:player.avatarSeed||player.userId,url:player.avatarUrl}}/>}
       <div className={`chess-player${player.userId===selfId?' is-self':''}${state.turn===player.color&&state.status==='playing'?' is-turn':''}`}>
         <span className={`chess-side-indicator${player.color==='w'?' is-white':' is-black'}`} role="img" aria-label={player.color==='w'?t('白方棋子','White pieces'):t('黑方棋子','Black pieces')} title={player.color==='w'?t('白方','White side'):t('黑方','Black side')}/>
-        <span className="chess-player-name" title={player.displayName}>{player.displayName}</span><span className="chess-player-score">{player.score}</span>
+        <span className="chess-player-name" title={player.displayName}>{player.displayName}{player.isAI&&<AiSourceIcon source={state.aiMode??state.aiSource??'local'}/>}</span><span className="chess-player-score">{player.score}</span>
       </div>
     </div>)}</div>}
+
+    {reserveAiModeRow&&<div className="game-ai-mode-slot">{canChangeAiMode&&<AiModeSwitch mode={state.aiMode??'cloud'} onChange={changeAiMode} thinking={aiIsThinking}/>}</div>}
 
     {state.status==='result'&&<div className="chess-result">{winner?t('获胜：','Winner: ')+winner.displayName:t('平局','Draw')}</div>}
     <div ref={boardRef} className={`chess-board${myColor==='b'?' chess-board--flipped':''}`} role="grid" aria-label={t('国际象棋棋盘','Chess board')}>
