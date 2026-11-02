@@ -124,7 +124,7 @@ export function addChessAi(state:ChessState):ChessState|null {
   if(state.status!=='waiting'||state.players.length!==1||state.players[0].isAI)return null
   const human={...state.players[0],color:'w' as const}
   const ai:ChessPlayer={userId:`chess-ai:${state.instanceId}`,displayName:'AI',avatarUrl:null,color:'b',score:0,isAI:true}
-  return {...state,players:[human,ai],turn:'w',status:'playing',aiMode:'cloud',aiSource:undefined}
+  return {...state,players:[human,ai],turn:'w',status:'playing',aiMode:'local',aiSource:undefined}
 }
 export function removeChessPlayer(state:ChessState,userId:string):ChessState|null {
   const leaving=state.players.find(p=>p.userId===userId&&!p.isAI)

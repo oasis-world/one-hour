@@ -64,7 +64,7 @@ export function addAiOpponent(state: GomokuState): GomokuState | null {
     players: [...state.players, ai],
     turn: state.round % 2 === 1 ? 1 : 2,
     status: 'playing',
-    aiMode: 'cloud',
+    aiMode: 'local',
     aiSource: undefined,
   }
 }

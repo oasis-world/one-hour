@@ -16,10 +16,12 @@ import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGa
 import { chooseAiMove } from './ai'
 import { requestCloudMove } from '../cloudAi'
 import AiSourceIcon from '../AiSourceIcon'
-import { AiModeSwitch } from '../AiControls'
+import GameCardMenu from '../GameCardMenu'
+import { getCachedAiMode, setCachedAiMode } from '../aiModePreference'
 import { loadXiangqiState, saveXiangqiState } from './cloudState'
-import { PaletteIcon, XiangqiGeneralIcon } from '../../components/icons'
+import { XiangqiGeneralIcon } from '../../components/icons'
 import './XiangqiGame.css'
+import '../GameCardMenu.css'
 import {
   addAiOpponent,
   colorOfPlayer,
@@ -73,6 +75,8 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   const [startToast, setStartToast] = useState('')
   const startToastTimerRef = useRef<number | null>(null)
   const startToastKeyRef = useRef('')
+  const [hintToast, setHintToast] = useState('')
+  const hintToastTimerRef = useRef<number | null>(null)
   const hydratedRef = useRef(false)
   const prevStatusRef = useRef<XiangqiState['status']>('waiting')
   const prevRoundRef = useRef(1)
@@ -222,6 +226,12 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     startToastTimerRef.current = window.setTimeout(() => setStartToast(''), 2500)
   }, [])
 
+  const showHintToast = useCallback((msg: string) => {
+    setHintToast(msg)
+    if (hintToastTimerRef.current !== null) window.clearTimeout(hintToastTimerRef.current)
+    hintToastTimerRef.current = window.setTimeout(() => setHintToast(''), 2000)
+  }, [])
+
   useEffect(() => {
     if (!stateLoadedRef.current) return
     if (!hydratedRef.current) {
@@ -362,7 +372,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       const side = sideOfColor(aiP.color)
       const position = { board: current.board, turn: current.turn, round: current.round, lastMove: current.lastMove }
       let move: Move | null = null
-      if ((current.aiMode ?? 'cloud') === 'cloud') {
+      if ((current.aiMode ?? 'local') === 'cloud') {
         try { move = await requestCloudMove('xiangqi', current.instanceId, position, legalMoves(current.board, side), () => isGameHostAuthority(channelRef.current, current.hostId) && canSendGameBroadcast(channelRef.current)) } catch { /* use local AI */ }
       }
       if (stateRef.current !== current || !isGameHostAuthority(channelRef.current, current.hostId)) return
@@ -386,6 +396,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     if (aiTimerRef.current !== null) window.clearTimeout(aiTimerRef.current)
     if (captureToastTimerRef.current !== null) window.clearTimeout(captureToastTimerRef.current)
     if (startToastTimerRef.current !== null) window.clearTimeout(startToastTimerRef.current)
+    if (hintToastTimerRef.current !== null) window.clearTimeout(hintToastTimerRef.current)
   }, [])
 
   useEffect(() => {
@@ -561,7 +572,9 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       })
       channel.on('broadcast', { event: 'ai' }, () => {
         if (selfIdRef.current !== stateRef.current.hostId || !isGameHostAuthority(channel, stateRef.current.hostId)) return
-        const next = addAiOpponent(stateRef.current)
+        const raw = addAiOpponent(stateRef.current)
+        const cached = getCachedAiMode()
+        const next = raw && cached ? { ...raw, aiMode: cached } : raw
         if (next) {
           publishState(next)
           scheduleAiTurn(next)
@@ -578,6 +591,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         if (selfIdRef.current !== stateRef.current.hostId || !isGameHostAuthority(channel, stateRef.current.hostId)) return
         const mode = (payload as { mode?: unknown } | null)?.mode
         if (mode !== 'cloud' && mode !== 'local') return
+        setCachedAiMode(mode)
         const next = { ...stateRef.current, aiMode: mode as 'cloud' | 'local' }
         publishState(next)
         scheduleAiTurn(next)
@@ -857,8 +871,10 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   const sendAiJoin = () => {
     if (!selfId || !isRealtimeReady()) return
     if (selfId === stateRef.current.hostId) {
-      const next = addAiOpponent(stateRef.current)
-      if (next) {
+      const raw = addAiOpponent(stateRef.current)
+      if (raw) {
+        const cached = getCachedAiMode()
+        const next = cached ? { ...raw, aiMode: cached } : raw
         publishState(next)
         scheduleAiTurn(next)
         if (next.status === 'playing' && next.players.length >= 2) {
@@ -875,13 +891,20 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   }
 
   const changeAiMode = (aiMode: 'cloud' | 'local') => {
+    setCachedAiMode(aiMode)
     const current = stateRef.current
-    if (!selfId || current.hostId !== selfId || !canSendGameBroadcast(channelRef.current) || current.aiMode === aiMode) return
+    if (!selfId || !canSendGameBroadcast(channelRef.current)) return
+    if (!current.players.some((p) => p.isAI)) return
+    if (current.aiMode === aiMode) return
     const next = { ...current, aiMode }
-    if (isGameHostAuthority(channelRef.current, current.hostId)) {
-      publishState(next)
-      scheduleAiTurn(next)
-    } else sendGameBroadcast(channelRef.current, 'ai-mode', { mode: aiMode })
+    if (current.hostId === selfId) {
+      if (isGameHostAuthority(channelRef.current, current.hostId)) {
+        publishState(next)
+        scheduleAiTurn(next)
+      } else sendGameBroadcast(channelRef.current, 'ai-mode', { mode: aiMode })
+    } else {
+      sendGameBroadcast(channelRef.current, 'ai-mode', { mode: aiMode })
+    }
   }
 
   // selection handling
@@ -927,8 +950,6 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   const canJoin = !isPlayer && state.players.length < 2 && (state.status === 'waiting' || state.status === 'result')
   const canJoinAI = isPlayer && state.players.length === 1 && state.status === 'waiting'
   const hasAiOpponent = state.players.some((player) => player.isAI)
-  const canChangeAiMode = hasAiOpponent && state.hostId === selfId
-  const reserveAiModeRow = !channelReady || canJoinAI || canChangeAiMode
   const aiIsThinking = state.status === 'playing' && state.players.some((player) => player.isAI && player.color === state.turn)
   const hasHumanOpponent = state.players.some((player) => !player.isAI && player.userId !== selfId)
   const waitingSolo = state.status === 'waiting' && state.players.length === 1
@@ -953,15 +974,6 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       <div className="xiangqi-head">
         <div className="xiangqi-heading">
           <span className="xiangqi-title"><XiangqiGeneralIcon size={17} />{t('中国象棋', 'Chinese Chess')}</span>
-          <button
-            type="button"
-            className="xiangqi-style-random"
-            onClick={randomizeBoardStyle}
-            aria-label={t('随机切换棋盘风格', 'Randomize board style')}
-            title={t('随机切换棋盘风格', 'Randomize board style')}
-          >
-            <PaletteIcon size={16} />
-          </button>
           {statusHint && (state.status === 'playing' && !isPlayer ? (
             <span className="xiangqi-spectator-control">
               <button type="button" className="xiangqi-status xiangqi-spectator-trigger" aria-haspopup="dialog" aria-expanded={spectatorsOpen} onClick={() => setSpectatorsOpen((o) => !o)}>
@@ -975,6 +987,14 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
           {statusHint && <span className="xiangqi-status-dot" aria-hidden="true" />}
           <span>{state.players.length}/2 {t('玩家', 'players')}</span>
         </span>
+        {state.status === 'playing' && isPlayer && (
+          <GameCardMenu
+            aiMode={state.aiMode ?? state.aiSource ?? getCachedAiMode() ?? 'local'}
+            onChangeAiMode={changeAiMode}
+            onToggleBoardStyle={randomizeBoardStyle}
+            onAiTutor={() => showHintToast(t('AI 教学功能敬请期待', 'AI Tutor coming soon'))}
+          />
+        )}
       </div>
 
       <div className="xiangqi-players">
@@ -994,14 +1014,13 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
                 aria-label={p.color === 1 ? t('红方棋子', 'Red pieces') : t('黑方棋子', 'Black pieces')}
                 title={p.color === 1 ? t('红方', 'Red side') : t('黑方', 'Black side')}
               />
-              <span className="xiangqi-player-name" title={p.displayName}>{p.displayName}{p.isAI && <AiSourceIcon source={state.aiMode ?? state.aiSource ?? 'local'} />}</span>
+              <span className="xiangqi-player-name" title={p.displayName}>{p.displayName}{p.isAI && <AiSourceIcon source={state.aiMode ?? state.aiSource ?? 'local'} />}{p.isAI && aiIsThinking && p.color === state.turn && <span className="game-ai-thinking-spinner" aria-label={t('AI 正在思考', 'AI is thinking')} />}</span>
               <span className="xiangqi-player-score">{p.score}</span>
             </div>
           </div>
         ))}
       </div>
 
-      {reserveAiModeRow && <div className="game-ai-mode-slot">{canChangeAiMode && <AiModeSwitch mode={state.aiMode ?? 'cloud'} onChange={changeAiMode} thinking={aiIsThinking} />}</div>}
 
       {state.status === 'result' && <div className="xiangqi-result">{resultText()}</div>}
 
@@ -1027,6 +1046,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         </div>
         {captureToast && <div className={`xiangqi-capture-toast${captureToastIsCheck ? ' is-check' : ''}${captureToastIsWinner ? ' is-winner' : ''}`} role="status" aria-live="assertive">{captureToast}</div>}
         {startToast && <div className="xiangqi-start-toast" role="status" aria-live="assertive">{startToast}</div>}
+        {hintToast && <div className="xiangqi-start-toast" role="status" aria-live="assertive">{hintToast}</div>}
         {state.board.map((row, r) =>
           row.map((cell, c) => {
             const isLastFrom = state.lastMove?.from[0] === r && state.lastMove.from[1] === c

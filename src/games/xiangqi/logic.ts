@@ -329,7 +329,7 @@ export function addAiOpponent(state: XiangqiState): XiangqiState | null {
     players: [human, ai],
     turn: 1,
     status: 'playing',
-    aiMode: 'cloud',
+    aiMode: 'local',
     aiSource: undefined,
   }
 }

@@ -16,11 +16,13 @@ import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGa
 import { chooseAiMove } from './ai'
 import { requestCloudMove } from '../cloudAi'
 import AiSourceIcon from '../AiSourceIcon'
-import { AiModeSwitch } from '../AiControls'
+import GameCardMenu from '../GameCardMenu'
+import { getCachedAiMode, setCachedAiMode } from '../aiModePreference'
 import { loadGomokuState, saveGomokuState } from './cloudState'
-import { GomokuIcon, PaletteIcon } from '../../components/icons'
+import { GomokuIcon } from '../../components/icons'
 import './GomokuGame.css'
 import './GomokuBoardStyles.css'
+import '../GameCardMenu.css'
 
 const BOARD_STYLES = ['classic', 'minimal', 'dark', 'neon', 'ocean', 'sakura', 'forest', 'retro', 'glass'] as const
 type BoardStyle = (typeof BOARD_STYLES)[number]
@@ -61,6 +63,8 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   const [startToast, setStartToast] = useState('')
   const startToastTimerRef = useRef<number | null>(null)
   const startToastKeyRef = useRef('')
+  const [hintToast, setHintToast] = useState('')
+  const hintToastTimerRef = useRef<number | null>(null)
   const hydratedRef = useRef(false)
   const prevStatusRef = useRef<GomokuState['status']>('waiting')
   const prevRoundRef = useRef(1)
@@ -180,7 +184,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
       const legalMoves = current.board.flatMap((row, r) => row.flatMap((cell, c) => cell === 0 ? [{ r, c }] : []))
       const position = { board: current.board, turn: current.turn, round: current.round, lastMove: current.lastMove }
       let move: { r: number; c: number } | null = null
-      if ((current.aiMode ?? 'cloud') === 'cloud') {
+      if ((current.aiMode ?? 'local') === 'cloud') {
         try { move = await requestCloudMove('gomoku', current.instanceId, position, legalMoves, () => isGameHostAuthority(channelRef.current, current.hostId) && canSendGameBroadcast(channelRef.current)) } catch { /* use local AI */ }
       }
       if (stateRef.current !== current || !isGameHostAuthority(channelRef.current, current.hostId)) return
@@ -199,6 +203,12 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
     setStartToast(t('游戏开始', 'Game start'))
     if (startToastTimerRef.current !== null) window.clearTimeout(startToastTimerRef.current)
     startToastTimerRef.current = window.setTimeout(() => setStartToast(''), 2500)
+  }, [])
+
+  const showHintToast = useCallback((msg: string) => {
+    setHintToast(msg)
+    if (hintToastTimerRef.current !== null) window.clearTimeout(hintToastTimerRef.current)
+    hintToastTimerRef.current = window.setTimeout(() => setHintToast(''), 2000)
   }, [])
 
   useEffect(() => {
@@ -233,6 +243,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
     if (aiTimerRef.current !== null) window.clearTimeout(aiTimerRef.current)
     if (winnerToastTimerRef.current !== null) window.clearTimeout(winnerToastTimerRef.current)
     if (startToastTimerRef.current !== null) window.clearTimeout(startToastTimerRef.current)
+    if (hintToastTimerRef.current !== null) window.clearTimeout(hintToastTimerRef.current)
   }, [])
 
   // Only the elected host tab writes canonical state; sibling tabs and
@@ -417,7 +428,9 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
 
       channel.on('broadcast', { event: 'ai' }, () => {
         if (selfIdRef.current !== stateRef.current.hostId || !isGameHostAuthority(channel, stateRef.current.hostId)) return
-        const next = addAiOpponent(stateRef.current)
+        const raw = addAiOpponent(stateRef.current)
+        const cached = getCachedAiMode()
+        const next = raw && cached ? { ...raw, aiMode: cached } : raw
         if (next) {
           publishState(next)
           scheduleAiTurn(next)
@@ -434,6 +447,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         if (selfIdRef.current !== stateRef.current.hostId || !isGameHostAuthority(channel, stateRef.current.hostId)) return
         const mode = (payload as { mode?: unknown } | null)?.mode
         if (mode !== 'cloud' && mode !== 'local') return
+        setCachedAiMode(mode)
         const next = { ...stateRef.current, aiMode: mode as 'cloud' | 'local' }
         publishState(next)
         scheduleAiTurn(next)
@@ -740,8 +754,10 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   const sendAiJoin = () => {
     if (!selfId || !isRealtimeReady()) return
     if (selfId === stateRef.current.hostId) {
-      const next = addAiOpponent(stateRef.current)
-      if (next) {
+      const raw = addAiOpponent(stateRef.current)
+      if (raw) {
+        const cached = getCachedAiMode()
+        const next = cached ? { ...raw, aiMode: cached } : raw
         publishState(next)
         scheduleAiTurn(next)
         if (next.status === 'playing' && next.players.length >= 2) {
@@ -758,13 +774,20 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   }
 
   const changeAiMode = (aiMode: 'cloud' | 'local') => {
+    setCachedAiMode(aiMode)
     const current = stateRef.current
-    if (!selfId || current.hostId !== selfId || !canSendGameBroadcast(channelRef.current) || current.aiMode === aiMode) return
+    if (!selfId || !canSendGameBroadcast(channelRef.current)) return
+    if (!current.players.some((p) => p.isAI)) return
+    if (current.aiMode === aiMode) return
     const next = { ...current, aiMode }
-    if (isGameHostAuthority(channelRef.current, current.hostId)) {
-      publishState(next)
-      scheduleAiTurn(next)
-    } else sendGameBroadcast(channelRef.current, 'ai-mode', { mode: aiMode })
+    if (current.hostId === selfId) {
+      if (isGameHostAuthority(channelRef.current, current.hostId)) {
+        publishState(next)
+        scheduleAiTurn(next)
+      } else sendGameBroadcast(channelRef.current, 'ai-mode', { mode: aiMode })
+    } else {
+      sendGameBroadcast(channelRef.current, 'ai-mode', { mode: aiMode })
+    }
   }
 
   if (!isSupabaseConfigured()) {
@@ -780,8 +803,6 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   const canJoin = !isPlayer && state.players.length < 2 && (state.status === 'waiting' || state.status === 'result')
   const canJoinAI = isPlayer && state.players.length === 1 && state.status === 'waiting'
   const hasAiOpponent = state.players.some((player) => player.isAI)
-  const canChangeAiMode = hasAiOpponent && state.hostId === selfId
-  const reserveAiModeRow = !channelReady || canJoinAI || canChangeAiMode
   const aiIsThinking = state.status === 'playing' && state.players.some((player) => player.isAI && player.color === state.turn)
   const hasHumanOpponent = state.players.some((player) => !player.isAI && player.userId !== selfId)
   const waitingSolo = state.status === 'waiting' && state.players.length === 1
@@ -817,15 +838,6 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
       <div className="gomoku-head">
         <div className="gomoku-heading">
           <span className="gomoku-title"><GomokuIcon size={17} />{t('五子棋', 'Gomoku')}</span>
-          <button
-            type="button"
-            className="gomoku-style-random"
-            onClick={randomizeBoardStyle}
-            aria-label={t('随机切换棋盘风格', 'Randomize board style')}
-            title={t('随机切换棋盘风格', 'Randomize board style')}
-          >
-            <PaletteIcon size={16} />
-          </button>
           {statusHint && (state.status === 'playing' && !isPlayer ? (
             <span className="gomoku-spectator-control">
               <button
@@ -855,6 +867,14 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
           {statusHint && <span className="gomoku-status-dot" aria-hidden="true" />}
           <span>{state.players.length}/2 {t('玩家', 'players')}</span>
         </span>
+        {state.status === 'playing' && isPlayer && (
+          <GameCardMenu
+            aiMode={state.aiMode ?? state.aiSource ?? getCachedAiMode() ?? 'local'}
+            onChangeAiMode={changeAiMode}
+            onToggleBoardStyle={randomizeBoardStyle}
+            onAiTutor={() => showHintToast(t('AI 教学功能敬请期待', 'AI Tutor coming soon'))}
+          />
+        )}
       </div>
 
       <div className="gomoku-players">
@@ -880,14 +900,13 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
             )}
             <div className={`gomoku-player${p.userId === selfId ? ' is-self' : ''}${state.turn === p.color && state.status === 'playing' ? ' is-turn' : ''}`}>
               <span className="gomoku-stone" data-color={p.color} />
-              <span className="gomoku-player-name" title={p.displayName}>{p.displayName}{p.isAI && <AiSourceIcon source={state.aiMode ?? state.aiSource ?? 'local'} />}</span>
+              <span className="gomoku-player-name" title={p.displayName}>{p.displayName}{p.isAI && <AiSourceIcon source={state.aiMode ?? state.aiSource ?? 'local'} />}{p.isAI && aiIsThinking && p.color === state.turn && <span className="game-ai-thinking-spinner" aria-label={t('AI 正在思考', 'AI is thinking')} />}</span>
               <span className="gomoku-player-score">{p.score}</span>
             </div>
           </div>
         ))}
       </div>
 
-      {reserveAiModeRow && <div className="game-ai-mode-slot">{canChangeAiMode && <AiModeSwitch mode={state.aiMode ?? 'cloud'} onChange={changeAiMode} thinking={aiIsThinking} />}</div>}
 
       {state.status === 'result' && (
         <div className="gomoku-result">{resultText()}</div>
@@ -898,6 +917,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         <span className="gomoku-frame" aria-hidden="true" />
         {winnerToast && <div className="gomoku-winner-toast" role="status" aria-live="assertive">{winnerToast}</div>}
         {startToast && <div className="gomoku-start-toast" role="status" aria-live="assertive">{startToast}</div>}
+        {hintToast && <div className="gomoku-start-toast" role="status" aria-live="assertive">{hintToast}</div>}
         {state.board.map((row, r) =>
           row.map((cell, c) => {
             const isWin = state.winningLine?.some(([wr, wc]) => wr === r && wc === c)

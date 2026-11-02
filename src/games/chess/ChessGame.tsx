@@ -16,9 +16,11 @@ import { createInitialState, isChessState, joinChess, addChessAi, inCheck, legal
 import { chooseChessAiMove } from './ai'
 import { requestCloudMove } from '../cloudAi'
 import AiSourceIcon from '../AiSourceIcon'
-import { AiModeSwitch } from '../AiControls'
+import GameCardMenu from '../GameCardMenu'
+import { getCachedAiMode, setCachedAiMode } from '../aiModePreference'
 import { loadChessState, saveChessState } from './cloudState'
 import './ChessGame.css'
+import '../GameCardMenu.css'
 
 type GameChannel = ReturnType<Awaited<ReturnType<typeof getSupabaseClient>>['channel']>
 interface Props { instanceId:string; hostUserId:string; onlineMembers?:PresenceMember[] }
@@ -53,6 +55,8 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
   const [moveToast,setMoveToast]=useState('')
   const [moveToastKind,setMoveToastKind]=useState<'check'|'winner'|''>('')
   const [startToast,setStartToast]=useState('')
+  const [hintToast,setHintToast]=useState('')
+  const hintToastTimerRef=useRef<number|null>(null)
   const stateRef=useRef(state),channelRef=useRef<GameChannel|null>(null)
   const renderedBoardRef=useRef(state.board)
   const boardRef=useRef<HTMLDivElement>(null)
@@ -77,6 +81,11 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
     setStartToast(t('游戏开始','Game start'))
     if(startToastTimerRef.current!==null)window.clearTimeout(startToastTimerRef.current)
     startToastTimerRef.current=window.setTimeout(()=>setStartToast(''),2500)
+  },[])
+  const showHintToast=useCallback((msg:string)=>{
+    setHintToast(msg)
+    if(hintToastTimerRef.current!==null)window.clearTimeout(hintToastTimerRef.current)
+    hintToastTimerRef.current=window.setTimeout(()=>setHintToast(''),2000)
   },[])
 
   useLayoutEffect(()=>{
@@ -165,6 +174,7 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
     moveCleanupRef.current?.()
     if(moveToastTimerRef.current!==null)window.clearTimeout(moveToastTimerRef.current)
     if(startToastTimerRef.current!==null)window.clearTimeout(startToastTimerRef.current)
+    if(hintToastTimerRef.current!==null)window.clearTimeout(hintToastTimerRef.current)
   },[])
 
   useEffect(()=>{
@@ -182,11 +192,11 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
         if(stateRef.current.hostId!==selfId||!payload||typeof payload!=='object')return
         applyState(joinChess(stateRef.current,payload as ChessState['players'][number]))
       })
-      active.on('broadcast',{event:'ai'},()=>{if(stateRef.current.hostId===selfId){const next=addChessAi(stateRef.current);if(next)applyState(next)}})
+      active.on('broadcast',{event:'ai'},()=>{if(stateRef.current.hostId===selfId){const raw=addChessAi(stateRef.current);const cached=getCachedAiMode();const next=raw&&cached?{...raw,aiMode:cached}:raw;if(next)applyState(next)}})
       active.on('broadcast',{event:'ai-mode'},({payload}:{payload:unknown})=>{
         if(stateRef.current.hostId!==selfId||!isGameHostAuthority(active,stateRef.current.hostId)||!payload||typeof payload!=='object')return
         const mode=(payload as {mode?:unknown}).mode
-        if(mode==='cloud'||mode==='local')applyState({...stateRef.current,aiMode:mode})
+        if(mode==='cloud'||mode==='local'){setCachedAiMode(mode);applyState({...stateRef.current,aiMode:mode})}
       })
       active.on('broadcast',{event:'move'},({payload}:{payload:unknown})=>{
         if(stateRef.current.hostId!==selfId||!payload||typeof payload!=='object')return
@@ -219,7 +229,7 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
       if(!ai)return
       const position={board:current.board,turn:current.turn,castling:current.castling,enPassant:current.enPassant,halfmove:current.halfmove,round:current.round,lastMove:current.lastMove}
       let move: ReturnType<typeof chooseChessAiMove> = null
-      if((current.aiMode??'cloud')==='cloud'){
+      if((current.aiMode??'local')==='cloud'){
         try { move=await requestCloudMove('chess',current.instanceId,position,legalMoves(current),()=>isGameHostAuthority(channelRef.current,current.hostId)) } catch { /* use local AI */ }
       }
       if(cancelled||stateRef.current!==current||current.hostId!==selfId||!isGameHostAuthority(channelRef.current,current.hostId))return
@@ -238,8 +248,6 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
   const canJoin=!isPlayer&&state.players.length<2&&(state.status==='waiting'||state.status==='result')
   const canJoinAi=isPlayer&&state.players.length===1&&state.status==='waiting'
   const hasAi=state.players.some(player=>player.isAI)
-  const canChangeAiMode=hasAi&&state.hostId===selfId
-  const reserveAiModeRow=!ready||canJoinAi||canChangeAiMode
   const aiIsThinking=state.status==='playing'&&state.players.some(player=>player.isAI&&player.color===state.turn)
   const hasHuman=state.players.some(player=>!player.isAI&&player.userId!==selfId)
   const waitingSolo=state.status==='waiting'&&state.players.length===1
@@ -261,14 +269,28 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
   }
   const joinAi=()=>{
     if(!selfId||!ready)return
-    if(selfId===stateRef.current.hostId){const next=addChessAi(stateRef.current);if(next)applyState(next)}
+    if(selfId===stateRef.current.hostId){
+      const raw=addChessAi(stateRef.current)
+      if(raw){
+        const cached=getCachedAiMode()
+        const next=cached?{...raw,aiMode:cached}:raw
+        applyState(next)
+      }
+    }
     else void channelRef.current?.send({type:'broadcast',event:'ai',payload:{}})
   }
   const changeAiMode=(aiMode:'cloud'|'local')=>{
+    setCachedAiMode(aiMode)
     const current=stateRef.current
-    if(!selfId||current.hostId!==selfId||current.aiMode===aiMode)return
-    if(isGameHostAuthority(channelRef.current,current.hostId))applyState({...current,aiMode})
-    else void channelRef.current?.send({type:'broadcast',event:'ai-mode',payload:{mode:aiMode}})
+    if(!selfId)return
+    if(!current.players.some((p)=>p.isAI))return
+    if(current.aiMode===aiMode)return
+    if(current.hostId===selfId){
+      if(isGameHostAuthority(channelRef.current,current.hostId))applyState({...current,aiMode})
+      else void channelRef.current?.send({type:'broadcast',event:'ai-mode',payload:{mode:aiMode}})
+    }else{
+      void channelRef.current?.send({type:'broadcast',event:'ai-mode',payload:{mode:aiMode}})
+    }
   }
   const rematch=()=>{if(!selfId||!ready)return;if(selfId===stateRef.current.hostId)applyState(restartChessRound(stateRef.current));else void channelRef.current?.send({type:'broadcast',event:'rematch',payload:{}})}
   const leave=()=>{
@@ -296,17 +318,24 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
       <div className="chess-heading"><span className="chess-title"><ChessCrownIcon size={17}/>{t('国际象棋','Chess')}</span>
         {statusHint&&(state.status==='playing'&&!isPlayer?<span className="chess-spectator-control"><button type="button" className="chess-status chess-spectator-trigger" aria-haspopup="dialog" aria-expanded={spectatorsOpen} onClick={()=>setSpectatorsOpen(value=>!value)}><span>{statusHint}{spectators.length?` (${spectators.length>99?'99+':spectators.length})`:''}</span></button>{spectatorsOpen&&<OnlineList members={spectators} placement="bottom" className="chess-spectator-pop" title={t('观战玩家','Spectators')} emptyText={t('暂无观战玩家','No spectators currently')} ownerSelector=".chess-spectator-control" onClose={()=>setSpectatorsOpen(false)}/>}</span>:<span className="chess-status">{statusHint}</span>)}
       </div><span className="chess-meta">{statusHint&&<i className="chess-status-dot" aria-hidden="true"/>}<span>{state.players.length}/2 {t('玩家','players')}</span></span>
+      {state.status === 'playing' && isPlayer && (
+        <GameCardMenu
+          aiMode={state.aiMode ?? state.aiSource ?? getCachedAiMode() ?? 'local'}
+          onChangeAiMode={changeAiMode}
+          onToggleBoardStyle={() => showHintToast(t('界面切换敬请期待', 'UI switch coming soon'))}
+          onAiTutor={() => showHintToast(t('AI 教学功能敬请期待', 'AI Tutor coming soon'))}
+        />
+      )}
     </div>
 
     {state.players.length>0&&<div className="chess-players">{state.players.map(player=><div key={player.userId} className="chess-player-slot">
       {player.isAI?<AiAvatar/>:<AvatarBadge className="chess-player-avatar" size={30} look={{style:player.avatarStyle||'thumbs',seed:player.avatarSeed||player.userId,url:player.avatarUrl}}/>}
       <div className={`chess-player${player.userId===selfId?' is-self':''}${state.turn===player.color&&state.status==='playing'?' is-turn':''}`}>
         <span className={`chess-side-indicator${player.color==='w'?' is-white':' is-black'}`} role="img" aria-label={player.color==='w'?t('白方棋子','White pieces'):t('黑方棋子','Black pieces')} title={player.color==='w'?t('白方','White side'):t('黑方','Black side')}/>
-        <span className="chess-player-name" title={player.displayName}>{player.displayName}{player.isAI&&<AiSourceIcon source={state.aiMode??state.aiSource??'local'}/>}</span><span className="chess-player-score">{player.score}</span>
+        <span className="chess-player-name" title={player.displayName}>{player.displayName}{player.isAI&&<AiSourceIcon source={state.aiMode??state.aiSource??'local'}/>}{player.isAI && aiIsThinking && player.color===state.turn && <span className="game-ai-thinking-spinner" aria-label={t('AI 正在思考', 'AI is thinking')} />}</span><span className="chess-player-score">{player.score}</span>
       </div>
     </div>)}</div>}
 
-    {reserveAiModeRow&&<div className="game-ai-mode-slot">{canChangeAiMode&&<AiModeSwitch mode={state.aiMode??'cloud'} onChange={changeAiMode} thinking={aiIsThinking}/>}</div>}
 
     {state.status==='result'&&<div className="chess-result">{winner?t('获胜：','Winner: ')+winner.displayName:t('平局','Draw')}</div>}
     <div ref={boardRef} className={`chess-board${myColor==='b'?' chess-board--flipped':''}`} role="grid" aria-label={t('国际象棋棋盘','Chess board')}>
@@ -319,6 +348,7 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[]}:Props
       }))}
       {moveToast&&<div className={`chess-capture-toast${moveToastKind==='check'?' is-check':''}${moveToastKind==='winner'?' is-winner':''}`} role="status" aria-live="assertive">{moveToast}</div>}
       {startToast&&<div className="chess-start-toast" role="status" aria-live="assertive">{startToast}</div>}
+      {hintToast&&<div className="chess-start-toast" role="status" aria-live="assertive">{hintToast}</div>}
     </div>
 
     <div className="chess-actions">
