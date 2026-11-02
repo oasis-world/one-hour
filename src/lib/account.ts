@@ -197,17 +197,25 @@ export async function signInWithPassword(
 
 export async function signOutAccount(): Promise<void> {
   if (!isSupabaseConfigured()) return
-  let client: Awaited<ReturnType<typeof getSupabaseClient>> | null = null
-  try {
-    client = await getSupabaseClient()
-    await client.auth.signOut()
-  } catch {
-    // Guest is the safe terminal state either way.
-  }
+  // Drop the local identity before waiting on auth or network work. Callers
+  // such as the one-hour expiry gate must never keep rendering the old user
+  // while sign-out is in flight.
   purgeLocalAuthSession()
   applySession(null)
-  // Don't strand the player as a guest until the next reload.
-  if (client) await createAnonymousIdentity(client)
+  try {
+    const client = await getSupabaseClient()
+    try {
+      // Local scope clears the SDK's in-memory session immediately. Remote
+      // profile cleanup is handled separately and cannot block identity reset.
+      await client.auth.signOut({ scope: 'local' })
+    } catch {
+      // Guest is already visible; keep going and try to create a fresh visitor.
+    }
+    // Don't strand the player as a guest until the next reload.
+    await createAnonymousIdentity(client)
+  } catch {
+    return
+  }
 }
 
 /** Remove persisted Supabase auth rows (large sessions spill into chunks). */

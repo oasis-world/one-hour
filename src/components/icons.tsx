@@ -397,6 +397,12 @@ export function XiangqiGeneralIcon({ size = 20 }: GlyphProps) {
   )
 }
 
+export function ChessCrownIcon({ size = 17 }: GlyphProps) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m3.2 7.3 4.4 3.8L12 4.5l4.4 6.6 4.4-3.8-1.7 11.1H4.9L3.2 7.3Z"/><path d="M5.5 21h13M5.8 15.6h12.4"/><circle cx="3.2" cy="6.4" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="3.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="20.8" cy="6.4" r="1.1" fill="currentColor" stroke="none"/>
+  </svg>
+}
+
 export function ChevronRightIcon({ size = 16 }: GlyphProps) {
   return (
     <svg

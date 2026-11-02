@@ -19,7 +19,7 @@
   margin-bottom: 0;
   font-size: 14px;
 }
-.xiangqi-title { font-weight: 600; flex: 0 0 auto; white-space: nowrap; }
+.xiangqi-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; flex: 0 0 auto; white-space: nowrap; }
 .xiangqi-style-random {
   flex: 0 0 auto;
   display: inline-flex;

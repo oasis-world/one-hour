@@ -15,7 +15,7 @@ import { withTimeout } from '../../lib/withTimeout'
 import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGamePresenceUsers, isGameHostAuthority, sendGameBroadcast, watchGameChannelClose } from '../realtime'
 import { chooseAiMove } from './ai'
 import { loadGomokuState, saveGomokuState } from './cloudState'
-import { PaletteIcon } from '../../components/icons'
+import { GomokuIcon, PaletteIcon } from '../../components/icons'
 import './GomokuGame.css'
 import './GomokuBoardStyles.css'
 
@@ -774,7 +774,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
     <div className="gomoku-card">
       <div className="gomoku-head">
         <div className="gomoku-heading">
-          <span className="gomoku-title">{t('五子棋', 'Gomoku')}</span>
+          <span className="gomoku-title"><GomokuIcon size={17} />{t('五子棋', 'Gomoku')}</span>
           <button
             type="button"
             className="gomoku-style-random"

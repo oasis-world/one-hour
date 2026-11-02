@@ -15,7 +15,7 @@ import { withTimeout } from '../../lib/withTimeout'
 import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGamePresenceUsers, isGameHostAuthority, sendGameBroadcast, watchGameChannelClose } from '../realtime'
 import { chooseAiMove } from './ai'
 import { loadXiangqiState, saveXiangqiState } from './cloudState'
-import { PaletteIcon } from '../../components/icons'
+import { PaletteIcon, XiangqiGeneralIcon } from '../../components/icons'
 import './XiangqiGame.css'
 import {
   addAiOpponent,
@@ -908,7 +908,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     <div className="xiangqi-card">
       <div className="xiangqi-head">
         <div className="xiangqi-heading">
-          <span className="xiangqi-title">{t('中国象棋', 'Chinese Chess')}</span>
+          <span className="xiangqi-title"><XiangqiGeneralIcon size={17} />{t('中国象棋', 'Chinese Chess')}</span>
           <button
             type="button"
             className="xiangqi-style-random"

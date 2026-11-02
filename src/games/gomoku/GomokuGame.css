@@ -19,7 +19,7 @@
   margin-bottom: 0;
   font-size: 14px;
 }
-.gomoku-title { font-weight: 600; }
+.gomoku-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
 .gomoku-heading { display: flex; align-items: center; gap: 15px; flex: 1; min-width: 0; }
 .gomoku-title { flex: 0 0 auto; white-space: nowrap; }
 .gomoku-style-random {

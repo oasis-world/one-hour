@@ -18,12 +18,12 @@ import { resetLocalUserId } from './identity'
  * identities exist, so "delete" here means purge the profile and recreate
  * the anonymous session.
  */
-export async function deleteCloudProfileRow(): Promise<void> {
+export async function deleteCloudProfileRow(userId?: string | null): Promise<void> {
   if (!isSupabaseConfigured()) return
   try {
     const client = await getSupabaseClient()
-    const { data } = await client.auth.getSession()
-    const uid = data.session?.user?.id
+    const { data } = userId ? { data: null } : await client.auth.getSession()
+    const uid = userId ?? data?.session?.user?.id
     if (!uid) return
     // Remove custom avatar objects first (all avatar-* files in the user's
     // folder), so a vanished profile leaves no orphaned photo behind.
@@ -44,13 +44,19 @@ export async function deleteCloudProfileRow(): Promise<void> {
   }
 }
 
-export async function expireAnonymousProfile(): Promise<void> {
-  await deleteCloudProfileRow()
-  clearUserProfile()
+export function expireAnonymousProfile(userId?: string | null): void {
+  // Clear local state first so the welcome gate and chat identity switch
+  // immediately, even if the profile/storage cleanup request is slow/offline.
   clearProfileExpiresAt()
   resetPreWelcome()
   resetLocalUserId()
-  await signOutAccount()
+  void deleteCloudProfileRow(userId)
+  // signOutAccount synchronously notifies normal sign-out listeners, which
+  // may seed a fresh profile for manual sign-out. Expiry is different: clear
+  // that transient seed before React can render it, so the welcome gate opens.
+  const sessionReset=signOutAccount()
+  clearUserProfile()
+  void sessionReset
 }
 
 export { getProfileExpiresAt }

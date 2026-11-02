@@ -213,6 +213,26 @@ create policy "signed-in players may delete xiangqi states"
 grant select, insert, update, delete on public.xiangqi_states to authenticated;
 revoke all on public.xiangqi_states from anon;
 
+-- ── Chess game state ───────────────────────────────────────────────────────
+create table if not exists public.chess_states (
+  instance_id text primary key,
+  state jsonb not null check (jsonb_typeof(state) = 'object'),
+  updated_at timestamptz not null default now(),
+  expires_at timestamptz not null default (now() + interval '1 hour')
+);
+create index if not exists chess_states_expiry on public.chess_states (expires_at);
+alter table public.chess_states enable row level security;
+drop policy if exists "chess states are readable by signed-in players" on public.chess_states;
+create policy "chess states are readable by signed-in players" on public.chess_states for select using (auth.uid() is not null);
+drop policy if exists "signed-in players may create chess states" on public.chess_states;
+create policy "signed-in players may create chess states" on public.chess_states for insert with check (auth.uid() is not null);
+drop policy if exists "signed-in players may update chess states" on public.chess_states;
+create policy "signed-in players may update chess states" on public.chess_states for update using (auth.uid() is not null) with check (auth.uid() is not null);
+drop policy if exists "signed-in players may delete chess states" on public.chess_states;
+create policy "signed-in players may delete chess states" on public.chess_states for delete using (auth.uid() is not null);
+grant select, insert, update, delete on public.chess_states to authenticated;
+revoke all on public.chess_states from anon;
+
 -- ── Chat image bucket ───────────────────────────────────────────────────────
 
 insert into storage.buckets (id, name, public)
@@ -296,6 +316,7 @@ begin
      );
   delete from public.gomoku_states where expires_at <= now();
   delete from public.xiangqi_states where expires_at <= now();
+  delete from public.chess_states where expires_at <= now();
   -- Purge expired anonymous profiles (and their now-orphaned messages were
   -- already removed above). Signed-in profiles have expires_at IS NULL and
   -- are never touched here.
@@ -312,6 +333,11 @@ begin
   where not exists (
     select 1 from public.chat_messages cm
     where cm.content like '%' || xs.instance_id || '%'
+  );
+  delete from public.chess_states cs
+  where not exists (
+    select 1 from public.chat_messages cm
+    where cm.content like '%' || cs.instance_id || '%'
   );
 end;
 $$;

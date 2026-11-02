@@ -271,12 +271,11 @@ export default function App() {
 
   const handleSummaryComplete = () => {
     if (currentUserId) expireUserMessages(currentUserId)
-    void expireAnonymousProfile().finally(() => {
-      resetStats()
-      clearPendingSummary()
-      setPendingSummary(null)
-      expiringRef.current = false
-    })
+    expireAnonymousProfile(currentUserId)
+    resetStats()
+    clearPendingSummary()
+    setPendingSummary(null)
+    expiringRef.current = false
   }
 
   const closeChat = () => {

@@ -13,6 +13,7 @@ import { useChatScroll } from './useChatScroll'
 import { parseGameRef } from '../games/types'
 import { deleteGomokuState } from '../games/gomoku/cloudState'
 import { deleteXiangqiState } from '../games/xiangqi/cloudState'
+import { deleteChessState } from '../games/chess/cloudState'
 
 interface Props {
   entries: ChatEntry[]
@@ -180,6 +181,7 @@ export default function MessageList({
     const gameRef = parseGameRef(entry.content)
     if (gameRef?.type === 'gomoku') void deleteGomokuState(gameRef.instanceId)
     if (gameRef?.type === 'xiangqi') void deleteXiangqiState(gameRef.instanceId)
+    if (gameRef?.type === 'chess') void deleteChessState(gameRef.instanceId)
     onRemove(entry.id)
   }
 
