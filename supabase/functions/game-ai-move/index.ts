@@ -79,7 +79,10 @@ const basetenProvider: AiProvider = {
       const localeLine = localeInstruction(req.locale)
       const questionLine = req.question ? `\nUserQuestion: ${String(req.question).slice(0, 600)}` : ""
       const viewerColor = typeof pos.viewerColor === 'string' ? pos.viewerColor : null
-      const viewerHint = viewerColor ? `\nViewer: the user asking is playing as ${viewerColor === 'w' ? 'White' : 'Black'} (their pieces are ${viewerColor === 'w' ? 'w' : 'b'}); current turn=${pos.turn ?? '-'} — recommend for the side to move but explain from the viewer's perspective and use absolute algebraic (e2, c3 etc.) that matches board edge labels.` : ""
+      const turnColor = typeof pos.turn === 'string' ? pos.turn : null
+      const moverColor = turnColor === 'w' ? 'b' : turnColor === 'b' ? 'w' : null
+      const isOwnLastMove = Boolean(viewerColor && moverColor && viewerColor === moverColor)
+      const viewerHint = viewerColor ? `\nViewer: the user asking is playing as ${viewerColor === 'w' ? 'White' : 'Black'} (their pieces are ${viewerColor === 'w' ? 'w' : 'b'}); current turn=${pos.turn ?? '-'}; last move was by ${moverColor ?? 'none'}${isOwnLastMove ? ' (viewer\'s own move)' : moverColor ? ' (opponent\'s move — do NOT review it)' : ''} — recommend for the side to move but explain from the viewer's perspective and use absolute algebraic (e2, c3 etc.) that matches board edge labels.` : ""
       const lastMoveStr = pos.lastMove ? JSON.stringify(pos.lastMove) : "none"
       const upstream = await fetch(BASETEN_ENDPOINT, {
         method: 'POST',
@@ -99,11 +102,11 @@ const basetenProvider: AiProvider = {
     {"move": <one element copied exactly from legalMoves>, "label": "...", "reason": "..."}
   ],
   "conceptTip": "1 short paragraph teaching one chess concept relevant to this position (center control, piece development, king safety, pins, etc.)",
-  "lastMoveReview": {"quality": "good|ok|mistake|none", "comment": "1-2 sentences about the previous move; say 'none' if no last move", "betterMove": <one legalMoves element or null>},
+  "lastMoveReview": {"quality": "good|ok|mistake|none", "comment": "1-2 sentences about the previous move; only review if it was the viewer's own move, otherwise quality must be 'none' and comment empty", "betterMove": <one legalMoves element or null>},
   "encouragement": "1 short encouraging sentence",
   "answer": "if UserQuestion is present, answer it concisely (2-4 sentences) using the position; otherwise empty string"
 }
-Rules: recommendations must be 2-3 items sorted best-first. Every recommendation.move must be copied verbatim from legalMoves — do not invent coordinates (use absolute algebraic like e2, c3 that matches board edge labels a-h left→right and 1-8 bottom→top for the viewer). Use beginner-friendly language, no heavy engine jargon.`,
+Rules: recommendations must be 2-3 items sorted best-first. Every recommendation.move must be copied verbatim from legalMoves — do not invent coordinates (use absolute algebraic like e2, c3 that matches board edge labels a-h left→right and 1-8 bottom→top for the viewer). lastMoveReview: ONLY review the viewer's own last move — if last move was by the opponent or there is no viewer color, set quality to 'none' with empty comment and null betterMove. Use beginner-friendly language, no heavy engine jargon.`,
             },
             {
               role: 'user',
@@ -249,13 +252,16 @@ const opencodeProvider: AiProvider = {
       const localeLine = localeInstruction(req.locale)
       const questionLine = req.question ? ` UserQuestion: ${String(req.question).slice(0, 600)}` : ""
       const viewerColorOc = typeof pos.viewerColor === 'string' ? pos.viewerColor : null
-      const viewerHintOc = viewerColorOc ? ` Viewer:${viewerColorOc} turn:${(pos as Record<string, unknown>).turn ?? '-'} (user plays ${viewerColorOc}); coordinates absolute a1=white dark bottom-left, h1 light, e2=r6c4; board flipped for black but algebraic e2/c3 still absolute matching edge labels.` : ""
+      const turnOc = typeof (pos as Record<string, unknown>).turn === 'string' ? (pos as Record<string, unknown>).turn as string : null
+      const moverOc = turnOc === 'w' ? 'b' : turnOc === 'b' ? 'w' : null
+      const isOwnLastMoveOc = Boolean(viewerColorOc && moverOc && viewerColorOc === moverOc)
+      const viewerHintOc = viewerColorOc ? ` Viewer:${viewerColorOc} turn:${turnOc ?? '-'} lastMoveBy:${moverOc ?? 'none'}${isOwnLastMoveOc ? ' (own move)' : moverOc ? ' (opponent move — do NOT review, set lastMoveReview quality to none)' : ''} (user plays ${viewerColorOc}); coordinates absolute a1=white dark bottom-left, h1 light, e2=r6c4; board flipped for black but algebraic e2/c3 still absolute matching edge labels.` : ""
       const upstream = await fetch(OPENCODE_ENDPOINT, {
         method: 'POST',
         headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json', 'x-opencode-session': req.sessionId },
         body: JSON.stringify({
           model: OPENCODE_MODEL,
-          instructions: `You are an expert ${req.game} tutor for beginners. Rules: ${GAME_RULES[req.game] ?? ""}${viewerHintOc} ${localeLine} Teach this position concisely; recommend for side to move but explain from viewer's perspective. Return ONLY JSON: {"situation":"...","keyThreats":"...","recommendations":[{"move":<legalMoves element>,"label":"...","reason":"..."} x2-3],"conceptTip":"...","lastMoveReview":{"quality":"good|ok|mistake|none","comment":"...","betterMove":<legalMoves element or null>},"encouragement":"...","answer":"..."}. Every recommendation.move must be exact from legalMoves (absolute algebraic like e2/c3 matching board edge labels). RecentMoves: ${(() => { const h = (pos as Record<string, unknown>).history; return Array.isArray(h) ? JSON.stringify(h.slice(-12)) : "[]"; })()} ThreatSummary: ${threatSummary.slice(0, 800)} AnnotatedMoves: ${JSON.stringify(annotated).slice(0, 4000)}${questionLine}`,
+          instructions: `You are an expert ${req.game} tutor for beginners. Rules: ${GAME_RULES[req.game] ?? ""}${viewerHintOc} ${localeLine} Teach this position concisely; recommend for side to move but explain from viewer's perspective. Return ONLY JSON: {"situation":"...","keyThreats":"...","recommendations":[{"move":<legalMoves element>,"label":"...","reason":"..."} x2-3],"conceptTip":"...","lastMoveReview":{"quality":"good|ok|mistake|none","comment":"only review viewer's own last move, otherwise quality none","betterMove":<legalMoves element or null>},"encouragement":"...","answer":"..."}. Every recommendation.move must be exact from legalMoves (absolute algebraic like e2/c3 matching board edge labels). lastMoveReview: ONLY review viewer's own move, else quality none. RecentMoves: ${(() => { const h = (pos as Record<string, unknown>).history; return Array.isArray(h) ? JSON.stringify(h.slice(-12)) : "[]"; })()} ThreatSummary: ${threatSummary.slice(0, 800)} AnnotatedMoves: ${JSON.stringify(annotated).slice(0, 4000)}${questionLine}`,
           input: JSON.stringify({ game: req.game, position: req.position, legalMoves: req.legalMoves, history: (req.position as Record<string, unknown>).history ?? [], threatSummary, annotatedMoves: annotated, question: req.question ?? "" }),
           max_output_tokens: maxOutput, reasoning: { effort: 'minimal' },
         }),

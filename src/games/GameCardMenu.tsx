@@ -10,6 +10,7 @@ interface Props {
   canChangeAiMode?: boolean
   aiIsThinking?: boolean
   hasAi?: boolean
+  hideAiMode?: boolean
   onChangeAiMode: (mode: AiSource) => void
   onToggleBoardStyle?: () => void
   onAiTutor?: () => void
@@ -71,7 +72,7 @@ function KebabIcon({ size = 16 }: { size?: number }) {
   )
 }
 
-export default function GameCardMenu({ aiMode, onChangeAiMode, onToggleBoardStyle, onAiTutor }: Props) {
+export default function GameCardMenu({ aiMode, hideAiMode, onChangeAiMode, onToggleBoardStyle, onAiTutor }: Props) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -116,38 +117,33 @@ export default function GameCardMenu({ aiMode, onChangeAiMode, onToggleBoardStyl
       </button>
       {open && (
         <div className="game-card-menu-pop" role="menu" onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            role="menuitemradio"
-            aria-checked={aiMode === 'local'}
-            className={`game-card-menu-item${aiMode === 'local' ? ' is-active' : ''}`}
-            onClick={() => handlePickMode('local')}
-          >
-            <span className="game-card-menu-icon"><LocalMenuIcon /></span>
-            <span className="game-card-menu-label">{t('本地 AI', 'Local AI')}</span>
-            {aiMode === 'local' && <span className="game-card-menu-check"><CheckIcon /></span>}
-          </button>
-          <button
-            type="button"
-            role="menuitemradio"
-            aria-checked={aiMode === 'cloud'}
-            className={`game-card-menu-item${aiMode === 'cloud' ? ' is-active' : ''}`}
-            onClick={() => handlePickMode('cloud')}
-          >
-            <span className="game-card-menu-icon"><CloudMenuIcon /></span>
-            <span className="game-card-menu-label">{t('云端 AI', 'Cloud AI')}</span>
-            {aiMode === 'cloud' && <span className="game-card-menu-check"><CheckIcon /></span>}
-          </button>
-          <div className="game-card-menu-sep" role="separator" />
-          <button
-            type="button"
-            role="menuitem"
-            className="game-card-menu-item"
-            onClick={() => { onToggleBoardStyle?.() }}
-          >
-            <span className="game-card-menu-icon"><PaletteMenuIcon /></span>
-            <span className="game-card-menu-label">{t('切换界面', 'Switch UI')}</span>
-          </button>
+          {!hideAiMode && (
+            <>
+              <button
+                type="button"
+                role="menuitemradio"
+                aria-checked={aiMode === 'local'}
+                className={`game-card-menu-item${aiMode === 'local' ? ' is-active' : ''}`}
+                onClick={() => handlePickMode('local')}
+              >
+                <span className="game-card-menu-icon"><LocalMenuIcon /></span>
+                <span className="game-card-menu-label">{t('本地 AI', 'Local AI')}</span>
+                {aiMode === 'local' && <span className="game-card-menu-check"><CheckIcon /></span>}
+              </button>
+              <button
+                type="button"
+                role="menuitemradio"
+                aria-checked={aiMode === 'cloud'}
+                className={`game-card-menu-item${aiMode === 'cloud' ? ' is-active' : ''}`}
+                onClick={() => handlePickMode('cloud')}
+              >
+                <span className="game-card-menu-icon"><CloudMenuIcon /></span>
+                <span className="game-card-menu-label">{t('云端 AI', 'Cloud AI')}</span>
+                {aiMode === 'cloud' && <span className="game-card-menu-check"><CheckIcon /></span>}
+              </button>
+              <div className="game-card-menu-sep" role="separator" />
+            </>
+          )}
           <button
             type="button"
             role="menuitem"
@@ -156,6 +152,15 @@ export default function GameCardMenu({ aiMode, onChangeAiMode, onToggleBoardStyl
           >
             <span className="game-card-menu-icon"><TutorMenuIcon /></span>
             <span className="game-card-menu-label">{t('AI 教学', 'AI Tutor')}</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="game-card-menu-item"
+            onClick={() => { onToggleBoardStyle?.() }}
+          >
+            <span className="game-card-menu-icon"><PaletteMenuIcon /></span>
+            <span className="game-card-menu-label">{t('切换界面', 'Switch UI')}</span>
           </button>
         </div>
       )}

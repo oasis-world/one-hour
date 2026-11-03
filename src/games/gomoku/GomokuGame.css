@@ -59,7 +59,7 @@
   line-height: 1.2;
   opacity: 0.7;
 }
-.gomoku-spectator-control { position: relative; display: flex; flex: 0 0 auto; min-width: 0; margin-left: auto; }
+.gomoku-head{position:relative}.gomoku-spectator-control { position: static; display: flex; flex: 0 0 auto; min-width: 0; margin-left: auto; }
 .gomoku-spectator-trigger {
   display: inline-flex;
   flex-wrap: nowrap;
@@ -83,6 +83,7 @@
   position: relative;
 }.gomoku-spectator-pop { background: #181a20; }
 .app-shell.theme-warm .gomoku-spectator-pop { background: #fcf3dc; }
+.gomoku-spectator-pop.online-pop.is-bottom{left:50%;right:auto;top:calc(100% + 2px);bottom:auto;width:min(280px,calc(100vw - 24px));max-width:calc(100% - 16px);max-height:min(380px,48vh);transform:translateX(-50%);transform-origin:top center;z-index:30;animation:spectator-pop-rise .22s cubic-bezier(.2,.9,.3,1.15) both}
 .gomoku-meta {
   display: flex;
   align-items: center;
@@ -418,3 +419,5 @@
 }
 
 .gomoku-card { isolation: isolate; contain: layout paint; transform: translateZ(0); backface-visibility: hidden; }
+.gomoku-card.has-spectator-pop{contain:none !important;transform:none !important;overflow:visible !important;isolation:auto !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;filter:none !important}
+@keyframes spectator-pop-rise{from{opacity:0;transform:translateX(-50%) translateY(8px) scale(.92)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}

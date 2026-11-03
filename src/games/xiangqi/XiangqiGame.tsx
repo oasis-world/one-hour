@@ -87,6 +87,22 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false)
   const [spectatorsOpen, setSpectatorsOpen] = useState(false)
   const [joinStatus, setJoinStatus] = useState<'idle' | 'joining' | 'retry'>('idle')
+  const headerRef=useRef<HTMLDivElement>(null)
+  const [spectatorHOffset,setSpectatorHOffset]=useState(0)
+  useLayoutEffect(()=>{
+    if(!spectatorsOpen)return
+    const update=()=>{
+      const header=headerRef.current
+      const chat=document.querySelector('.chat-column') as HTMLElement | null
+      if(!header||!chat)return
+      const hr=header.getBoundingClientRect()
+      const cr=chat.getBoundingClientRect()
+      setSpectatorHOffset(Math.round((cr.left+cr.width/2)-(hr.left+hr.width/2)))
+    }
+    update()
+    window.addEventListener('resize',update)
+    return ()=>window.removeEventListener('resize',update)
+  },[spectatorsOpen])
   useEffect(() => {
     if (!spectatorsOpen) return
     setPopoverOpen(true)
@@ -984,8 +1000,8 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   }
 
   return (
-    <div className="xiangqi-card">
-      <div className="xiangqi-head">
+    <div className={`xiangqi-card${spectatorsOpen ? ' has-spectator-pop' : ''}`}>
+      <div ref={headerRef} className="xiangqi-head">
         <div className="xiangqi-heading">
           <span className="xiangqi-title"><XiangqiGeneralIcon size={17} />{t('中国象棋', 'Chinese Chess')}</span>
           {statusHint && (state.status === 'playing' && !isPlayer ? (
@@ -993,7 +1009,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
               <button type="button" className="xiangqi-status xiangqi-spectator-trigger" aria-haspopup="dialog" aria-expanded={spectatorsOpen} onClick={() => setSpectatorsOpen((o) => !o)}>
                 <span>{statusHint}{spectators.length > 0 ? ` (${spectators.length > 99 ? '99+' : spectators.length})` : ''}</span>
               </button>
-              {spectatorsOpen && <OnlineList members={spectators} placement="bottom" className="xiangqi-spectator-pop" title={t('观战玩家', 'Spectators')} emptyText={t('暂无观战玩家', 'No spectators currently')} ownerSelector=".xiangqi-spectator-control" onClose={() => setSpectatorsOpen(false)} />}
+              {spectatorsOpen && <OnlineList members={spectators} placement="bottom" className="xiangqi-spectator-pop" title={t('观战玩家', 'Spectators')} emptyText={t('暂无观战玩家', 'No spectators currently')} ownerSelector=".xiangqi-spectator-control" onClose={() => setSpectatorsOpen(false)} style={spectatorHOffset ? { marginLeft: spectatorHOffset } : undefined} />}
             </span>
           ) : <span className="xiangqi-status">{statusHint}</span>)}
         </div>

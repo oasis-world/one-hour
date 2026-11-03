@@ -63,6 +63,24 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
   const hintToastTimerRef=useRef<number|null>(null)
   const [tutorOpen,setTutorOpen]=useState(false)
   const [tutorHighlight,setTutorHighlight]=useState<{from:Square;to:Square;promotion?:string}|null>(null)
+  const headerRef=useRef<HTMLDivElement>(null)
+  const [spectatorHOffset,setSpectatorHOffset]=useState(0)
+  useLayoutEffect(()=>{
+    if(!spectatorsOpen)return
+    const update=()=>{
+      const header=headerRef.current
+      const chat=document.querySelector('.chat-column') as HTMLElement | null
+      if(!header||!chat)return
+      const hr=header.getBoundingClientRect()
+      const cr=chat.getBoundingClientRect()
+      const headerCenter=hr.left+hr.width/2
+      const chatCenter=cr.left+cr.width/2
+      setSpectatorHOffset(Math.round(chatCenter-headerCenter))
+    }
+    update()
+    window.addEventListener('resize',update)
+    return ()=>window.removeEventListener('resize',update)
+  },[spectatorsOpen])
   const stateRef=useRef(state),channelRef=useRef<GameChannel|null>(null)
   const renderedBoardRef=useRef(state.board)
   const boardRef=useRef<HTMLDivElement>(null)
@@ -364,14 +382,15 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
   const winner=state.players.find(player=>player.userId===state.winnerId)
   if(!isSupabaseConfigured())return <div className="chess-card"><p className="chess-empty">{t('游戏需要联网（Supabase）','Games require an online connection')}</p></div>
 
-  return <div className="chess-card">
-    <div className="chess-head">
+  return <div className={`chess-card${spectatorsOpen ? ' has-spectator-pop' : ''}`}>
+    <div ref={headerRef} className="chess-head">
       <div className="chess-heading"><span className="chess-title"><ChessCrownIcon size={17}/>{t('国际象棋','Chess')}</span>
-        {statusHint&&(state.status==='playing'&&!isPlayer?<span className="chess-spectator-control"><button type="button" className="chess-status chess-spectator-trigger" aria-haspopup="dialog" aria-expanded={spectatorsOpen} onClick={()=>setSpectatorsOpen(value=>!value)}><span>{statusHint}{spectators.length?` (${spectators.length>99?'99+':spectators.length})`:''}</span></button>{spectatorsOpen&&<OnlineList members={spectators} placement="bottom" className="chess-spectator-pop" title={t('观战玩家','Spectators')} emptyText={t('暂无观战玩家','No spectators currently')} ownerSelector=".chess-spectator-control" onClose={()=>setSpectatorsOpen(false)}/>}</span>:<span className="chess-status">{statusHint}</span>)}
+        {statusHint&&(state.status==='playing'&&!isPlayer?<span className="chess-spectator-control"><button type="button" className="chess-status chess-spectator-trigger" aria-haspopup="dialog" aria-expanded={spectatorsOpen} onClick={()=>setSpectatorsOpen(value=>!value)}><span>{statusHint}{spectators.length?` (${spectators.length>99?'99+':spectators.length})`:''}</span></button>{spectatorsOpen&&<OnlineList members={spectators} placement="bottom" className="chess-spectator-pop" title={t('观战玩家','Spectators')} emptyText={t('暂无观战玩家','No spectators currently')} ownerSelector=".chess-spectator-control" onClose={()=>setSpectatorsOpen(false)} style={spectatorHOffset ? { marginLeft: spectatorHOffset } : undefined}/>}</span>:<span className="chess-status">{statusHint}</span>)}
       </div><span className="chess-meta">{statusHint&&<i className="chess-status-dot" aria-hidden="true"/>}<span>{state.players.length}/2 {t('玩家','players')}</span></span>
       {(state.status === 'playing' || state.status === 'result') && (
         <GameCardMenu
           aiMode={state.aiMode ?? state.aiSource ?? getCachedAiMode() ?? 'local'}
+          hideAiMode={!isPlayer}
           onChangeAiMode={changeAiMode}
           onToggleBoardStyle={() => showHintToast(t('界面切换敬请期待', 'UI switch coming soon'))}
           onAiTutor={() => setTutorOpen(true)}

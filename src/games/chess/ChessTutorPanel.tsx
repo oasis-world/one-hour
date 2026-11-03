@@ -85,7 +85,7 @@ export default function ChessTutorPanel({ open, onClose, chessState, viewerColor
       setErrorMsg(e instanceof Error ? e.message : String(e))
       setStatus('error')
     }
-  }, [chessState, positionKey, lang])
+  }, [chessState, positionKey, lang, viewerColor])
 
   // Single effect: open/position change => reset and fetch, close => reset
   useEffect(() => {
@@ -203,41 +203,46 @@ export default function ChessTutorPanel({ open, onClose, chessState, viewerColor
                 <p><ExpandableText text={data.conceptTip} limit={260} /></p>
               </section>
             )}
-            {data.lastMoveReview && data.lastMoveReview.quality !== 'none' && (
-              <section className="chess-tutor-section">
-                <h4>{t('上一步点评', 'Last move review')} <span className={`chess-tutor-quality is-${data.lastMoveReview.quality}`}>{data.lastMoveReview.quality === 'good' ? t('不错', 'Good') : data.lastMoveReview.quality === 'mistake' ? t('失误', 'Mistake') : t('一般', 'OK')}</span></h4>
-                <p><ExpandableText text={data.lastMoveReview.comment} limit={180} /></p>
-                {data.lastMoveReview.betterMove && (
-                  <p className="chess-tutor-better">{t('更好的走法：', 'Better move:')} <strong>{moveLabel(data.lastMoveReview.betterMove as Move)}</strong></p>
-                )}
-              </section>
-            )}
+            {(() => {
+              const moverColor = chessState.turn === 'w' ? 'b' : 'w'
+              const isOwnMove = Boolean(viewerColor && chessState.lastMove && moverColor === viewerColor)
+              if (!isOwnMove) return null
+              if (!data.lastMoveReview || data.lastMoveReview.quality === 'none') return null
+              return (
+                <section className="chess-tutor-section">
+                  <h4>{t('上一步点评', 'Last move review')} <span className={`chess-tutor-quality is-${data.lastMoveReview.quality}`}>{data.lastMoveReview.quality === 'good' ? t('不错', 'Good') : data.lastMoveReview.quality === 'mistake' ? t('失误', 'Mistake') : t('一般', 'OK')}</span></h4>
+                  <p><ExpandableText text={data.lastMoveReview.comment} limit={180} /></p>
+                  {data.lastMoveReview.betterMove && (
+                    <p className="chess-tutor-better">{t('更好的走法：', 'Better move:')} <strong>{moveLabel(data.lastMoveReview.betterMove as Move)}</strong></p>
+                  )}
+                </section>
+              )
+            })()}
             {data.encouragement && <p className="chess-tutor-encouragement">✦ {data.encouragement}</p>}
           </div>
         )}
 
-        <div className="chess-tutor-ask">
-          <div className="chess-tutor-ask-row">
-            <input
-              {...ime.imeProps}
-              className="chess-tutor-input"
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder={t('询问这个局面…', 'Ask about this position...')}
-              onKeyDown={(e) => {
-                if (ime.imeConsumesEnter(e)) return
-                if (e.key === 'Enter') { e.preventDefault(); void handleAsk() }
-              }}
-              aria-label={t('问导师', 'Ask the tutor')}
-            />
-            <button type="button" className="btn-accent chess-tutor-send" disabled={!question.trim() || asking} onClick={handleAsk}>
-              {asking ? t('导师思考中…', 'Tutor is thinking...') : t('发送', 'Send')}
-            </button>
+        {status !== 'loading' && (
+          <div className="chess-tutor-ask">
+            <div className="chess-tutor-ask-row">
+              <input
+                {...ime.imeProps}
+                className="chess-tutor-input"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                placeholder={t('询问这个局面…', 'Ask about this position...')}
+                onKeyDown={(e) => {
+                  if (ime.imeConsumesEnter(e)) return
+                  if (e.key === 'Enter') { e.preventDefault(); void handleAsk() }
+                }}
+                aria-label={t('问导师', 'Ask the tutor')}
+              />
+              <button type="button" className="btn-accent chess-tutor-send" disabled={!question.trim() || asking} onClick={handleAsk}>
+                {t('发送', 'Send')}
+              </button>
+            </div>
           </div>
-          <div className="chess-tutor-actions">
-            <button type="button" className="chess-tutor-ghost" onClick={() => doFetch()} disabled={status === 'loading'}>{t('重新分析', 'Retry analysis')}</button>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   )

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { getSupabaseClient } from '../../lib/supabaseClient'
 import { isSupabaseConfigured } from '../../lib/supabaseConfig'
 import { useAccount } from '../../lib/useAccount'
@@ -74,6 +74,22 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false)
   const [spectatorsOpen, setSpectatorsOpen] = useState(false)
   const [joinStatus, setJoinStatus] = useState<'idle' | 'joining' | 'retry'>('idle')
+  const headerRef=useRef<HTMLDivElement>(null)
+  const [spectatorHOffset,setSpectatorHOffset]=useState(0)
+  useLayoutEffect(()=>{
+    if(!spectatorsOpen)return
+    const update=()=>{
+      const header=headerRef.current
+      const chat=document.querySelector('.chat-column') as HTMLElement | null
+      if(!header||!chat)return
+      const hr=header.getBoundingClientRect()
+      const cr=chat.getBoundingClientRect()
+      setSpectatorHOffset(Math.round((cr.left+cr.width/2)-(hr.left+hr.width/2)))
+    }
+    update()
+    window.addEventListener('resize',update)
+    return ()=>window.removeEventListener('resize',update)
+  },[spectatorsOpen])
   useEffect(() => {
     if (!spectatorsOpen) return
     setPopoverOpen(true)
@@ -837,8 +853,8 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   }
 
   return (
-    <div className="gomoku-card">
-      <div className="gomoku-head">
+    <div className={`gomoku-card${spectatorsOpen ? ' has-spectator-pop' : ''}`}>
+      <div ref={headerRef} className="gomoku-head">
         <div className="gomoku-heading">
           <span className="gomoku-title"><GomokuIcon size={17} />{t('五子棋', 'Gomoku')}</span>
           {statusHint && (state.status === 'playing' && !isPlayer ? (
@@ -861,6 +877,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
                   emptyText={t('暂无观战玩家', 'No spectators currently')}
                   ownerSelector=".gomoku-spectator-control"
                   onClose={() => setSpectatorsOpen(false)}
+                  style={spectatorHOffset ? { marginLeft: spectatorHOffset } : undefined}
                 />
               )}
             </span>

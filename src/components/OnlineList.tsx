@@ -19,6 +19,7 @@ export default function OnlineList({
   emptyText,
   ownerSelector,
   className = '',
+  style,
 }: {
   members: PresenceMember[]
   onClose: () => void
@@ -27,6 +28,7 @@ export default function OnlineList({
   emptyText?: string
   ownerSelector?: string
   className?: string
+  style?: React.CSSProperties
 }) {
   const popRef = useRef<HTMLDivElement>(null)
 
@@ -54,6 +56,7 @@ export default function OnlineList({
       ref={popRef}
       role="dialog"
       aria-label={t('在线列表', 'Online members')}
+      style={style}
     >
       <header className="online-pop-head">
         <span>{`${title ?? t('在线', 'Online')} · ${members.length}`}</span>

@@ -54,13 +54,9 @@
 .chess-tutor-input:focus{border-color:rgba(250,204,21,.5);box-shadow:0 0 0 2px rgba(250,204,21,.15)}
 .app-shell.theme-warm .chess-tutor-input{border-color:rgba(90,60,20,.18);background:#fff9}
 .chess-tutor-send{flex:0 0 auto;min-height:36px;padding:0 14px;white-space:nowrap}
-.chess-tutor-actions{display:flex;justify-content:center;margin-top:8px}
-.chess-tutor-ghost{padding:6px 12px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:transparent;color:inherit;font-size:12px;cursor:pointer;opacity:.7}
-.chess-tutor-ghost:hover{opacity:1}
-.app-shell.theme-warm .chess-tutor-ghost{border-color:rgba(90,60,20,.18)}
 .chess-tutor-hl-from{box-shadow:inset 0 0 0 3px #facc15,inset 0 0 0 100px #facc1530 !important;z-index:2}
 .chess-tutor-hl-to{box-shadow:inset 0 0 0 3px #22c55e,inset 0 0 0 100px #22c55e26 !important;z-index:2}
 @media(max-width:520px){
-  .chess-tutor-backdrop{display:flex;align-items:flex-end;justify-content:center;padding:0 10px 0 10px;padding-bottom:max(10px, env(safe-area-inset-bottom,0px))}
-  .chess-tutor-panel{width:100%;max-height:min(88vh,720px);max-height:min(88dvh,720px);max-height:calc(100dvh - 12px);border-radius:18px 18px 0 0}
+  .chess-tutor-backdrop{display:grid;place-items:center;padding:14px;padding-bottom:max(14px, env(safe-area-inset-bottom,0px))}
+  .chess-tutor-panel{width:min(100%,420px);max-height:80vh;max-height:80dvh;border-radius:18px}
 }
