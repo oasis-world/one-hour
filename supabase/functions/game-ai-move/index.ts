@@ -53,7 +53,7 @@ const BASETEN_ENDPOINT = 'https://inference.baseten.co/v1/chat/completions'
 const GAME_RULES: Record<string, string> = {
   gomoku: "Gomoku 11x11, stones 1=black 2=white. Black moves first each round. Five in a row (horizontal/vertical/diagonal) wins. Board is Stone[row][col], 0 empty. Prioritize attack (create open-four/live-three) over passive defense; block opponent open-four immediately.",
   xiangqi: "Xiangqi 10x9, board[row][col] 10 rows, red=+ bottom, black=- top. Pieces: 1 General,2 Advisor,3 Elephant,4 Horse,5 Chariot,6 Cannon,7 Soldier. General in 3x3 palace, advisors/elephants cannot cross river, soldiers gain sideways after crossing. Flying general & check rules apply. Red first. Checkmate wins.",
-  chess: "Chess 8x8, pieces w/b + kqrbnp. Turn w/b. Castling KQkq, enPassant square, halfmove for 50-move. PositionHistory detects repetition. Evaluate material, king safety, center control. Checkmate wins; stalemate/50-move/repetition/insufficient material draws.",
+  chess: "Chess 8x8, board[r][c] r0=8th rank(black back), r7=1st rank(white back), c0=a file, c7=h file. Algebraic: a1=bottom-left dark for white (r7c0), h1=bottom-right light (r7c7), e2 = r6c4. Turn w/b. Castling KQkq, enPassant square, halfmove for 50-move. PositionHistory detects repetition. Coordinates are absolute (white perspective): when viewer is black the board is visually flipped (bottom = 8th rank, left→right = h→a) but algebraic remains e2/c3 etc. matched to edge labels. Evaluate material, king safety, center control. Checkmate wins; stalemate/50-move/repetition/insufficient material draws.",
 }
 
 const basetenProvider: AiProvider = {
@@ -78,6 +78,8 @@ const basetenProvider: AiProvider = {
     if (isTutor) {
       const localeLine = localeInstruction(req.locale)
       const questionLine = req.question ? `\nUserQuestion: ${String(req.question).slice(0, 600)}` : ""
+      const viewerColor = typeof pos.viewerColor === 'string' ? pos.viewerColor : null
+      const viewerHint = viewerColor ? `\nViewer: the user asking is playing as ${viewerColor === 'w' ? 'White' : 'Black'} (their pieces are ${viewerColor === 'w' ? 'w' : 'b'}); current turn=${pos.turn ?? '-'} — recommend for the side to move but explain from the viewer's perspective and use absolute algebraic (e2, c3 etc.) that matches board edge labels.` : ""
       const lastMoveStr = pos.lastMove ? JSON.stringify(pos.lastMove) : "none"
       const upstream = await fetch(BASETEN_ENDPOINT, {
         method: 'POST',
@@ -87,7 +89,7 @@ const basetenProvider: AiProvider = {
           messages: [
             {
               role: 'system',
-              content: `You are an expert ${req.game} tutor for beginners — friendly, concise, encouraging. Rules: ${rules} ${localeLine} You teach the current position to someone who barely knows how to play. Use ThreatSummary and AnnotatedMoves as factual advisors. Output ONLY valid JSON (no markdown, no extra text) with this exact shape:
+              content: `You are an expert ${req.game} tutor for beginners — friendly, concise, encouraging. Rules: ${rules}${viewerHint} ${localeLine} You teach the current position to someone who barely knows how to play. Use ThreatSummary and AnnotatedMoves as factual advisors. Output ONLY valid JSON (no markdown, no extra text) with this exact shape:
 {
   "situation": "1-2 sentences: overview of who is ahead, king safety, key tension",
   "keyThreats": "1-2 sentences: immediate tactical threats to notice",
@@ -101,7 +103,7 @@ const basetenProvider: AiProvider = {
   "encouragement": "1 short encouraging sentence",
   "answer": "if UserQuestion is present, answer it concisely (2-4 sentences) using the position; otherwise empty string"
 }
-Rules: recommendations must be 2-3 items sorted best-first. Every recommendation.move must be copied verbatim from legalMoves — do not invent coordinates. Use beginner-friendly language, no heavy engine jargon.`,
+Rules: recommendations must be 2-3 items sorted best-first. Every recommendation.move must be copied verbatim from legalMoves — do not invent coordinates (use absolute algebraic like e2, c3 that matches board edge labels a-h left→right and 1-8 bottom→top for the viewer). Use beginner-friendly language, no heavy engine jargon.`,
             },
             {
               role: 'user',
@@ -246,12 +248,14 @@ const opencodeProvider: AiProvider = {
     if (isTutor) {
       const localeLine = localeInstruction(req.locale)
       const questionLine = req.question ? ` UserQuestion: ${String(req.question).slice(0, 600)}` : ""
+      const viewerColorOc = typeof pos.viewerColor === 'string' ? pos.viewerColor : null
+      const viewerHintOc = viewerColorOc ? ` Viewer:${viewerColorOc} turn:${(pos as Record<string, unknown>).turn ?? '-'} (user plays ${viewerColorOc}); coordinates absolute a1=white dark bottom-left, h1 light, e2=r6c4; board flipped for black but algebraic e2/c3 still absolute matching edge labels.` : ""
       const upstream = await fetch(OPENCODE_ENDPOINT, {
         method: 'POST',
         headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json', 'x-opencode-session': req.sessionId },
         body: JSON.stringify({
           model: OPENCODE_MODEL,
-          instructions: `You are an expert ${req.game} tutor for beginners. Rules: ${GAME_RULES[req.game] ?? ""} ${localeLine} Teach this position concisely. Return ONLY JSON: {"situation":"...","keyThreats":"...","recommendations":[{"move":<legalMoves element>,"label":"...","reason":"..."} x2-3],"conceptTip":"...","lastMoveReview":{"quality":"good|ok|mistake|none","comment":"...","betterMove":<legalMoves element or null>},"encouragement":"...","answer":"..."}. Every recommendation.move must be exact from legalMoves. RecentMoves: ${(() => { const h = (pos as Record<string, unknown>).history; return Array.isArray(h) ? JSON.stringify(h.slice(-12)) : "[]"; })()} ThreatSummary: ${threatSummary.slice(0, 800)} AnnotatedMoves: ${JSON.stringify(annotated).slice(0, 4000)}${questionLine}`,
+          instructions: `You are an expert ${req.game} tutor for beginners. Rules: ${GAME_RULES[req.game] ?? ""}${viewerHintOc} ${localeLine} Teach this position concisely; recommend for side to move but explain from viewer's perspective. Return ONLY JSON: {"situation":"...","keyThreats":"...","recommendations":[{"move":<legalMoves element>,"label":"...","reason":"..."} x2-3],"conceptTip":"...","lastMoveReview":{"quality":"good|ok|mistake|none","comment":"...","betterMove":<legalMoves element or null>},"encouragement":"...","answer":"..."}. Every recommendation.move must be exact from legalMoves (absolute algebraic like e2/c3 matching board edge labels). RecentMoves: ${(() => { const h = (pos as Record<string, unknown>).history; return Array.isArray(h) ? JSON.stringify(h.slice(-12)) : "[]"; })()} ThreatSummary: ${threatSummary.slice(0, 800)} AnnotatedMoves: ${JSON.stringify(annotated).slice(0, 4000)}${questionLine}`,
           input: JSON.stringify({ game: req.game, position: req.position, legalMoves: req.legalMoves, history: (req.position as Record<string, unknown>).history ?? [], threatSummary, annotatedMoves: annotated, question: req.question ?? "" }),
           max_output_tokens: maxOutput, reasoning: { effort: 'minimal' },
         }),

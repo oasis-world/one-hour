@@ -39,11 +39,12 @@ interface Props {
   open: boolean
   onClose: () => void
   chessState: ChessState
+  viewerColor?: 'w' | 'b' | null
   highlighted: Move | null
   onHighlight: (m: Move | null) => void
 }
 
-export default function ChessTutorPanel({ open, onClose, chessState, highlighted, onHighlight }: Props) {
+export default function ChessTutorPanel({ open, onClose, chessState, viewerColor = null, highlighted, onHighlight }: Props) {
   useLang()
   const ime = useImeEnter()
   const [data, setData] = useState<TutorResult<Move> | null>(null)
@@ -56,7 +57,7 @@ export default function ChessTutorPanel({ open, onClose, chessState, highlighted
   const cacheRef = useRef<Map<string, TutorResult<Move>>>(new Map())
   const fetchIdRef = useRef(0)
 
-  const positionKey = `${chessState.turn}:${chessState.castling}:${chessState.enPassant?.join(',') ?? '-'}:${chessState.halfmove}:${chessState.lastMove?.from.join(',') ?? ''}->${chessState.lastMove?.to.join(',') ?? ''}:${chessState.moveHistory?.length ?? 0}`
+  const positionKey = `${chessState.turn}:${viewerColor ?? '-'}:${chessState.castling}:${chessState.enPassant?.join(',') ?? '-'}:${chessState.halfmove}:${chessState.lastMove?.from.join(',') ?? ''}->${chessState.lastMove?.to.join(',') ?? ''}:${chessState.moveHistory?.length ?? 0}`
 
   const doFetch = useCallback(async (q?: string) => {
     const moves = legalMoves(chessState) as Move[]
@@ -70,7 +71,7 @@ export default function ChessTutorPanel({ open, onClose, chessState, highlighted
     try {
       const { annotatedMoves, threatSummary } = buildChessHints(chessState, moves as { from: Square; to: Square; promotion?: string }[])
       const position = {
-        board: chessState.board, turn: chessState.turn, castling: chessState.castling,
+        board: chessState.board, turn: chessState.turn, viewerColor, castling: chessState.castling,
         enPassant: chessState.enPassant, halfmove: chessState.halfmove, round: chessState.round,
         lastMove: chessState.lastMove, history: (chessState.moveHistory ?? []).slice(-12),
         threatSummary, annotatedMoves,
@@ -117,7 +118,7 @@ export default function ChessTutorPanel({ open, onClose, chessState, highlighted
       const moves = legalMoves(chessState) as Move[]
       const { annotatedMoves, threatSummary } = buildChessHints(chessState, moves as { from: Square; to: Square; promotion?: string }[])
       const position = {
-        board: chessState.board, turn: chessState.turn, castling: chessState.castling,
+        board: chessState.board, turn: chessState.turn, viewerColor, castling: chessState.castling,
         enPassant: chessState.enPassant, halfmove: chessState.halfmove, round: chessState.round,
         lastMove: chessState.lastMove, history: (chessState.moveHistory ?? []).slice(-12),
         threatSummary, annotatedMoves,

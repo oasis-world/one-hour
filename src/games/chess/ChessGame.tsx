@@ -394,8 +394,11 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
         const isTarget=targets.has(`${r}-${c}`)
         const isTutorFrom=tutorHighlight?.from[0]===r&&tutorHighlight.from[1]===c
         const isTutorTo=tutorHighlight?.to[0]===r&&tutorHighlight.to[1]===c
+        // 坐标标签始终跟随视角的视觉底边/左边：白方在下方时底边是 r=7、左边是 c=0；黑方在下方（棋盘翻转）时底边是 r=0、左边是 c=7
+        const isFileEdge=myColor==='b'?r===0:r===7
+        const isRankEdge=myColor==='b'?c===7:c===0
         return <button type="button" key={`${r}-${c}`} data-square={`${r}-${c}`} role="gridcell" aria-label={`${String.fromCharCode(97+c)}${8-r}`} className={`chess-square${(r+c)%2===0?' is-light':' is-dark'}${selected?.[0]===r&&selected[1]===c?' is-selected':''}${isTarget?' is-target':''}${isLast?' is-last':''}${isTutorFrom?' chess-tutor-hl-from':''}${isTutorTo?' chess-tutor-hl-to':''}`} onClick={()=>onSquare(r,c)}>
-          <PieceArt piece={piece}/>{r===7&&<small>{String.fromCharCode(97+c)}</small>}{c===0&&<em>{8-r}</em>}
+          <PieceArt piece={piece}/>{isFileEdge&&<small>{String.fromCharCode(97+c)}</small>}{isRankEdge&&<em>{8-r}</em>}
         </button>
       }))}
       {moveToast&&<div className={`chess-capture-toast${moveToastKind==='check'?' is-check':''}${moveToastKind==='winner'?' is-winner':''}`} role="status" aria-live="assertive">{moveToast}</div>}
@@ -414,6 +417,6 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
       <h3 id="chess-confirm-title">{t('离开这场对局？','Leave this game?')}</h3><p>{t('离开后棋盘会重置，你可以之后重新加入。','The board will reset when you leave. You can join again later.')}</p>
       <div className="chess-confirm-actions"><button type="button" className="chess-confirm-cancel" onClick={()=>setLeaveConfirmOpen(false)}>{t('继续游戏','Stay')}</button><button type="button" className="btn-accent" disabled={!ready} onClick={leave}>{t('离开房间','Leave room')}</button></div>
     </div></div>}
-    <ChessTutorPanel open={tutorOpen} onClose={()=>setTutorOpen(false)} chessState={state} highlighted={tutorHighlight} onHighlight={setTutorHighlight} />
+    <ChessTutorPanel open={tutorOpen} onClose={()=>setTutorOpen(false)} chessState={state} viewerColor={myColor} highlighted={tutorHighlight} onHighlight={setTutorHighlight} />
   </div>
 }
