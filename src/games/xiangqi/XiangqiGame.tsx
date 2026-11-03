@@ -1028,7 +1028,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
                 aria-label={p.color === 1 ? t('红方棋子', 'Red pieces') : t('黑方棋子', 'Black pieces')}
                 title={p.color === 1 ? t('红方', 'Red side') : t('黑方', 'Black side')}
               />
-              <span className="xiangqi-player-name" title={p.displayName}>{p.displayName}{p.isAI && <AiSourceIcon source={state.aiMode ?? state.aiSource ?? 'local'} />}{p.isAI && <AiThinkingTimer active={aiIsThinking && p.color === state.turn} />}</span>
+              <span className="xiangqi-player-name" title={p.displayName}><span className="xiangqi-player-name-text">{p.displayName}</span>{p.isAI && <AiSourceIcon source={state.aiMode ?? state.aiSource ?? 'local'} />}{p.isAI && <AiThinkingTimer active={aiIsThinking && p.color === state.turn} />}</span>
               <span className="xiangqi-player-score">{p.score}</span>
             </div>
           </div>

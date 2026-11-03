@@ -166,7 +166,8 @@
   border: 1px solid #a9a49a;
   box-shadow: 0 0 0 1px rgba(255,255,255,0.2);
 }
-.xiangqi-player-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xiangqi-player-name { display: flex; align-items: center; gap: 0; flex: 1; min-width: 0; overflow: hidden; }
+.xiangqi-player-name-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .xiangqi-player-score { font-weight: 700; opacity: 0.8; }
 .xiangqi-empty { font-size: 12px; opacity: 0.6; }
 .xiangqi-result {

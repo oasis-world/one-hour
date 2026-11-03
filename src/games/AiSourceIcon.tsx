@@ -7,7 +7,8 @@ export default function AiSourceIcon({ source }: { source: AiSource }) {
       role="img"
       aria-label={isCloud ? '云端模型 / Cloud model' : '本地 AI / Local AI'}
       title={isCloud ? '云端模型 / Cloud model' : '本地 AI / Local AI'}
-      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', verticalAlign: 'middle', marginLeft: 5, color: isCloud ? '#60a5fa' : '#a8a29e', filter: isCloud ? 'drop-shadow(0 0 3px #60a5fa66)' : 'drop-shadow(0 0 2px #a8a29e44)' }}
+      className="game-ai-source-icon"
+      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: isCloud ? '#60a5fa' : '#a8a29e', filter: isCloud ? 'drop-shadow(0 0 3px #60a5fa66)' : 'drop-shadow(0 0 2px #a8a29e44)' }}
     >
       {isCloud ? (
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

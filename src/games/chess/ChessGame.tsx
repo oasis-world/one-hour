@@ -379,7 +379,7 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
       {player.isAI?<AiAvatar/>:<AvatarBadge className="chess-player-avatar" size={30} look={{style:player.avatarStyle||'thumbs',seed:player.avatarSeed||player.userId,url:player.avatarUrl}}/>}
       <div className={`chess-player${player.userId===selfId?' is-self':''}${state.turn===player.color&&state.status==='playing'?' is-turn':''}`}>
         <span className={`chess-side-indicator${player.color==='w'?' is-white':' is-black'}`} role="img" aria-label={player.color==='w'?t('白方棋子','White pieces'):t('黑方棋子','Black pieces')} title={player.color==='w'?t('白方','White side'):t('黑方','Black side')}/>
-        <span className="chess-player-name" title={player.displayName}>{player.displayName}{player.isAI&&<AiSourceIcon source={state.aiMode??state.aiSource??'local'}/>}{player.isAI && <AiThinkingTimer active={aiIsThinking && player.color===state.turn} />}</span><span className="chess-player-score">{player.score}</span>
+        <span className="chess-player-name" title={player.displayName}><span className="chess-player-name-text">{player.displayName}</span>{player.isAI&&<AiSourceIcon source={state.aiMode??state.aiSource??'local'}/>}{player.isAI && <AiThinkingTimer active={aiIsThinking && player.color===state.turn} />}</span><span className="chess-player-score">{player.score}</span>
       </div>
     </div>)}</div>
 

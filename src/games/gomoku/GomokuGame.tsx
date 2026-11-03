@@ -903,7 +903,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
             )}
             <div className={`gomoku-player${p.userId === selfId ? ' is-self' : ''}${state.turn === p.color && state.status === 'playing' ? ' is-turn' : ''}`}>
               <span className="gomoku-stone" data-color={p.color} />
-              <span className="gomoku-player-name" title={p.displayName}>{p.displayName}{p.isAI && <AiSourceIcon source={state.aiMode ?? state.aiSource ?? 'local'} />}{p.isAI && <AiThinkingTimer active={aiIsThinking && p.color === state.turn} />}</span>
+              <span className="gomoku-player-name" title={p.displayName}><span className="gomoku-player-name-text">{p.displayName}</span>{p.isAI && <AiSourceIcon source={state.aiMode ?? state.aiSource ?? 'local'} />}{p.isAI && <AiThinkingTimer active={aiIsThinking && p.color === state.turn} />}</span>
               <span className="gomoku-player-score">{p.score}</span>
             </div>
           </div>
