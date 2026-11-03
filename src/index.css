@@ -1867,6 +1867,8 @@ button {
   position: relative;
   display: flex;
   flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
 }
 
 .popover {
@@ -2587,3 +2589,87 @@ button {
   transition: transform 0.18s ease;
 }
 .plus-menu-chevron.is-open { transform: rotate(90deg); }
+
+/* ---------- Companion private messages (Discord-style) ---------- */
+.msg-row.is-private {
+  background: rgba(88, 101, 242, 0.08);
+  border-left: 2px solid #5865f2;
+  border-radius: 0 10px 10px 0;
+}
+.app-shell.theme-warm .msg-row.is-private {
+  background: rgba(88, 101, 242, 0.07);
+  border-left-color: #7983f5;
+}
+.msg-mention {
+  color: #5865f2;
+  font-weight: 800;
+  background: rgba(88, 101, 242, 0.14);
+  padding: 0 3px;
+  border-radius: 4px;
+}
+.app-shell.theme-warm .msg-mention {
+  color: #4049d0;
+  background: rgba(88, 101, 242, 0.12);
+}
+
+/* Companion avatar button to the right of + — pure avatar, no border */
+.composer-companion-btn {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.14s ease, opacity 0.14s ease;
+}
+.composer-companion-btn img {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: block;
+}
+.composer-companion-btn:hover {
+  transform: scale(1.08);
+  opacity: 0.9;
+}
+.composer-companion-btn:active { transform: scale(0.94); }
+
+.mention-popover {
+  left: 0;
+  min-width: 200px;
+  max-width: 260px;
+  padding: 6px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(24, 26, 32, 0.98);
+  border: 1px solid var(--line);
+}
+.app-shell.theme-warm .mention-popover {
+  background: rgba(252, 243, 220, 0.98);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.mention-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.13s ease;
+}
+.mention-item:hover,
+.mention-item.is-selected { background: var(--row-hover); }
+.mention-item-main { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.mention-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mention-role { font-size: 11px; opacity: 0.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -7,6 +7,8 @@ import { markFilePickerOpened } from '../lib/filePickerGuard'
 import { CameraIcon, ChessCrownIcon, ChevronRightIcon, EmojiIcon, GameIcon, GomokuIcon, PlusIcon, SendIcon, ThinXIcon, UploadIcon, XiangqiGeneralIcon } from './icons'
 import { PhotoIcon } from './userIcons'
 import EmojiPanel from './EmojiPanel'
+import AvatarBadge from './AvatarBadge'
+import type { CompanionProfile } from '../lib/companionProfile'
 import { getGameList } from '../games/registry'
 
 interface Props {
@@ -25,6 +27,8 @@ interface Props {
   onStartGame?: (gameId: string) => void
   /** Notifies the shell while a popover is up (mobile hides the gear). */
   onMenuOpenChange?: (open: boolean) => void
+  companion?: CompanionProfile | null
+  onMentionCompanion?: () => void
 }
 
 function isCoarsePointer(): boolean {
@@ -58,13 +62,15 @@ function useMobileFormFactor(): boolean {
  * or emoji button toggles its popover (a click outside closes it); there
  * is no hover-to-open.
  */
-export default function Composer({ onSend, replyTo, onClearReply, editing, onClearEditing, onEdit, onImagePicked, onImagesPicked, onMenuOpenChange, onStartGame }: Props) {
+export default function Composer({ onSend, replyTo, onClearReply, editing, onClearEditing, onEdit, onImagePicked, onImagesPicked, onMenuOpenChange, onStartGame, companion, onMentionCompanion }: Props) {
   const lang = useLang()
   const [draft, setDraft] = useState(editing?.content ?? '')
   const [plusOpen, setPlusOpen] = useState(false)
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [gamesOpen, setGamesOpen] = useState(false)
   const [multiline, setMultiline] = useState(false)
+  const [mentionOpen, setMentionOpen] = useState(false)
+  const [mentionIndex, setMentionIndex] = useState(0)
   const coarse = isCoarsePointer()
   const mobileForm = useMobileFormFactor()
   const ime = useImeEnter()
@@ -72,6 +78,23 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
+
+  const updateMentionState = (value: string) => {
+    if (!companion) { setMentionOpen(false); return }
+    const lastAt = value.lastIndexOf('@')
+    if (lastAt === -1) { setMentionOpen(false); return }
+    const after = value.slice(lastAt)
+    const tag = `@${companion.name}`
+    const tagWithSpace = `${tag} `
+    if (after === tag || after === tagWithSpace || after.startsWith(tagWithSpace) || after.startsWith(tag)) {
+      setMentionOpen(false)
+      return
+    }
+    setMentionOpen(true)
+    setMentionIndex(0)
+  }
+
+  const mentionCandidates = companion ? [companion] : []
   useLayoutEffect(() => {
     if (replyTo) inputRef.current?.focus()
   }, [replyTo])
@@ -132,7 +155,7 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
 
   // Tap outside closes the popovers.
   useEffect(() => {
-    if (!plusOpen && !emojiOpen) return
+    if (!plusOpen && !emojiOpen && !mentionOpen) return
     const onDown = (e: PointerEvent) => {
       if (!rootRef.current?.contains(e.target as Node)) {
         suppressNextClick()
@@ -142,19 +165,23 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
         setPlusOpen(false)
         setEmojiOpen(false)
         setGamesOpen(false)
+        setMentionOpen(false)
       }
     }
     document.addEventListener('pointerdown', onDown, true)
     return () => document.removeEventListener('pointerdown', onDown, true)
-  }, [plusOpen, emojiOpen])
+  }, [plusOpen, emojiOpen, mentionOpen])
 
   useEffect(() => {
-    const menuOpen = plusOpen || emojiOpen
+    const menuOpen = plusOpen || emojiOpen || mentionOpen
     onMenuOpenChange?.(menuOpen)
     if (!menuOpen) return
     setPopoverOpen(true)
     return () => setPopoverOpen(false)
-  }, [plusOpen, emojiOpen, onMenuOpenChange])
+  }, [plusOpen, emojiOpen, mentionOpen, onMenuOpenChange])
+
+  // Sync mention popover with draft
+  useEffect(() => { updateMentionState(draft) }, [draft, companion])
 
   // Warm the HEIC decoder while the user browses the plus menu, so a
   // first HEIC pick doesn't pay the chunk-download latency mid-send.
@@ -214,6 +241,23 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
     input.current?.click()
   }
 
+  const insertMention = (candidate?: CompanionProfile) => {
+    const target = candidate ?? (mentionCandidates[mentionIndex] ?? companion)
+    if (!target) return
+    const lastAt = draft.lastIndexOf('@')
+    const tag = `@${target.name} `
+    const newDraft = lastAt === -1 ? tag : draft.slice(0, lastAt) + tag
+    setDraft(newDraft)
+    setMentionOpen(false)
+    requestAnimationFrame(() => {
+      const el = inputRef.current
+      if (el) {
+        el.focus()
+        try { el.selectionStart = el.selectionEnd = newDraft.length } catch { /* noop */ }
+      }
+    })
+  }
+
   return (
     <div className="composer-dock" ref={rootRef}>
       {replyTo && (
@@ -254,6 +298,28 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
           >
             <PlusIcon />
           </button>
+          {companion && (
+            <button
+              type="button"
+              className="composer-companion-btn"
+              aria-label={t('提及助手', 'Mention companion')}
+              title={companion.name}
+              onMouseDown={keepFocus}
+              onPointerDown={keepFocus}
+              onClick={() => {
+                const tag = `@${companion.name} `
+                setDraft((prev) => {
+                  if (prev.includes(tag)) return prev
+                  if (!prev) return tag
+                  return prev.startsWith('@') ? `${tag}${prev}` : `${tag}${prev}`
+                })
+                onMentionCompanion?.()
+                window.setTimeout(() => inputRef.current?.focus(), 0)
+              }}
+            >
+              <AvatarBadge look={{ style: companion.style, seed: companion.seed, avatarUrl: companion.avatarUrl ?? null }} size={24} />
+            </button>
+          )}
 
           {plusOpen && (
             <div className="popover plus-menu" role="menu">
@@ -338,6 +404,29 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
               )}
             </div>
           )}
+          {mentionOpen && companion && (
+            <div className="popover mention-popover" role="listbox" aria-label={t('提及', 'Mention')}>
+              {mentionCandidates.map((c, idx) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`mention-item${idx === mentionIndex ? ' is-selected' : ''}`}
+                  role="option"
+                  aria-selected={idx === mentionIndex}
+                  onMouseDown={keepFocus}
+                  onPointerDown={keepFocus}
+                  onMouseEnter={() => setMentionIndex(idx)}
+                  onClick={() => insertMention(c)}
+                >
+                  <AvatarBadge look={{ style: c.style, seed: c.seed, avatarUrl: c.avatarUrl ?? null }} size={28} />
+                  <span className="mention-item-main">
+                    <span className="mention-name">{c.name}</span>
+                    <span className="mention-role">{c.role}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <textarea
@@ -347,9 +436,30 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
           rows={1}
           maxLength={1000}
           placeholder={COMPOSER_PLACEHOLDER[lang]}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => { setDraft(e.target.value) }}
           {...ime.imeProps}
           onKeyDown={(e) => {
+            if (mentionOpen) {
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                if (ime.imeConsumesEnter(e)) return
+                e.preventDefault()
+                const dir = e.key === 'ArrowDown' ? 1 : -1
+                const len = mentionCandidates.length || 1
+                setMentionIndex((i) => (i + dir + len) % len)
+                return
+              }
+              if (e.key === 'Enter') {
+                if (ime.imeConsumesEnter(e)) return
+                e.preventDefault()
+                insertMention()
+                return
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                setMentionOpen(false)
+                return
+              }
+            }
             if (e.key === 'Escape' && replyTo) {
               e.preventDefault()
               e.stopPropagation()
@@ -357,8 +467,6 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
               return
             }
             if (e.key !== 'Enter' || e.shiftKey) return
-            // Guard IME confirmation (candidates) — that Enter commits
-            // the composition, it must not send.
             if (ime.imeConsumesEnter(e)) return
             e.preventDefault()
             submit()

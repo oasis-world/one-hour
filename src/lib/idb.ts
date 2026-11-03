@@ -11,9 +11,10 @@
 export const MESSAGES_STORE = 'messages'
 export const OUTBOX_STORE = 'outbox'
 export const KV_STORE = 'kv'
+export const COMPANION_STORE = 'companion_messages'
 
 const DB_NAME = 'one-hour-chat'
-const DB_VERSION = 2
+const DB_VERSION = 3
 
 let dbPromise: Promise<IDBDatabase | null> | null = null
 
@@ -33,6 +34,9 @@ function openDb(): Promise<IDBDatabase | null> {
         }
         if (!db.objectStoreNames.contains(KV_STORE)) {
           db.createObjectStore(KV_STORE, { keyPath: 'key' })
+        }
+        if (!db.objectStoreNames.contains(COMPANION_STORE)) {
+          db.createObjectStore(COMPANION_STORE, { keyPath: 'id' })
         }
       }
       request.onsuccess = () => resolve(request.result)

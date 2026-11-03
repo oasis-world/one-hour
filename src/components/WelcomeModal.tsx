@@ -18,6 +18,7 @@ import {
   type UserProfile,
 } from '../lib/userProfile'
 import { randomAvatarSeed } from '../lib/avatar'
+import { generateCompanionProfile, loadCompanionProfile, saveCompanionProfile } from '../lib/companionProfile'
 import AvatarEditor from './AvatarEditor'
 import { BriefcaseIcon, ChatBubbleIcon, HourglassIcon, ThinXIcon } from './icons'
 
@@ -98,7 +99,18 @@ export default function WelcomeModal({
     })
     if (mode !== 'edit') resetStats()
     // Anonymous users also live for one hour: stamp the expiry now.
-    setProfileExpiresAt(Date.now() + PROFILE_LIFETIME_MS)
+    const expiresAt = Date.now() + PROFILE_LIFETIME_MS
+    setProfileExpiresAt(expiresAt)
+    // Companion lives alongside the profile — create/refresh on every confirm.
+    // Keep existing companion in edit mode to preserve private history.
+    const existingCompanion = loadCompanionProfile()
+    const shouldRecreate = mode !== 'edit' || !existingCompanion || existingCompanion.expiresAt <= Date.now()
+    if (shouldRecreate) {
+      const companion = generateCompanionProfile(nickname, role, { lang, expiresAt })
+      saveCompanionProfile(companion)
+    } else if (existingCompanion) {
+      saveCompanionProfile({ ...existingCompanion, expiresAt })
+    }
     // Returning player with a live session: the pick belongs in the cloud.
     // Anonymous users also persist their profile + expiry for refresh sync.
     if (account.status === 'signedIn' || account.status === 'anonymous') void pushProfileToCloud()

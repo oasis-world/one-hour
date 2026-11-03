@@ -41,6 +41,11 @@ import { useBackgroundMusic } from './lib/useBackgroundMusic'
 import { loadCountdownAnimation, loadTheme, loadVeil, saveCountdownAnimation, type ThemeName } from './lib/settings'
 import type { CountdownAnimation } from './lib/countdownAnimations'
 import type { ChatEntry, MessageReply } from './lib/chatTypes'
+import { getCompanionIfAlive, clearCompanionProfile, subscribeCompanion, type CompanionProfile } from './lib/companionProfile'
+import { clearCompanionMessages, loadCompanionMessages, saveCompanionMessage, createUserCompanionMessage, createCompanionReply, pruneCompanionMessages, companionMessageExpiresAt, removeCompanionMessage } from './lib/companionStore'
+import type { CompanionMessage } from './lib/companionStore'
+import { requestCompanionGreeting, requestCompanionReply, toHistory } from './lib/companionChat'
+import { containsCompanionMention } from './lib/mention'
 
 /**
  * 一小时 / one-hour — the ephemeral chat room. Every message, text or
@@ -182,6 +187,8 @@ export default function App() {
       if (Date.now() < exp) return
       expiringRef.current = true
       if (currentUserId) expireUserMessages(currentUserId)
+      clearCompanionProfile()
+      void clearCompanionMessages()
       const summary: PendingSummary = {
         stats: loadStats(),
         profileExpiresAt: exp,
@@ -269,9 +276,63 @@ export default function App() {
     toastTimer.current = window.setTimeout(() => setToast(null), 2600)
   }
 
+  const [companion, setCompanion] = useState<CompanionProfile | null>(() => getCompanionIfAlive())
+  const [privateMessages, setPrivateMessages] = useState<CompanionMessage[]>([])
+  const [, setCompanionTyping] = useState(false)
+  useEffect(() => subscribeCompanion(setCompanion), [])
+  useEffect(() => {
+    const tick = () => { const alive = getCompanionIfAlive(); setCompanion((prev) => (prev?.id !== alive?.id || prev?.expiresAt !== alive?.expiresAt ? alive : prev)) }
+    const id = window.setInterval(tick, 2000)
+    const onStorage = () => tick()
+    window.addEventListener('storage', onStorage)
+    return () => { window.clearInterval(id); window.removeEventListener('storage', onStorage) }
+  }, [])
+  useEffect(() => {
+    let alive = true
+    void loadCompanionMessages().then((rows) => {
+      if (!alive) return
+      setPrivateMessages((prev) => {
+        // Race fix: the greeting may have been created while this load was
+        // in flight. If DB snapshot was empty but we already have a greeting
+        // in memory, keep it instead of wiping with [].
+        if (prev.length > 0 && rows.length === 0) return prev
+        return rows
+      })
+    })
+    return () => { alive = false }
+  }, [companion?.id])
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      void pruneCompanionMessages().then(() => loadCompanionMessages().then(setPrivateMessages).catch(() => {}))
+      if (getCompanionIfAlive() == null && companion) setCompanion(null)
+    }, 10_000)
+    return () => window.clearInterval(id)
+  }, [companion])
+  const greetedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!profile || !companion || !room.identity) return
+    if (privateMessages.length > 0) return
+    if (greetedRef.current === companion.id) return
+    const key = `one-hour-companion-greeted:${companion.id}`
+    if (globalThis.localStorage?.getItem(key)) { greetedRef.current = companion.id; return }
+    greetedRef.current = companion.id
+    globalThis.localStorage?.setItem(key, '1')
+    void (async () => {
+      const text = await requestCompanionGreeting(companion)
+      const msg = createCompanionReply(text)
+      await saveCompanionMessage(msg)
+      setPrivateMessages((prev) => [...prev, msg])
+      setSentMessageSequence((s) => s + 1)
+    })()
+  }, [profile, companion, privateMessages.length, room.identity])
+
   const handleSummaryComplete = () => {
     if (currentUserId) expireUserMessages(currentUserId)
     expireAnonymousProfile(currentUserId)
+    clearCompanionProfile()
+    void clearCompanionMessages()
+    setPrivateMessages([])
+    setCompanion(null)
     resetStats()
     clearPendingSummary()
     setPendingSummary(null)
@@ -301,7 +362,31 @@ export default function App() {
     }, UNFOLD_MS)
   }
 
+  const sendPrivateAndReply = async (text: string) => {
+    if (!companion) return
+    const userMsg = createUserCompanionMessage(text)
+    await saveCompanionMessage(userMsg)
+    setPrivateMessages((prev) => [...prev, userMsg])
+    setSentMessageSequence((s) => s + 1)
+    setReplyTo(null)
+    // companion reply
+    setCompanionTyping(true)
+    try {
+      const history = toHistory([...privateMessages, userMsg])
+      const replyText = await requestCompanionReply(companion, text, history.slice(0, -1))
+      const botMsg = createCompanionReply(replyText)
+      await saveCompanionMessage(botMsg)
+      setPrivateMessages((prev) => [...prev, botMsg])
+      setSentMessageSequence((s) => s + 1)
+    } catch (e) { console.warn('[companion] reply failed', e) }
+    finally { setCompanionTyping(false) }
+  }
+
   const handleSend = (text: string, reply?: MessageReply | null) => {
+    if (companion && containsCompanionMention(text, companion)) {
+      void sendPrivateAndReply(text)
+      return
+    }
     room.send(text, undefined, reply)
     recordMessageSent()
     if (reply?.userId && reply.userId !== (room.identity?.userId ?? null)) {
@@ -385,6 +470,46 @@ export default function App() {
       showToast(t(`${sent} 张已发出，${failed} 张读取失败`, `${sent} sent, ${failed} failed to read`))
     }
   }
+
+  // Merge private companion messages into the public log (sorted by time, local-only)
+  // Private messages share the same 1h lifecycle as the user/companion profile — cap to companion.expiresAt
+  const privateChatEntries: ChatEntry[] = useMemo(() => {
+    if (!companion) return []
+    return privateMessages.map((m): ChatEntry => {
+      const isUser = m.from === 'user'
+      return {
+        id: m.id, userId: isUser ? (room.identity?.userId ?? 'me') : companion.id,
+        displayName: isUser ? (profile?.nickname ?? '我') : companion.name,
+        avatarStyle: isUser ? (profile?.style ?? null) : companion.style,
+        avatarSeed: isUser ? (profile?.seed ?? null) : companion.seed,
+        avatarUrl: isUser ? (profile?.avatarUrl ?? null) : (companion.avatarUrl ?? null),
+        authorRole: isUser ? (profile?.role ?? null) : companion.role,
+        content: m.content, at: m.at, expiresAt: Math.min(companionMessageExpiresAt(m.at), companion.expiresAt),
+      }
+    })
+  }, [privateMessages, companion, profile, room.identity])
+  const privateIds = useMemo(() => new Set(privateChatEntries.map((e) => e.id)), [privateChatEntries])
+  const mergedEntries: ChatEntry[] = useMemo(() => {
+    const all = [...room.entries, ...privateChatEntries]
+    all.sort((a, b) => a.at - b.at || a.id.localeCompare(b.id))
+    return all
+  }, [room.entries, privateChatEntries])
+  const displayPresence = useMemo(() => {
+    if (!companion) return room.presence
+    const companionMember = {
+      userId: companion.id,
+      displayName: companion.name,
+      avatarStyle: companion.style,
+      avatarSeed: companion.seed,
+      avatarUrl: companion.avatarUrl ?? null,
+      role: companion.role,
+      profileExpiresAt: companion.expiresAt,
+      enteredAt: companion.createdAt,
+    }
+    // Avoid duplicate if somehow already in presence
+    if (room.presence.some((p) => p.userId === companion.id)) return room.presence
+    return [...room.presence, companionMember]
+  }, [room.presence, companion])
 
   // The backdrop follows the newest photo in the log; the viewer browses
   // every live photo, oldest → newest.
@@ -532,9 +657,10 @@ export default function App() {
               <ChatTopAvatar account={account} profile={profile} />
             </div>
             <MessageList
-              entries={room.entries}
+              entries={mergedEntries}
               selfId={room.identity?.userId ?? null}
-              presence={room.presence}
+              presence={displayPresence}
+              isPrivateId={(id) => privateIds.has(id)}
               status={room.status}
               layoutKey={fold === 'unfolding'}
               incomingMessageSequence={room.incomingMessageSequence}
@@ -542,7 +668,12 @@ export default function App() {
               reactions={room.reactions}
               onImageClick={openImage}
               onRetry={room.retry}
-              onRemove={room.remove}
+              onRemove={(id) => {
+                if (privateIds.has(id)) {
+                  void removeCompanionMessage(id)
+                  setPrivateMessages((prev) => prev.filter((m) => m.id !== id))
+                } else room.remove(id)
+              }}
               onToast={showToast}
               onLoadOlder={room.loadOlder}
               onReact={room.toggleReaction}
@@ -563,6 +694,7 @@ export default function App() {
                 onImagesPicked={handleImagesPicked}
                 onMenuOpenChange={handleMenuOpenChange}
                 onStartGame={handleStartGame}
+                companion={companion}
               />
             ) : (
               <div className="composer-dock">

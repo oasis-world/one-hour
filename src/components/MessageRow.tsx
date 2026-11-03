@@ -17,6 +17,7 @@ import { TravelerGlyph } from './icons'
 import MsgHoverBar from './MsgHoverBar'
 import MsgReactions from './MsgReactions'
 import MessageAuthorCard from './MessageAuthorCard'
+import { parseMentions } from '../lib/mention'
 
 interface Props {
   entry: ChatEntry
@@ -36,6 +37,7 @@ interface Props {
   onReact: (entryId: string, emoji: string) => void
   onCopy: (entry: ChatEntry) => void
   onJumpToReply: (id: string) => void
+  isPrivate?: boolean
 }
 
 /** Touch form factors (phones, tablets) get the long-press sheet. */
@@ -70,24 +72,28 @@ function isSingleEmoji(text: string): boolean {
 
 function renderMessageContent(content: string): ReactNode {
   if (!content) return content
+  // Mentions (@name) take precedence — they need blue bold spans
+  const mentionParts = parseMentions(content)
+  const hasMention = mentionParts.some((p) => p.type === 'mention')
+  if (hasMention) {
+    return mentionParts.map((p, i) => p.type === 'mention' ? <span key={i} className="msg-mention">{p.value}</span> : <span key={i}>{renderEmojiText(p.value)}</span>)
+  }
   if (isSingleEmoji(content)) {
     return <span className="msg-emoji-single">{content}</span>
   }
+  return renderEmojiText(content)
+}
+
+function renderEmojiText(text: string): ReactNode {
   try {
     const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
-    const parts = [...seg.segment(content)].map((s) => s.segment)
+    const parts = [...seg.segment(text)].map((s) => s.segment)
     return parts.map((part, i) =>
       /\p{Extended_Pictographic}/u.test(part) ? (
-        <span key={i} className="msg-emoji">
-          {part}
-        </span>
-      ) : (
-        part
-      ),
+        <span key={i} className="msg-emoji">{part}</span>
+      ) : part,
     )
-  } catch {
-    return content
-  }
+  } catch { return text }
 }
 
 /**
@@ -114,6 +120,7 @@ export default function MessageRow({
   onReact,
   onCopy,
   onJumpToReply,
+  isPrivate,
 }: Props) {
   const imageSrc = entry.imageUrl ?? entry.localImage ?? null
   const messageMedia = findMessageMedia(entry.content)
@@ -198,6 +205,7 @@ export default function MessageRow({
         entry.state ? `is-${entry.state}` : '',
         entry.expiring ? 'is-expiring' : '',
         menuOpen ? 'is-menu-open' : '',
+        isPrivate ? 'is-private' : '',
       ].join(' ')}
       onContextMenu={(e) => {
         e.preventDefault()

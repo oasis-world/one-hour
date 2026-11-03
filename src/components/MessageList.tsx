@@ -32,6 +32,7 @@ interface Props {
   onReact: (entryId: string, emoji: string) => void
   onReply: (reply: MessageReply) => void
   onEdit: (entry: ChatEntry) => void
+  isPrivateId?: (id: string) => boolean
 }
 
 interface OpenMenu {
@@ -66,6 +67,7 @@ export default function MessageList({
   onReact,
   onReply,
   onEdit,
+  isPrivateId,
 }: Props) {
   useLang() // re-render on language flips
   const logRef = useRef<HTMLDivElement>(null)
@@ -288,6 +290,7 @@ export default function MessageList({
             onReact={reactEntry}
             onCopy={copyEntry}
             onJumpToReply={jumpToReply}
+            isPrivate={isPrivateId?.(entry.id) ?? false}
           />
         ))}
         {status === 'offline' && (
