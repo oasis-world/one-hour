@@ -46,6 +46,7 @@ import { clearCompanionMessages, loadCompanionMessages, saveCompanionMessage, cr
 import type { CompanionMessage } from './lib/companionStore'
 import { requestCompanionGreeting, requestCompanionReply, toHistory } from './lib/companionChat'
 import { containsCompanionMention } from './lib/mention'
+import { createCompanionGame, gameTitle } from './lib/companionGame'
 
 /**
  * 一小时 / one-hour — the ephemeral chat room. Every message, text or
@@ -362,6 +363,19 @@ export default function App() {
     }, UNFOLD_MS)
   }
 
+  const handleCompanionGame = async (gameId: 'gomoku' | 'xiangqi' | 'chess') => {
+    if (!room.identity || !companion) return
+    const instanceId = (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2))
+    const title = gameTitle(gameId, t)
+    room.send(`🎮 ${title}\n__GAME__:${gameId}:${instanceId}`, undefined, null)
+    recordMessageSent()
+    setSentMessageSequence((s) => s + 1)
+    // Create game state with companion already joined; host is current user
+    try {
+      await createCompanionGame(gameId, instanceId, room.identity, companion)
+    } catch (e) { console.warn('[companion] auto-join failed', e) }
+  }
+
   const sendPrivateAndReply = async (text: string) => {
     if (!companion) return
     const userMsg = createUserCompanionMessage(text)
@@ -369,15 +383,20 @@ export default function App() {
     setPrivateMessages((prev) => [...prev, userMsg])
     setSentMessageSequence((s) => s + 1)
     setReplyTo(null)
-    // companion reply
     setCompanionTyping(true)
     try {
       const history = toHistory([...privateMessages, userMsg])
-      const replyText = await requestCompanionReply(companion, text, history.slice(0, -1))
-      const botMsg = createCompanionReply(replyText)
+      const result = await requestCompanionReply(companion, text, history.slice(0, -1))
+      const botMsg = createCompanionReply(result.reply)
       await saveCompanionMessage(botMsg)
       setPrivateMessages((prev) => [...prev, botMsg])
       setSentMessageSequence((s) => s + 1)
+      if (result.game) {
+        void handleCompanionGame(result.game)
+        const sys = createCompanionReply(t(`已为你创建${gameTitle(result.game, t)}对局，助手已加入`, `Created ${gameTitle(result.game, t)} — your companion has joined`))
+        await saveCompanionMessage(sys)
+        setPrivateMessages((prev) => [...prev, sys])
+      }
     } catch (e) { console.warn('[companion] reply failed', e) }
     finally { setCompanionTyping(false) }
   }

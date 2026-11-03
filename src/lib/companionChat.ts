@@ -6,28 +6,35 @@ import type { CompanionMessage } from './companionStore'
 import { loadUserProfile } from './userProfile'
 
 export interface CompanionHistoryItem { role: 'user' | 'assistant'; content: string }
+export type CompanionGameId = 'gomoku' | 'xiangqi' | 'chess'
+export interface CompanionReply { reply: string; game: CompanionGameId | null }
+
+function parseGame(v: unknown): CompanionGameId | null {
+  return v === 'gomoku' || v === 'xiangqi' || v === 'chess' ? v : null
+}
 
 export async function requestCompanionReply(
   companion: CompanionProfile,
   userText: string,
   history: CompanionHistoryItem[],
-): Promise<string> {
+): Promise<CompanionReply> {
   const user = loadUserProfile()
   if (!user) throw new Error('no user profile')
   const systemPrompt = buildCompanionSystemPrompt(user, companion)
-  // Try cloud proxy first
   if (isSupabaseConfigured()) {
     try {
       const client = await getSupabaseClient()
       const { data, error } = await client.functions.invoke('companion-chat', {
         body: { systemPrompt, history, userText, companionName: companion.name, userName: user.nickname },
       })
-      if (!error && typeof data?.reply === 'string' && data.reply.trim()) return data.reply.trim()
+      if (!error && data) {
+        const reply = typeof data.reply === 'string' ? data.reply.trim() : ''
+        if (reply) return { reply, game: parseGame(data.game) }
+      }
       if (error) throw error
     } catch (e) { console.warn('[companion] cloud failed, fallback', e) }
   }
-  // Local fallback — simple templated reply (offline)
-  return fallbackReply(user.nickname, companion.name, userText)
+  return { reply: fallbackReply(user.nickname, companion.name, userText), game: null }
 }
 
 export async function requestCompanionGreeting(companion: CompanionProfile): Promise<string> {
@@ -62,7 +69,6 @@ export async function requestCompanionGreeting(companion: CompanionProfile): Pro
 
 function ensureMentionPrefix(text: string, userName: string): string {
   if (text.startsWith(`@${userName}`)) return text
-  // Prepend if model forgot
   return `@${userName} ${text}`
 }
 

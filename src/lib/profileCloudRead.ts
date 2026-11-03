@@ -22,6 +22,8 @@ export interface CloudProfileSnapshot {
 /** Read any authenticated room member's profile for the message avatar card. */
 export async function fetchCloudProfile(userId: string, signal?: AbortSignal): Promise<CloudProfileSnapshot | null> {
   if (!isSupabaseConfigured()) return null
+  // Companion/local ids are not real Supabase users — never query the cloud
+  if (userId.startsWith('companion-') || userId.startsWith('local-')) return null
   try {
     if (signal?.aborted) return null
     const client = await getSupabaseClient()

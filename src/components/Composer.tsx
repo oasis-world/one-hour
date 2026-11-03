@@ -181,6 +181,7 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
   }, [plusOpen, emojiOpen, mentionOpen, onMenuOpenChange])
 
   // Sync mention popover with draft
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
   useEffect(() => { updateMentionState(draft) }, [draft, companion])
 
   // Warm the HEIC decoder while the user browses the plus menu, so a

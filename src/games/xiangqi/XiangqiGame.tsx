@@ -1030,7 +1030,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       <div className="xiangqi-players">
         {state.players.map((p) => (
           <div key={p.userId} className="xiangqi-player-slot">
-            {p.isAI ? (
+            {(p.isAI && !p.avatarStyle && !p.avatarSeed && !p.avatarUrl) ? (
               <span className="xiangqi-ai-avatar" aria-label="AI">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3M9 3h6M7 8h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3Z" /><path d="M8.5 13h.01M15.5 13h.01M9 17h6" /></svg>
               </span>
