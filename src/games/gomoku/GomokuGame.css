@@ -104,12 +104,13 @@
 }
 .gomoku-players {
   display: flex;
-  gap: 10px;
-  margin-top: 14px;
-  margin-bottom: 11px;
+  gap: 8px;
+  margin-top: 10px;
   flex-wrap: nowrap;
   min-width: 0;
 }
+.gomoku-players:empty { display: none; }
+.gomoku-players:not(:empty) { margin-bottom: 8px; }
 .gomoku-player-slot {
   display: flex;
   align-items: center;
@@ -117,7 +118,7 @@
   flex: 1 1 0;
   min-width: 0;
 }
-.gomoku-player-slot + .gomoku-player-slot { margin-left: 10px; }
+.gomoku-player-slot + .gomoku-player-slot { margin-left: 8px; }
 .gomoku-player-avatar {
   flex: 0 0 30px;
   width: 30px;
@@ -175,9 +176,10 @@
 .gomoku-result {
   text-align: center;
   font-weight: 700;
-  margin: 6px 0;
   color: #facc15;
 }
+.gomoku-result:empty { display: none; }
+.gomoku-result:not(:empty) { margin: 4px 0; }
 .gomoku-board {
   position: relative;
   display: grid;
@@ -194,7 +196,7 @@
   border: 0;
   border-radius: 0;
   padding: 0;
-  margin: 8px auto;
+  margin: 6px auto;
   width: min(100%, 408px);
   aspect-ratio: 1 / 1;
   box-sizing: border-box;
@@ -327,8 +329,9 @@
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
-  margin-top: 8px;
 }
+.gomoku-actions:empty { display: none; }
+.gomoku-actions:not(:empty) { margin-top: 10px; }
 .gomoku-confirm-backdrop {
   position: absolute;
   inset: 0;

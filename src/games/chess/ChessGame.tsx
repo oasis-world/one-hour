@@ -25,7 +25,7 @@ import './ChessGame.css'
 import '../GameCardMenu.css'
 
 type GameChannel = ReturnType<Awaited<ReturnType<typeof getSupabaseClient>>['channel']>
-interface Props { instanceId:string; hostUserId:string; onlineMembers?:PresenceMember[]; isVisible?: boolean }
+interface Props { instanceId: string; hostUserId: string; onlineMembers?: PresenceMember[] }
 const pieceAsset=(piece:Piece)=>piece?`/games/chess-pieces/${piece[0]==='w'?'l':'d'}${piece[1]}.png`:''
 const PIECE_NAMES:Record<string,[string,string]>={
   wk:['王','King'],wq:['后','Queen'],wr:['车','Rook'],wb:['象','Bishop'],wn:['马','Knight'],wp:['兵','Pawn'],
@@ -41,7 +41,7 @@ function AiAvatar() {
   return <span className="chess-ai-avatar" aria-label="AI"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3M9 3h6M7 8h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3Z"/><path d="M8.5 13h.01M15.5 13h.01M9 17h6"/></svg></span>
 }
 
-export default function ChessGame({instanceId,hostUserId,onlineMembers=[], isVisible = true}:Props) {
+export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }: Props) {
   useLang()
   const account=useAccount(),identity=resolveChatIdentity(account),profile=loadUserProfile()
   const selfId=identity?.userId??null,displayName=profile?.nickname??identity?.displayName??'Player'
@@ -179,59 +179,95 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[], isVis
     if(hintToastTimerRef.current!==null)window.clearTimeout(hintToastTimerRef.current)
   },[])
 
-  useEffect(()=>{
-    if(!selfId||!isSupabaseConfigured()||!isVisible)return
-    let cancelled=false,ch:GameChannel|null=null
-    const abort=new AbortController()
-    const slotCtrl=new AbortController()
-    let releaseSlot:(()=>void)|null=null
-    void (async()=>{
-      const client=await getSupabaseClient();if(cancelled)return
-      const slot=await acquireGameChannelSlot(slotCtrl.signal);if(cancelled||!slot)return
-      releaseSlot=slot
-      const topic=`game:chess:${instanceId}`
-      await removeStaleGameChannel(client,topic);if(cancelled)return
-      const active=client.channel(topic,{config:{presence:{key:getGamePresenceKey(selfId)}}})
-      ch=active;channelRef.current=active
-      watchGameChannelClose(active,'Chess',instanceId,()=>!cancelled)
-      active.on('broadcast',{event:'state'},({payload}:{payload:unknown})=>{if(isChessState(payload,instanceId)){if(!stateHydratedRef.current){renderedBoardRef.current=payload.board;stateHydratedRef.current=true}stateRef.current=payload;setState(payload);setReady(true);if(payload.players.some(player=>player.userId===selfId))setJoinStatus('idle')}})
-      active.on('broadcast',{event:'join'},({payload}:{payload:unknown})=>{
-        if(stateRef.current.hostId!==selfId||!payload||typeof payload!=='object')return
-        applyState(joinChess(stateRef.current,payload as ChessState['players'][number]))
+  const [channelAttempt, setChannelAttempt] = useState(0)
+  const channelRetryRef = useRef(0)
+
+  useEffect(() => {
+    if (!selfId || !isSupabaseConfigured()) return
+    let cancelled = false
+    let ch: GameChannel | null = null
+    const abort = new AbortController()
+    const slotCtrl = new AbortController()
+    let releaseSlot: (() => void) | null = null
+    let reconnectTimer: number | null = null
+    let stableTimer: number | null = null
+    const retry = (reason: string, error?: unknown) => {
+      if (cancelled || reconnectTimer !== null) return
+      if (stableTimer !== null) window.clearTimeout(stableTimer)
+      stableTimer = null
+      setReady(false)
+      const delays = [1000, 2000, 5000, 10000, 15000]
+      const base = delays[Math.min(channelRetryRef.current, delays.length - 1)]
+      const delay = Math.round(base * (0.8 + Math.random() * 0.4))
+      console.warn(`Chess channel ${reason}; retrying in ${delay}ms`, { instanceId, attempt: channelRetryRef.current + 1, channelState: ch?.state ?? 'not created', error })
+      channelRetryRef.current += 1
+      reconnectTimer = window.setTimeout(() => { reconnectTimer = null; if (!cancelled) setChannelAttempt((v) => v + 1) }, delay)
+    }
+    void (async () => {
+      const client = await getSupabaseClient().catch((e: unknown) => { retry('client init failed', e); return null })
+      if (!client || cancelled) return
+      const slot = await acquireGameChannelSlot(slotCtrl.signal); if (cancelled || !slot) return
+      releaseSlot = slot
+      const topic = `game:chess:${instanceId}`
+      await removeStaleGameChannel(client, topic); if (cancelled) return
+      const active = client.channel(topic, { config: { presence: { key: getGamePresenceKey(selfId) } } })
+      ch = active; channelRef.current = active
+      watchGameChannelClose(active, 'Chess', instanceId, () => !cancelled)
+      active.on('broadcast', { event: 'state' }, ({ payload }: { payload: unknown }) => { if (isChessState(payload, instanceId)) { if (!stateHydratedRef.current) { renderedBoardRef.current = payload.board; stateHydratedRef.current = true } stateRef.current = payload; setState(payload); setReady(true); if (payload.players.some((player) => player.userId === selfId)) setJoinStatus('idle') } })
+      active.on('broadcast', { event: 'join' }, ({ payload }: { payload: unknown }) => {
+        if (stateRef.current.hostId !== selfId || !payload || typeof payload !== 'object') return
+        applyState(joinChess(stateRef.current, payload as ChessState['players'][number]))
       })
-      active.on('broadcast',{event:'ai'},()=>{if(stateRef.current.hostId===selfId){const raw=addChessAi(stateRef.current);const cached=getCachedAiMode();const next=raw&&cached?{...raw,aiMode:cached}:raw;if(next)applyState(next)}})
-      active.on('broadcast',{event:'ai-mode'},({payload}:{payload:unknown})=>{
-        if(stateRef.current.hostId!==selfId||!isGameHostAuthority(active,stateRef.current.hostId)||!payload||typeof payload!=='object')return
-        const mode=(payload as {mode?:unknown}).mode
-        if(mode==='cloud'||mode==='local'){setCachedAiMode(mode);applyState({...stateRef.current,aiMode:mode})}
+      active.on('broadcast', { event: 'ai' }, () => { if (stateRef.current.hostId === selfId) { const raw = addChessAi(stateRef.current); const cached = getCachedAiMode(); const next = raw && cached ? { ...raw, aiMode: cached } : raw; if (next) applyState(next) } })
+      active.on('broadcast', { event: 'ai-mode' }, ({ payload }: { payload: unknown }) => {
+        if (stateRef.current.hostId !== selfId || !isGameHostAuthority(active, stateRef.current.hostId) || !payload || typeof payload !== 'object') return
+        const mode = (payload as { mode?: unknown }).mode
+        if (mode === 'cloud' || mode === 'local') { setCachedAiMode(mode); applyState({ ...stateRef.current, aiMode: mode }) }
       })
-      active.on('broadcast',{event:'move'},({payload}:{payload:unknown})=>{
-        if(stateRef.current.hostId!==selfId||!payload||typeof payload!=='object')return
-        const move=payload as {userId:string;from:[number,number];to:[number,number]}
-        const next=tryMove(stateRef.current,move.userId,move.from,move.to);if(next)applyState(next)
+      active.on('broadcast', { event: 'move' }, ({ payload }: { payload: unknown }) => {
+        if (stateRef.current.hostId !== selfId || !payload || typeof payload !== 'object') return
+        const move = payload as { userId: string; from: [number, number]; to: [number, number] }
+        const next = tryMove(stateRef.current, move.userId, move.from, move.to); if (next) applyState(next)
       })
-      active.on('broadcast',{event:'leave'},({payload}:{payload:unknown})=>{
-        if(stateRef.current.hostId!==selfId||!payload||typeof payload!=='object')return
-        const next=removeChessPlayer(stateRef.current,(payload as {userId:string}).userId);if(next)applyState(next)
+      active.on('broadcast', { event: 'leave' }, ({ payload }: { payload: unknown }) => {
+        if (stateRef.current.hostId !== selfId || !payload || typeof payload !== 'object') return
+        const next = removeChessPlayer(stateRef.current, (payload as { userId: string }).userId); if (next) applyState(next)
       })
-      active.on('broadcast',{event:'rematch'},()=>{if(stateRef.current.hostId===selfId)applyState(restartChessRound(stateRef.current))})
-      active.on('broadcast',{event:'state-request'},()=>{if(stateRef.current.hostId===selfId&&canSendGameBroadcast(active))void active.send({type:'broadcast',event:'state',payload:stateRef.current})})
-      active.subscribe(async(status)=>{
-        if(status!=='SUBSCRIBED'||cancelled)return
-        await active.track({userId:selfId})
-        // Reuse in-memory state if we already have hydrated players (keep-alive path), avoid empty flash
-        if(stateHydratedRef.current&&stateRef.current.players.length>0){setReady(true);void active.send({type:'broadcast',event:'state-request',payload:{}});return}
-        const loaded=await loadChessState(instanceId,abort.signal);if(cancelled)return
-        if(loaded.state){renderedBoardRef.current=loaded.state.board;stateHydratedRef.current=true;stateRef.current=loaded.state;setState(loaded.state)}
-        else if(selfId===hostUserId&&!stateHydratedRef.current){const initial=createInitialState(instanceId,selfId);renderedBoardRef.current=initial.board;stateHydratedRef.current=true;stateRef.current=initial;setState(initial);void saveChessState(instanceId,initial)}
-        setReady(true);void active.send({type:'broadcast',event:'state-request',payload:{}})
+      active.on('broadcast', { event: 'rematch' }, () => { if (stateRef.current.hostId === selfId) applyState(restartChessRound(stateRef.current)) })
+      active.on('broadcast', { event: 'state-request' }, () => { if (stateRef.current.hostId === selfId && canSendGameBroadcast(active)) void active.send({ type: 'broadcast', event: 'state', payload: stateRef.current }) })
+      active.subscribe(async (status, error) => {
+        if (status === 'SUBSCRIBED') {
+          if (reconnectTimer !== null) window.clearTimeout(reconnectTimer)
+          reconnectTimer = null
+          if (stableTimer !== null) window.clearTimeout(stableTimer)
+          stableTimer = window.setTimeout(() => { channelRetryRef.current = 0; stableTimer = null }, 30000)
+          if (cancelled) return
+          try {
+            await active.track({ userId: selfId })
+          } catch (e) { retry('track failed', e); return }
+          if (cancelled || !canSendGameBroadcast(active)) return
+          if (stateHydratedRef.current && stateRef.current.players.length > 0) { setReady(true); void active.send({ type: 'broadcast', event: 'state-request', payload: {} }); return }
+          const loaded = await loadChessState(instanceId, abort.signal); if (cancelled) return
+          if (loaded.state) { renderedBoardRef.current = loaded.state.board; stateHydratedRef.current = true; stateRef.current = loaded.state; setState(loaded.state) }
+          else if (selfId === hostUserId && !stateHydratedRef.current) { const initial = createInitialState(instanceId, selfId); renderedBoardRef.current = initial.board; stateHydratedRef.current = true; stateRef.current = initial; setState(initial); void saveChessState(instanceId, initial) }
+          setReady(true); void active.send({ type: 'broadcast', event: 'state-request', payload: {} })
+        } else if (!cancelled) {
+          setReady(false)
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') retry(status, error)
+        }
       })
     })()
-    return()=>{cancelled=true;abort.abort();slotCtrl.abort();releaseSlot?.();channelRef.current=null;const old=ch;if(old)void getSupabaseClient().then(client=>client.removeChannel(old))}
-  },[instanceId,selfId,hostUserId,applyState,isVisible])
+    return () => {
+      cancelled = true; abort.abort(); slotCtrl.abort()
+      if (reconnectTimer !== null) window.clearTimeout(reconnectTimer)
+      if (stableTimer !== null) window.clearTimeout(stableTimer)
+      releaseSlot?.(); channelRef.current = null
+      const old = ch; if (old) void getSupabaseClient().then((client) => client.removeChannel(old))
+    }
+  }, [instanceId, selfId, hostUserId, applyState, channelAttempt])
 
-  useEffect(()=>{
-    if(!isVisible||state.status!=='playing'||!state.players.some(p=>p.isAI&&p.color===state.turn)||state.hostId!==selfId||!isGameHostAuthority(channelRef.current,state.hostId))return
+  useEffect(() => {
+    if (state.status !== 'playing' || !state.players.some((p) => p.isAI && p.color === state.turn) || state.hostId !== selfId || !isGameHostAuthority(channelRef.current, state.hostId)) return
     let cancelled=false
     const timer=window.setTimeout(async()=>{
       const current=stateRef.current,ai=current.players.find(p=>p.isAI&&p.color===current.turn)
@@ -249,8 +285,8 @@ export default function ChessGame({instanceId,hostUserId,onlineMembers=[], isVis
       const next=afterCandidate??(fallbackMove?tryMove(current,ai.userId,fallbackMove.from,fallbackMove.to):null)
       if(next){if(!afterCandidate)console.info('[game-ai] Applying local AI move for chess.');applyState({...next,aiSource:afterCandidate?'cloud':'local'})}
     },520)
-    return()=>{cancelled=true;window.clearTimeout(timer)}
-  },[state,selfId,applyState,isVisible])
+    return () => { cancelled = true; window.clearTimeout(timer) }
+  }, [state, selfId, applyState])
 
   const myColor=state.players.find(player=>player.userId===selfId)?.color??null
   const isPlayer=myColor!==null

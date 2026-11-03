@@ -45,10 +45,9 @@ interface Props {
   instanceId: string
   hostUserId: string
   onlineMembers?: PresenceMember[]
-  isVisible?: boolean
 }
 
-export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [], isVisible = true }: Props) {
+export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] }: Props) {
   useLang()
   const account = useAccount()
   const identity = resolveChatIdentity(account)
@@ -264,7 +263,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [],
   const isRealtimeReady = () => channelReady && canSendGameBroadcast(channelRef.current)
 
   useEffect(() => {
-    if (!isSupabaseConfigured() || !selfId || !isVisible) return
+    if (!isSupabaseConfigured() || !selfId) return
     let cancelled = false
     let stateSyncTimer: number | null = null
     let cloudPollTimer: number | null = null
@@ -641,7 +640,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [],
         releaseSlot()
       }
     }
-  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, channelAttempt, presenceKey, publishState, scheduleAiTurn, showStartToast, isVisible])
+  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, channelAttempt, presenceKey, publishState, scheduleAiTurn, showStartToast])
 
   const sendMove = (r: number, c: number) => {
     if (!selfId || !isRealtimeReady()) return

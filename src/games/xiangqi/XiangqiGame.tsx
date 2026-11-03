@@ -47,7 +47,6 @@ interface Props {
   instanceId: string
   hostUserId: string
   onlineMembers?: PresenceMember[]
-  isVisible?: boolean
 }
 
 const BOARD_STYLES = ['wood', 'classic', 'concave', 'jade'] as const
@@ -59,7 +58,7 @@ const PIECE_GLYPH: Record<number, string> = {
 }
 const currentTimestamp = () => Date.now()
 
-export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = [], isVisible = true }: Props) {
+export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = [] }: Props) {
   useLang()
   const account = useAccount()
   const identity = resolveChatIdentity(account)
@@ -425,7 +424,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   const isRealtimeReady = () => channelReady && canSendGameBroadcast(channelRef.current)
 
   useEffect(() => {
-    if (!isSupabaseConfigured() || !selfId || !isVisible) return
+    if (!isSupabaseConfigured() || !selfId) return
     let cancelled = false
     let stateSyncTimer: number | null = null
     let cloudPollTimer: number | null = null
@@ -794,7 +793,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         releaseSlot()
       }
     }
-  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, channelAttempt, presenceKey, announceCapture, publishState, scheduleAiTurn, showStartToast, isVisible])
+  }, [instanceId, hostUserId, selfId, displayName, avatarUrl, avatarStyle, avatarSeed, channelKey, channelAttempt, presenceKey, announceCapture, publishState, scheduleAiTurn, showStartToast])
 
   const sendMove = (fromR: number, fromC: number, toR: number, toC: number) => {
     if (!selfId || !isRealtimeReady()) return

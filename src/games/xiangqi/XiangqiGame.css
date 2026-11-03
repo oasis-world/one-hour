@@ -99,12 +99,13 @@
 }
 .xiangqi-players {
   display: flex;
-  gap: 10px;
-  margin-top: 14px;
-  margin-bottom: 11px;
+  gap: 8px;
+  margin-top: 10px;
   flex-wrap: nowrap;
   min-width: 0;
 }
+.xiangqi-players:empty { display: none; }
+.xiangqi-players:not(:empty) { margin-bottom: 8px; }
 .xiangqi-player-slot {
   display: flex;
   align-items: center;
@@ -112,7 +113,7 @@
   flex: 1 1 0;
   min-width: 0;
 }
-.xiangqi-player-slot + .xiangqi-player-slot { margin-left: 10px; }
+.xiangqi-player-slot + .xiangqi-player-slot { margin-left: 8px; }
 .xiangqi-player-avatar {
   flex: 0 0 30px;
   width: 30px;
@@ -171,15 +172,16 @@
 .xiangqi-result {
   text-align: center;
   font-weight: 700;
-  margin: 6px 0;
   color: #facc15;
 }
+.xiangqi-result:empty { display: none; }
+.xiangqi-result:not(:empty) { margin: 4px 0; }
 .xiangqi-board {
   position: relative;
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
   grid-template-rows: repeat(10, minmax(0, 1fr));
-  margin: 8px auto;
+  margin: 6px auto;
   width: min(100%, 408px);
   aspect-ratio: 8 / 9;
   box-sizing: border-box;
@@ -577,8 +579,9 @@
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
-  margin-top: 8px;
 }
+.xiangqi-actions:empty { display: none; }
+.xiangqi-actions:not(:empty) { margin-top: 10px; }
 .xiangqi-confirm-backdrop {
   position: absolute;
   inset: 0;

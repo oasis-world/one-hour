@@ -21,7 +21,6 @@ import MessageAuthorCard from './MessageAuthorCard'
 interface Props {
   entry: ChatEntry
   mine: boolean
-  initiallyVisibleGame?: boolean
   author: PresenceMember
   onlineMembers: PresenceMember[]
   menuOpen: boolean
@@ -105,7 +104,6 @@ function renderMessageContent(content: string): ReactNode {
 export default function MessageRow({
   entry,
   mine,
-  initiallyVisibleGame = false,
   author,
   onlineMembers,
   menuOpen,
@@ -287,12 +285,7 @@ export default function MessageRow({
         )}
         <div className="msg-body">
           {gameRef ? (
-            <GameMessage
-              content={entry.content}
-              hostUserId={entry.userId}
-              onlineMembers={onlineMembers}
-              initiallyVisible={initiallyVisibleGame}
-            />
+            <GameMessage content={entry.content} hostUserId={entry.userId} onlineMembers={onlineMembers} />
           ) : (
             renderMessageContent(displayContent)
           )}
