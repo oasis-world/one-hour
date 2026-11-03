@@ -21,7 +21,9 @@ import { AiThinkingTimer } from '../AiThinkingTimer'
 import GameCardMenu from '../GameCardMenu'
 import { getCachedAiMode, setCachedAiMode } from '../aiModePreference'
 import { loadChessState, saveChessState } from './cloudState'
+import ChessTutorPanel from './ChessTutorPanel'
 import './ChessGame.css'
+import './ChessTutorPanel.css'
 import '../GameCardMenu.css'
 
 type GameChannel = ReturnType<Awaited<ReturnType<typeof getSupabaseClient>>['channel']>
@@ -59,6 +61,8 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
   const [startToast,setStartToast]=useState('')
   const [hintToast,setHintToast]=useState('')
   const hintToastTimerRef=useRef<number|null>(null)
+  const [tutorOpen,setTutorOpen]=useState(false)
+  const [tutorHighlight,setTutorHighlight]=useState<{from:Square;to:Square;promotion?:string}|null>(null)
   const stateRef=useRef(state),channelRef=useRef<GameChannel|null>(null)
   const renderedBoardRef=useRef(state.board)
   const boardRef=useRef<HTMLDivElement>(null)
@@ -365,12 +369,12 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
       <div className="chess-heading"><span className="chess-title"><ChessCrownIcon size={17}/>{t('国际象棋','Chess')}</span>
         {statusHint&&(state.status==='playing'&&!isPlayer?<span className="chess-spectator-control"><button type="button" className="chess-status chess-spectator-trigger" aria-haspopup="dialog" aria-expanded={spectatorsOpen} onClick={()=>setSpectatorsOpen(value=>!value)}><span>{statusHint}{spectators.length?` (${spectators.length>99?'99+':spectators.length})`:''}</span></button>{spectatorsOpen&&<OnlineList members={spectators} placement="bottom" className="chess-spectator-pop" title={t('观战玩家','Spectators')} emptyText={t('暂无观战玩家','No spectators currently')} ownerSelector=".chess-spectator-control" onClose={()=>setSpectatorsOpen(false)}/>}</span>:<span className="chess-status">{statusHint}</span>)}
       </div><span className="chess-meta">{statusHint&&<i className="chess-status-dot" aria-hidden="true"/>}<span>{state.players.length}/2 {t('玩家','players')}</span></span>
-      {state.status === 'playing' && isPlayer && (
+      {(state.status === 'playing' || state.status === 'result') && (
         <GameCardMenu
           aiMode={state.aiMode ?? state.aiSource ?? getCachedAiMode() ?? 'local'}
           onChangeAiMode={changeAiMode}
           onToggleBoardStyle={() => showHintToast(t('界面切换敬请期待', 'UI switch coming soon'))}
-          onAiTutor={() => showHintToast(t('AI 教学功能敬请期待', 'AI Tutor coming soon'))}
+          onAiTutor={() => setTutorOpen(true)}
         />
       )}
     </div>
@@ -388,7 +392,9 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
       {state.board.map((row,r)=>row.map((piece,c)=>{
         const isLast=state.lastMove?.from[0]===r&&state.lastMove.from[1]===c||state.lastMove?.to[0]===r&&state.lastMove.to[1]===c
         const isTarget=targets.has(`${r}-${c}`)
-        return <button type="button" key={`${r}-${c}`} data-square={`${r}-${c}`} role="gridcell" aria-label={`${String.fromCharCode(97+c)}${8-r}`} className={`chess-square${(r+c)%2===0?' is-light':' is-dark'}${selected?.[0]===r&&selected[1]===c?' is-selected':''}${isTarget?' is-target':''}${isLast?' is-last':''}`} onClick={()=>onSquare(r,c)}>
+        const isTutorFrom=tutorHighlight?.from[0]===r&&tutorHighlight.from[1]===c
+        const isTutorTo=tutorHighlight?.to[0]===r&&tutorHighlight.to[1]===c
+        return <button type="button" key={`${r}-${c}`} data-square={`${r}-${c}`} role="gridcell" aria-label={`${String.fromCharCode(97+c)}${8-r}`} className={`chess-square${(r+c)%2===0?' is-light':' is-dark'}${selected?.[0]===r&&selected[1]===c?' is-selected':''}${isTarget?' is-target':''}${isLast?' is-last':''}${isTutorFrom?' chess-tutor-hl-from':''}${isTutorTo?' chess-tutor-hl-to':''}`} onClick={()=>onSquare(r,c)}>
           <PieceArt piece={piece}/>{r===7&&<small>{String.fromCharCode(97+c)}</small>}{c===0&&<em>{8-r}</em>}
         </button>
       }))}
@@ -408,5 +414,6 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
       <h3 id="chess-confirm-title">{t('离开这场对局？','Leave this game?')}</h3><p>{t('离开后棋盘会重置，你可以之后重新加入。','The board will reset when you leave. You can join again later.')}</p>
       <div className="chess-confirm-actions"><button type="button" className="chess-confirm-cancel" onClick={()=>setLeaveConfirmOpen(false)}>{t('继续游戏','Stay')}</button><button type="button" className="btn-accent" disabled={!ready} onClick={leave}>{t('离开房间','Leave room')}</button></div>
     </div></div>}
+    <ChessTutorPanel open={tutorOpen} onClose={()=>setTutorOpen(false)} chessState={state} highlighted={tutorHighlight} onHighlight={setTutorHighlight} />
   </div>
 }
