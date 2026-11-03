@@ -279,7 +279,7 @@ export default function App() {
 
   const [companion, setCompanion] = useState<CompanionProfile | null>(() => getCompanionIfAlive())
   const [privateMessages, setPrivateMessages] = useState<CompanionMessage[]>([])
-  const [, setCompanionTyping] = useState(false)
+  const [companionTyping, setCompanionTyping] = useState(false)
   useEffect(() => subscribeCompanion(setCompanion), [])
   useEffect(() => {
     const tick = () => { const alive = getCompanionIfAlive(); setCompanion((prev) => (prev?.id !== alive?.id || prev?.expiresAt !== alive?.expiresAt ? alive : prev)) }
@@ -697,6 +697,8 @@ export default function App() {
               onLoadOlder={room.loadOlder}
               onReact={room.toggleReaction}
               onReply={setReplyTo}
+              companionTyping={companionTyping}
+              companion={companion ? { name: companion.name, style: companion.style, seed: companion.seed, avatarUrl: companion.avatarUrl ?? null } : null}
               onEdit={handleStartEdit}
             />
 

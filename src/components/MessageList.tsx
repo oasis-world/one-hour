@@ -13,6 +13,7 @@ import { useChatScroll } from './useChatScroll'
 import { parseGameRef } from '../games/types'
 import { deleteGomokuState } from '../games/gomoku/cloudState'
 import { deleteXiangqiState } from '../games/xiangqi/cloudState'
+import AvatarBadge from './AvatarBadge'
 import { deleteChessState } from '../games/chess/cloudState'
 
 interface Props {
@@ -33,6 +34,8 @@ interface Props {
   onReply: (reply: MessageReply) => void
   onEdit: (entry: ChatEntry) => void
   isPrivateId?: (id: string) => boolean
+  companionTyping?: boolean
+  companion?: { name: string; style: string; seed: string; avatarUrl?: string | null } | null
 }
 
 interface OpenMenu {
@@ -68,6 +71,8 @@ export default function MessageList({
   onReply,
   onEdit,
   isPrivateId,
+  companionTyping,
+  companion,
 }: Props) {
   useLang() // re-render on language flips
   const logRef = useRef<HTMLDivElement>(null)
@@ -293,6 +298,26 @@ export default function MessageList({
             isPrivate={isPrivateId?.(entry.id) ?? false}
           />
         ))}
+        {companionTyping && companion && (
+          <div className="msg-row is-private is-typing" aria-live="polite" aria-label={t('助手正在输入', 'Companion is typing')}>
+            <div className="msg-gutter">
+              <AvatarBadge look={{ style: companion.style, seed: companion.seed, avatarUrl: companion.avatarUrl ?? null }} size={35} className="msg-avatar-img" />
+            </div>
+            <div className="msg-main">
+              <div className="msg-head">
+                <span className="msg-name" style={{ color: 'var(--ink-soft)', fontWeight: 800 }}>{companion.name}</span>
+                <span className="msg-typing-label">{t('正在输入…', 'typing…')}</span>
+              </div>
+              <div className="msg-body">
+                <span className="typing-dots" aria-hidden="true">
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
         {status === 'offline' && (
           <p className="chat-offline-note">
             {t(
