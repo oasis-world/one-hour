@@ -70,10 +70,10 @@ function isSingleEmoji(text: string): boolean {
   return /[\p{Extended_Pictographic}\p{Regional_Indicator}\u20E3]/u.test(trimmed)
 }
 
-function renderMessageContent(content: string): ReactNode {
+function renderMessageContent(content: string, extraNames?: string[]): ReactNode {
   if (!content) return content
   // Mentions (@name) take precedence — they need blue bold spans
-  const mentionParts = parseMentions(content)
+  const mentionParts = parseMentions(content, extraNames)
   const hasMention = mentionParts.some((p) => p.type === 'mention')
   if (hasMention) {
     return mentionParts.map((p, i) => p.type === 'mention' ? <span key={i} className="msg-mention">{p.value}</span> : <span key={i}>{renderEmojiText(p.value)}</span>)
@@ -126,6 +126,14 @@ export default function MessageRow({
   const messageMedia = findMessageMedia(entry.content)
   const displayContent = stripRenderedMediaMarkup(entry.content)
   const gameRef = parseGameRef(entry.content)
+  const mentionNames = (onlineMembers ?? []).map((m) => m.displayName).filter(Boolean)
+  const isMentioned = (() => {
+    try {
+      const nick = localStorage.getItem('one-hour-user-profile') ? JSON.parse(localStorage.getItem('one-hour-user-profile')!).nickname : null
+      if (!nick) return false
+      return displayContent.includes(`@${nick}`)
+    } catch { return false }
+  })()
   const [authorOpen, setAuthorOpen] = useState(false)
   const [authorPosition, setAuthorPosition] = useState<{ left: number; top: number } | null>(null)
   const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null)
@@ -206,6 +214,7 @@ export default function MessageRow({
         entry.expiring ? 'is-expiring' : '',
         menuOpen ? 'is-menu-open' : '',
         isPrivate ? 'is-private' : '',
+        isMentioned ? 'is-mentioned' : '',
       ].join(' ')}
       onContextMenu={(e) => {
         e.preventDefault()
@@ -295,7 +304,7 @@ export default function MessageRow({
           {gameRef ? (
             <GameMessage content={entry.content} hostUserId={entry.userId} onlineMembers={onlineMembers} />
           ) : (
-            renderMessageContent(displayContent)
+            renderMessageContent(displayContent, mentionNames)
           )}
           {entry.editedAt && (
             <span className="msg-edited">{t('（已编辑）', ' (edited)')}</span>

@@ -56,6 +56,7 @@ export interface PresenceMember {
   avatarUrl: string | null
   role?: string
   profileExpiresAt?: number | null
+  lang?: string | null
   /** epoch ms — when this member entered the room (last track). */
   enteredAt: number
 }

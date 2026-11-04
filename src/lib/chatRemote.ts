@@ -70,6 +70,7 @@ export interface RoomHandle {
     avatarUrl: string | null
     role: string
     profileExpiresAt: number | null
+    lang?: string | null
   }): void
   send(draft: {
     id: string
@@ -277,6 +278,7 @@ export async function joinChatRoom(options: {
             avatarUrl: entry.avatarUrl ?? null,
             role: entry.role ?? '',
             profileExpiresAt: entry.profileExpiresAt ?? null,
+            lang: (entry.lang as string | undefined) ?? null,
             enteredAt: entry.enteredAt,
           }))
         options.onPresence(members)
@@ -380,6 +382,7 @@ export async function joinChatRoom(options: {
             avatarUrl: lastIdentity.avatarUrl,
             role: lastIdentity.role,
             profileExpiresAt: lastIdentity.profileExpiresAt,
+            lang: (lastIdentity as { lang?: string | null }).lang ?? null,
             enteredAt: Date.now(),
           })
         }, PRESENCE_HEARTBEAT_MS)
@@ -392,6 +395,7 @@ export async function joinChatRoom(options: {
         avatarUrl: identity.avatarUrl,
         role: identity.role,
         profileExpiresAt: identity.profileExpiresAt,
+        lang: (identity as { lang?: string | null }).lang ?? null,
         enteredAt: Date.now(),
       })
     },
@@ -538,6 +542,7 @@ interface PresencePayload {
   avatarUrl?: string | null
   role?: string
   profileExpiresAt?: number | null
+  lang?: string | null
   enteredAt: number
 }
 

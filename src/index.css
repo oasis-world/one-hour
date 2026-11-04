@@ -2611,6 +2611,15 @@ button {
   color: #4049d0;
   background: rgba(88, 101, 242, 0.12);
 }
+.msg-row.is-mentioned {
+  background: rgba(255, 122, 69, 0.10);
+  border-left: 2px solid rgba(255, 122, 69, 0.55);
+  border-radius: 0 10px 10px 0;
+}
+.app-shell.theme-warm .msg-row.is-mentioned {
+  background: rgba(255, 122, 69, 0.09);
+  border-left-color: rgba(255, 122, 69, 0.50);
+}
 
 /* Companion avatar button to the right of + — pure avatar, no border */
 .composer-companion-btn {

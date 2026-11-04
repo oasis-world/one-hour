@@ -14,6 +14,7 @@ export interface ChatIdentity {
   avatarUrl: string | null
   role: string
   profileExpiresAt: number | null
+  lang?: string | null
 }
 
 const LOCAL_UID_KEY = 'one-hour-local-uid'
@@ -27,13 +28,15 @@ export function resolveChatIdentity(account: AccountState): ChatIdentity | null 
   const avatarUrl = profile.avatarUrl ?? null
   const role = profile.role ?? ''
   const profileExpiresAt = getProfileExpiresAt()
+  let lang: string | null = null
+  try { lang = globalThis.localStorage?.getItem('one-hour-lang') } catch { /* ignore */ }
   if (account.userId) {
-    return { userId: account.userId, displayName, avatar, avatarUrl, role, profileExpiresAt }
+    return { userId: account.userId, displayName, avatar, avatarUrl, role, profileExpiresAt, lang }
   }
   // Supabase unconfigured: run as a purely local player so the room (and
   // its one-hour rule) works end-to-end without any backend.
   if (!isSupabaseConfigured()) {
-    return { userId: localUserId(), displayName, avatar, avatarUrl, role, profileExpiresAt }
+    return { userId: localUserId(), displayName, avatar, avatarUrl, role, profileExpiresAt, lang }
   }
   return null
 }

@@ -47,6 +47,13 @@ import type { CompanionMessage } from './lib/companionStore'
 import { requestCompanionGreeting, requestCompanionReply, toHistory } from './lib/companionChat'
 import { containsCompanionMention } from './lib/mention'
 import { createCompanionGame, gameTitle } from './lib/companionGame'
+import { useMudAutoInvite } from './lib/useMudAutoInvite'
+import { isMudRecreateIntent } from './lib/mudRecreate'
+import { selectMudParty } from './lib/mudSelect'
+import { buildInviteText, buildMudBlueprint, buildOpeningScene } from './lib/mudTemplates'
+import { requestMudScene, aiPayloadToScene } from './lib/mudGeneration'
+import { createInitialMudState, saveMudState } from './games/mud/cloudState'
+import { getLang } from './lib/i18n'
 
 /**
  * 一小时 / one-hour — the ephemeral chat room. Every message, text or
@@ -327,6 +334,8 @@ export default function App() {
     })()
   }, [profile, companion, privateMessages.length, room.identity])
 
+  // MUD auto-invite is wired after displayPresence is defined (see below)
+
   const handleSummaryComplete = () => {
     if (currentUserId) expireUserMessages(currentUserId)
     expireAnonymousProfile(currentUserId)
@@ -376,8 +385,52 @@ export default function App() {
     } catch (e) { console.warn('[companion] auto-join failed', e) }
   }
 
+  const triggerMudRecreate = async () => {
+    if (!companion || !room.identity) return
+    const presence = displayPresence ?? room.presence
+    const party = selectMudParty(presence, room.identity.userId, companion.id)
+    if (!party || party.length < 2) {
+      const tip = createCompanionReply(t('在线小伙伴还不够2人，稍后再试试吧～', 'Not enough online friends yet (need 2+) — try again soon!'))
+      await saveCompanionMessage(tip)
+      setPrivateMessages((prev) => [...prev, tip])
+      setSentMessageSequence((s) => s + 1)
+      return
+    }
+    const lang = getLang()
+    const isZh = lang.startsWith('zh')
+    const inviteText = buildInviteText(party, companion.name, isZh)
+    try { room.send(inviteText) } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/purity -- triggered by user action, not render
+    const instanceId = globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+    const blueprint = buildMudBlueprint(party)
+    let scene = buildOpeningScene(blueprint, party, lang)
+    try { const ai = await requestMudScene(blueprint, party, lang); if (ai) scene = aiPayloadToScene(ai) } catch { /* fallback */ }
+    const invited = party.map((p) => ({ userId: p.userId, displayName: p.displayName, role: p.role ?? '' }))
+    const state = createInitialMudState(instanceId, room.identity.userId, invited, blueprint, scene, lang)
+    const title = isZh ? blueprint.title : blueprint.titleEn
+    const cardText = `🎮 ${title}\n__GAME__:mud:${instanceId}`
+    try { room.send(cardText) } catch { /* ignore */ }
+    await new Promise((r) => setTimeout(r, 400))
+    try { await saveMudState(instanceId, state) } catch { /* ignore */ }
+    // Clear auto-invite flag so next recreate can also fire freely
+    try { localStorage.removeItem(`one-hour-mud-invited:${companion.id}`) } catch { /* ignore */ }
+    const sys = createCompanionReply(t(`已为你重新创建《${blueprint.title}》冒险！`, `Recreated "${blueprint.titleEn}" adventure for you!`))
+    await saveCompanionMessage(sys)
+    setPrivateMessages((prev) => [...prev, sys])
+    setSentMessageSequence((s) => s + 1)
+  }
+
   const sendPrivateAndReply = async (text: string) => {
     if (!companion) return
+    if (isMudRecreateIntent(text)) {
+      const userMsg = createUserCompanionMessage(text)
+      await saveCompanionMessage(userMsg)
+      setPrivateMessages((prev) => [...prev, userMsg])
+      setSentMessageSequence((s) => s + 1)
+      setReplyTo(null)
+      await triggerMudRecreate()
+      return
+    }
     const userMsg = createUserCompanionMessage(text)
     await saveCompanionMessage(userMsg)
     setPrivateMessages((prev) => [...prev, userMsg])
@@ -529,6 +582,8 @@ export default function App() {
     if (room.presence.some((p) => p.userId === companion.id)) return room.presence
     return [...room.presence, companionMember]
   }, [room.presence, companion])
+
+  useMudAutoInvite(profile, companion, displayPresence, room.entries, room.send, room.status, room.identity, fold, hasRevealed) // eslint-disable-line react-hooks/preserve-manual-memoization
 
   // The backdrop follows the newest photo in the log; the viewer browses
   // every live photo, oldest → newest.

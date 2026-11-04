@@ -68,7 +68,7 @@ export function useChatRoom(enabled: boolean) {
 
   const displayName = identity?.displayName
   const avatarUrl = identity?.avatarUrl ?? null
-  const profileDetails = `${identity?.role ?? ''}:${identity?.profileExpiresAt ?? ''}`
+  const profileDetails = `${identity?.role ?? ''}:${identity?.profileExpiresAt ?? ''}:${identity?.lang ?? ''}`
   const avatarKey = `${identity?.avatar ? `${identity.avatar.style}:${identity.avatar.seed}` : ''}|${avatarUrl ?? ''}`
   useEffect(() => {
     if (!identity || apiRef.current == null) return
