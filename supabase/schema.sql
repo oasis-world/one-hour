@@ -253,6 +253,28 @@ create policy "signed-in players may delete mud states" on public.mud_states for
 grant select, insert, update, delete on public.mud_states to authenticated;
 revoke all on public.mud_states from anon;
 
+-- ── World MUD — eternal shared realm (never purged) ────────────────────────
+create table if not exists public.world_mud_state (
+  world_id text primary key,
+  state jsonb not null check (jsonb_typeof(state) = 'object'),
+  updated_at timestamptz not null default now()
+);
+alter table public.world_mud_state enable row level security;
+drop policy if exists "world state readable by signed-in players" on public.world_mud_state;
+create policy "world state readable by signed-in players" on public.world_mud_state for select using (auth.uid() is not null);
+drop policy if exists "signed-in players may create world state" on public.world_mud_state;
+create policy "signed-in players may create world state" on public.world_mud_state for insert with check (auth.uid() is not null);
+drop policy if exists "signed-in players may update world state" on public.world_mud_state;
+create policy "signed-in players may update world state" on public.world_mud_state for update using (auth.uid() is not null) with check (auth.uid() is not null);
+grant select, insert, update on public.world_mud_state to authenticated;
+revoke all on public.world_mud_state from anon;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.world_mud_state;
+exception when duplicate_object then null;
+end $$;
+
 -- ── Chat image bucket ───────────────────────────────────────────────────────
 
 insert into storage.buckets (id, name, public)

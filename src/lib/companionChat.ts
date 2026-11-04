@@ -52,19 +52,33 @@ export async function requestCompanionGreeting(companion: CompanionProfile): Pro
     } catch (e) { console.warn('[companion] greeting cloud failed', e) }
   }
   const lang = (await import('./i18n')).getLang()
-  const hints: Record<string, string> = {
-    zh: `嗨～我是${companion.name}，${companion.role}✨ 在这个一小时的世界里，你的每条消息都有倒计时，我们还能一起下棋玩游戏哦～ 想找我聊天，请随时点击我在输入框里的头像来和我聊天，期待你的消息！`,
-    'zh-TW': `嗨～我是${companion.name}，${companion.role}✨ 在這個一小時的世界裡，你的每條消息都有倒計時，我們還能一起下棋玩遊戲哦～ 想找我聊天，請隨時點擊我在輸入框裡的頭像來和我聊天，期待你的訊息！`,
-    en: `Hey! I'm ${companion.name}, ${companion.role} ✨ Every message here lives an hour — we can even play chess together. Tap my avatar in the composer to chat with me anytime!`,
-    ja: `やあ！私は${companion.name}（${companion.role}）だよ✨ この一時間の世界ではメッセージにカウントダウンがあって、一緒にチェスもできるんだ。いつでも入力欄の私のアバターをタップして話しかけてね！`,
-    fr: `Salut ! Je suis ${companion.name}, ${companion.role} ✨ Ici chaque message ne vit qu'une heure, on peut même jouer aux échecs ensemble. Appuie sur mon avatar dans la barre de saisie pour discuter avec moi à tout moment !`,
-    es: `¡Hola! Soy ${companion.name}, ${companion.role} ✨ Aquí cada mensaje vive una hora y podemos jugar al ajedrez juntos. ¡Toca mi avatar en el cuadro de texto para charlar conmigo cuando quieras!`,
-    de: `Hey! Ich bin ${companion.name}, ${companion.role} ✨ Jede Nachricht lebt hier eine Stunde, wir können sogar Schach spielen. Tippe jederzeit auf meinen Avatar im Eingabefeld, um mit mir zu chatten!`,
-    ko: `안녕! 나는 ${companion.name}, ${companion.role}야 ✨ 여기서는 모든 메시지가 한 시간만 살아있고 체스도 같이 둘 수 있어. 언제든 입력창에서 내 아바타를 탭해서 대화해요!`,
-    it: `Ciao! Sono ${companion.name}, ${companion.role} ✨ Qui ogni messaggio vive un'ora e possiamo anche giocare a scacchi insieme. Tocca il mio avatar nella barra di input per chattare con me quando vuoi!`,
-    ar: `مرحباً! أنا ${companion.name}، ${companion.role} ✨ كل رسالة هنا تعيش ساعة واحدة، ويمكننا حتى لعب الشطرنج معاً. انقر على صورتي في مربع الإدخال للدردشة معي في أي وقت!`,
+  const roleName = user.role ? `「${user.role}」` : ''
+  const rolePart = lang === 'zh' ? `${roleName}` : lang === 'en' ? ` as ${user.role ?? 'adventurer'}` : `（${user.role ?? ''}）`
+  const mudLines: Record<string, string> = {
+    zh: `这里有一个 MUD 文字冒险《永恒沙漏》⏳，你可以用自己目前的角色 ${user.nickname}${rolePart} 来游玩 1 个小时，来享受吧！沙漏里的世界是永恒的，所有玩家共同书写历史。`,
+    'zh-TW': `這裡有一個 MUD 文字冒險《永恆沙漏》⏳，你可以用自己目前的角色 ${user.nickname}${rolePart} 來遊玩 1 個小時，來享受吧！沙漏裡的世界是永恆的，所有玩家共同書寫歷史。`,
+    en: `There's a MUD adventure here — The Eternal Hourglass ⏳. Jump in for an hour as ${user.nickname}${user.role ? ` (${user.role})` : ''} and enjoy it! The world is eternal, written together by all who enter.`,
+    ja: `ここに MUD 冒険『永遠の砂時計』⏳があるよ。${user.nickname}${user.role ? `（${user.role}）` : ''}として1時間、この世界を楽しんで！永遠の世界は皆で紡がれるんだ。`,
+    fr: `Une aventure MUD vous attend — Le Sablier Éternel ⏳. Incarnez ${user.nickname}${user.role ? ` (${user.role})` : ''} pendant une heure et profitez-en ! Le monde est éternel, écrit par tous.`,
+    es: `Hay una aventura MUD aquí — El Reloj de Arena Eterno ⏳. Juega una hora como ${user.nickname}${user.role ? ` (${user.role})` : ''} ¡y disfrútalo! El mundo es eterno, escrito por todos.`,
+    de: `Hier wartet ein MUD-Abenteuer — Die Ewige Sanduhr ⏳. Spiele eine Stunde als ${user.nickname}${user.role ? ` (${user.role})` : ''} und genieße es! Die Welt ist ewig, von allen geschrieben.`,
+    ko: `여기에 MUD 어드벤처 ‘영원한 모래시계’⏳가 있어요. ${user.nickname}${user.role ? `(${user.role})` : ''}로 1시간 동안 즐겨봐요! 영원한 세계는 모두가 함께 써 내려가요.`,
+    it: `C'è un'avventura MUD qui — La Clessidra Eterna ⏳. Gioca per un'ora come ${user.nickname}${user.role ? ` (${user.role})` : ''} e divertiti! Il mondo è eterno, scritto da tutti.`,
+    ar: `هناك مغامرة MUD هنا — الساعة الرملية الأبدية ⏳. العب ساعة كـ ${user.nickname}${user.role ? ` (${user.role})` : ''} واستمتع! العالم أبدي، يكتبه الجميع.`,
   }
-  return `@${user.nickname} ${hints[lang] ?? hints.en}`
+  const base: Record<string, string> = {
+    zh: `嗨～我是${companion.name}，${companion.role}✨ 在这个一小时的世界里，每条消息都有倒计时，我们还能一起下棋玩游戏哦～ 想找我聊天，请随时点击我在输入框里的头像来和我聊天，期待你的消息！${mudLines.zh}`,
+    'zh-TW': `嗨～我是${companion.name}，${companion.role}✨ 在這個一小時的世界裡，每條消息都有倒計時，我們還能一起下棋玩遊戲哦～ 想找我聊天，請隨時點擊我在輸入框裡的頭像來和我聊天，期待你的訊息！${mudLines['zh-TW']}`,
+    en: `Hey! I'm ${companion.name}, ${companion.role} ✨ Every message here lives an hour — we can even play chess together. Tap my avatar in the composer to chat anytime! ${mudLines.en}`,
+    ja: `やあ！私は${companion.name}（${companion.role}）だよ✨ この一時間の世界ではメッセージにカウントダウンがあって、一緒にチェスもできるんだ。いつでも入力欄の私のアバターをタップして話しかけてね！${mudLines.ja}`,
+    fr: `Salut ! Je suis ${companion.name}, ${companion.role} ✨ Ici chaque message ne vit qu'une heure, on peut même jouer aux échecs ensemble. Appuie sur mon avatar pour discuter ! ${mudLines.fr}`,
+    es: `¡Hola! Soy ${companion.name}, ${companion.role} ✨ Aquí cada mensaje vive una hora y podemos jugar al ajedrez juntos. ¡Toca mi avatar para charlar! ${mudLines.es}`,
+    de: `Hey! Ich bin ${companion.name}, ${companion.role} ✨ Jede Nachricht lebt hier eine Stunde, wir können sogar Schach spielen. Tippe auf meinen Avatar! ${mudLines.de}`,
+    ko: `안녕! 나는 ${companion.name}, ${companion.role}야 ✨ 여기서는 모든 메시지가 한 시간만 살아있고 체스도 같이 둘 수 있어. 언제든 입력창에서 내 아바타를 탭해요! ${mudLines.ko}`,
+    it: `Ciao! Sono ${companion.name}, ${companion.role} ✨ Qui ogni messaggio vive un'ora e possiamo anche giocare a scacchi insieme. Tocca il mio avatar! ${mudLines.it}`,
+    ar: `مرحباً! أنا ${companion.name}، ${companion.role} ✨ كل رسالة هنا تعيش ساعة واحدة، ويمكننا حتى لعب الشطرنج معاً. انقر على صورتي للدردشة! ${mudLines.ar}`,
+  }
+  return `@${user.nickname} ${base[lang] ?? base.en}`
 }
 
 function ensureMentionPrefix(text: string, userName: string): string {

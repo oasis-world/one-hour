@@ -35,6 +35,9 @@ export function buildGreetingPrompt(user: UserProfile, companion: CompanionProfi
   const lang = getLang()
   const hint = AVATAR_HINT[lang] ?? AVATAR_HINT.en
   const isZh = lang === 'zh' || lang === 'zh-TW'
-  if (isZh) return `用${lang === 'zh-TW' ? '繁中' : '中文'}和${user.nickname}打招呼，开头必须是“@${user.nickname} ”（含空格），然后自我介绍你是${companion.name}（${companion.role}），提一句一小时聊天室的倒计时/游戏特色。必须包含这句话并润色得温暖热情：“${hint}”。2-3句话，温暖俏皮。`
-  return `Greet ${user.nickname} in ${lang}. Start exactly with "@${user.nickname} " then introduce yourself as ${companion.name} (${companion.role}), mention one-hour countdown/games. You MUST include warmly rephrased: "${hint}". 2-3 sentences, warm.`
+  const userRole = user.role ? `「${user.role}」` : ''
+  const mudHintZh = `这里有一个MUD文字冒险《永恒沙漏》⏳，你可以用自己目前的角色 ${user.nickname}${userRole} 来游玩1个小时，来享受吧！沙漏里的世界是永恒的，所有玩家共同书写历史。`
+  const mudHintEn = `There's a MUD adventure — The Eternal Hourglass ⏳. Play for an hour as ${user.nickname}${user.role ? ` (${user.role})` : ''} and enjoy it! The world is eternal, written by all.`
+  if (isZh) return `用${lang === 'zh-TW' ? '繁中' : '中文'}和${user.nickname}打招呼，开头必须是“@${user.nickname} ”（含空格），然后自我介绍你是${companion.name}（${companion.role}），提一句一小时聊天室的倒计时/游戏特色。必须包含这句话并润色得温暖热情：“${hint}”。另外必须加上一句（保留角色名与1小时信息）：“${mudHintZh}”可轻微润色但必须保留“${user.nickname}”与“1小时”与“永恒沙漏”。3-5句话，温暖俏皮。`
+  return `Greet ${user.nickname} in ${lang}. Start exactly with "@${user.nickname} " then introduce yourself as ${companion.name} (${companion.role}), mention one-hour countdown/games. You MUST include warmly rephrased: "${hint}". Also add a sentence (keep role + 1 hour): "${mudHintEn}" — must keep "${user.nickname}" and "1 hour" and "Eternal Hourglass". 3-5 sentences, warm.`
 }

@@ -37,6 +37,8 @@ interface Props {
   isPrivateId?: (id: string) => boolean
   companionTyping?: boolean
   companion?: { name: string; style: string; seed: string; avatarUrl?: string | null } | null
+  userTyping?: boolean
+  selfProfile?: { nickname: string; style: string | null; seed: string | null; avatarUrl?: string | null } | null
 }
 
 interface OpenMenu {
@@ -74,6 +76,8 @@ export default function MessageList({
   isPrivateId,
   companionTyping,
   companion,
+  userTyping,
+  selfProfile,
 }: Props) {
   useLang() // re-render on language flips
   const logRef = useRef<HTMLDivElement>(null)
@@ -308,6 +312,26 @@ export default function MessageList({
             <div className="msg-main">
               <div className="msg-head">
                 <span className="msg-name" style={{ color: 'var(--ink-soft)', fontWeight: 800 }}>{companion.name}</span>
+                <span className="msg-typing-label">{t('正在输入…', 'typing…')}</span>
+              </div>
+              <div className="msg-body">
+                <span className="typing-dots" aria-hidden="true">
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+        {userTyping && selfProfile && (
+          <div className="msg-row is-private is-typing is-mine" aria-live="polite" aria-label={t('正在输入…', 'typing…')}>
+            <div className="msg-gutter">
+              <AvatarBadge look={{ style: selfProfile.style ?? 'lorelei', seed: selfProfile.seed ?? '', avatarUrl: selfProfile.avatarUrl ?? null }} size={35} className="msg-avatar-img" />
+            </div>
+            <div className="msg-main">
+              <div className="msg-head">
+                <span className="msg-name" style={{ color: 'var(--ink-soft)', fontWeight: 800 }}>{selfProfile.nickname}</span>
                 <span className="msg-typing-label">{t('正在输入…', 'typing…')}</span>
               </div>
               <div className="msg-body">

@@ -15,21 +15,32 @@ export function parseMentions(text: string, extraNames?: string[]): Array<{ type
   if (companion?.name) knownNames.push(companion.name)
   if (user?.nickname) knownNames.push(user.nickname)
   if (extraNames) for (const n of extraNames) if (n) knownNames.push(n)
-  // Fallback: extract any @... sequences so foreign mentions still highlight
-  // Supports multi-word names like "Amber Lantern" by capturing up to next @ or punctuation
-  // We iterate over text to find @ segments and push their trimmed content as candidates
+  // Fallback: extract @... mentions not in knownNames — capped to 1-2 words,
+  // stopping at line breaks / @ / punctuation boundaries so trailing "hello world"
+  // is never absorbed into the mention.
   const atSegments: string[] = []
   let searchIdx = 0
   while (searchIdx < text.length) {
     const at = text.indexOf('@', searchIdx)
     if (at === -1) break
-    // Take up to 40 chars or next @, whichever first, then trim to word boundaries
     const nextAt = text.indexOf('@', at + 1)
-    const end = nextAt === -1 ? Math.min(text.length, at + 41) : Math.min(nextAt, at + 41)
-    const seg = text.slice(at + 1, end).trim()
-    // Clean trailing punctuation
-    const cleaned = seg.replace(/[,!?.，。！？、]+$/g, '').trim()
-    if (cleaned) atSegments.push(cleaned)
+    const hardEnd = nextAt === -1 ? text.length : nextAt
+    // Take up to 40 chars but break early at newline or sentence punctuation
+    let end = Math.min(hardEnd, at + 41)
+    for (let k = at + 1; k < end; k++) {
+      const ch = text[k]
+      if (ch === '\n' || ch === '\r') { end = k; break }
+    }
+    let seg = text.slice(at + 1, end).trim()
+    seg = seg.replace(/[,!?.，。！？、；：:;]+$/g, '').trim()
+    if (!seg) { searchIdx = at + 1; continue }
+    // Only the first word after @ is taken as candidate; 2-word names are
+    // already in knownNames via companion/user/presence, so "Hey" after
+    // @kz never becomes part of the mention.
+    const firstWord = seg.split(/\s+/).filter(Boolean)[0]
+    if (firstWord && firstWord.length <= 24 && !/\d{2,}/.test(firstWord)) {
+      atSegments.push(firstWord)
+    }
     searchIdx = at + 1
   }
   for (const c of atSegments) knownNames.push(c)

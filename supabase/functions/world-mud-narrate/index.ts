@@ -1,0 +1,169 @@
+import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
+
+const BASETEN_MODEL = 'meta-models/muse-spark-open-1026'
+const BASETEN_ENDPOINT = 'https://inference.baseten.co/v1/chat/completions'
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  try {
+    if (!await isAuthenticated(req)) return json({ error: 'Authentication required' }, 401)
+  } catch {
+    return json({ error: 'Authentication check failed' }, 401)
+  }
+  let body: Record<string, unknown>
+  try { body = await req.json() } catch { return json({ error: 'Invalid JSON' }, 400) }
+
+  const {
+    actionText, locationId, districtId, roomName, player, lang, recentLog, globalEvent,
+  } = body as {
+    actionText?: string; locationId?: string; districtId?: string; roomName?: string
+    player?: { displayName?: string; role?: string }; lang?: string; recentLog?: unknown[]; globalEvent?: string | null
+  }
+  if (typeof actionText !== 'string' || !actionText.trim()) return json({ error: 'Missing actionText' }, 400)
+
+  const apiKey = Deno.env.get('BASETEN_API_KEY')
+  if (!apiKey) return json(fallback(reqLang(lang), actionText, locationId, roomName))
+
+  const playerDesc = `${player?.displayName ?? 'Traveler'} (${player?.role ?? 'adventurer'})`
+  const logSnippet = Array.isArray(recentLog) ? recentLog.slice(-6).map((e: unknown) => {
+    const r = e as Record<string, unknown>
+    return `${r.displayName ?? ''}: ${r.action ?? ''} → ${r.result ?? ''}`
+  }).join('\n') : ''
+
+  const langName: Record<string, string> = {
+    zh: 'Simplified Chinese (zh)', 'zh-TW': 'Traditional Chinese (zh-TW)', en: 'English', ja: 'Japanese',
+    fr: 'French', es: 'Spanish', de: 'German', ko: 'Korean', it: 'Italian', ar: 'Arabic',
+  }
+  const outLang = langName[lang ?? 'zh'] ?? langName.en
+
+  const isEn = (lang ?? 'en').startsWith('en')
+  const langRule = isEn
+    ? 'CRITICAL LANGUAGE RULE: Respond ONLY in English. Never output Chinese characters, Japanese, or any non-English. All narrative/choices/broadcast must be 100% English.'
+    : `CRITICAL LANGUAGE RULE: Respond ONLY in ${outLang}. Never mix another language. All narrative/choices/broadcast must be 100% that language.`
+  const sysPrompt = `You are the living narrator of a persistent shared MUD world "The Eternal Hourglass".
+World: one eternal city where every soul lives 1 hour. Districts: plaza/ruin/lab/forest/ocean/city/tavern/academy. No fixed plot — AI + players co-evolve it.
+Player: ${playerDesc}, at ${roomName ?? locationId} in district ${districtId ?? 'plaza'}.
+Recent world log:
+${logSnippet || '(world just awoke)'}
+${globalEvent ? `Global event: ${globalEvent}` : ''}
+Required output language: ${outLang} (lang code: ${lang ?? 'en'}).
+${langRule}
+Rules:
+- Keep narrative 2-4 sentences, vivid, second-person, acknowledge player's action naturally.
+- Choices: 3-4 short action labels (4-10 chars each) reflecting what to do next at this location. Include movement / interaction / search mix. Labels must be in the required language.
+- Broadcast: very short 3-8 word summary of what happened for world feed, in required language.
+Output ONLY valid JSON: {"narrative": string, "choices": [{"label": string, "action": string, "icon": string?}], "broadcast": string, "hint": string?}
+action is snake_case command the client sends back (e.g. "go_north", "talk", "search", "look").
+No fixed NPC dialogue — improvise NPCs as needed.
+Never break JSON. Never include Chinese when language is English.`
+
+  try {
+    const upstream = await fetch(BASETEN_ENDPOINT, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: BASETEN_MODEL,
+        messages: [
+          { role: 'system', content: sysPrompt },
+          { role: 'user', content: `Player action: "${actionText}"\nCurrent room: ${roomName ?? locationId}\nYou MUST respond in ${outLang} only — see CRITICAL LANGUAGE RULE above.` },
+        ],
+        max_completion_tokens: 800,
+        temperature: 0.9,
+        top_p: 0.95,
+        response_format: { type: 'json_object' } as unknown as Record<string, unknown>,
+      }),
+      signal: AbortSignal.timeout(20000),
+    })
+    if (!upstream.ok) {
+      const t = await upstream.text().catch(() => '')
+      console.warn('[world-mud-narrate] upstream', upstream.status, t.slice(0, 400))
+      return json(fallback(reqLang(lang), actionText, locationId, roomName))
+    }
+    const result = await upstream.json() as Record<string, unknown>
+    const choice = (result.choices as unknown[] | undefined)?.[0] as Record<string, unknown> | undefined
+    const msg = (choice?.message ?? {}) as Record<string, unknown>
+    let text = ''
+    if (typeof msg.content === 'string') text = msg.content
+    else if (Array.isArray(msg.content)) text = (msg.content as unknown[]).map((p: unknown) => (p as { text?: string })?.text ?? '').join('')
+    text = text.trim()
+    if (!text) return json(fallback(reqLang(lang), actionText, locationId, roomName))
+    const parsed = (() => { try { return JSON.parse(text) as Record<string, unknown> } catch { return null } })()
+    if (!parsed || typeof parsed.narrative !== 'string' || !Array.isArray(parsed.choices)) {
+      console.warn('[world-mud-narrate] bad JSON', text.slice(0, 300))
+      return json(fallback(reqLang(lang), actionText, locationId, roomName))
+    }
+    return json({
+      narrative: (parsed.narrative as string).slice(0, 800),
+      choices: (parsed.choices as unknown[]).slice(0, 4).filter((c) => c && typeof (c as { label?: unknown }).label === 'string').map((c) => {
+        const cc = c as { label: string; action: string; icon?: string }
+        return { label: cc.label.slice(0, 28), action: (cc.action || 'look').slice(0, 32), icon: cc.icon?.slice(0, 4) }
+      }),
+      broadcast: typeof parsed.broadcast === 'string' ? parsed.broadcast.slice(0, 60) : actionText.slice(0, 40),
+      hint: typeof parsed.hint === 'string' ? parsed.hint.slice(0, 80) : undefined,
+    })
+  } catch (e) {
+    console.warn('[world-mud-narrate] error', (e as Error).message)
+    return json(fallback(reqLang(lang), actionText, locationId, roomName))
+  }
+})
+
+function reqLang(lang?: string): string {
+  if (typeof lang === 'string' && lang) return lang
+  return 'zh'
+}
+
+function fallback(lang: string, actionText: string, locationId?: string, roomName?: string): Record<string, unknown> {
+  const isZh = lang.startsWith('zh')
+  const loc = roomName ?? locationId ?? (isZh ? '未知之地' : 'unknown')
+  if (isZh) {
+    return {
+      narrative: `你说道“${actionText.slice(0, 40)}”，${loc}的空气微微颤动，似乎在回应你。前方有新的可能在等待。`,
+      choices: [
+        { label: '观察四周', action: 'look', icon: '👁️' },
+        { label: '与人交谈', action: 'talk', icon: '💬' },
+        { label: '搜索', action: 'search', icon: '🔍' },
+      ],
+      broadcast: actionText.slice(0, 40),
+    }
+  }
+  if (lang === 'ja') {
+    return {
+      narrative: `あなたは「${actionText.slice(0, 40)}」と告げる。${loc}の空気がわずかに揺らぎ、世界が応えているようだ。新たな可能性が目の前に広がる。`,
+      choices: [
+        { label: '周りを見る', action: 'look', icon: '👁️' },
+        { label: '話しかける', action: 'talk', icon: '💬' },
+        { label: '探索する', action: 'search', icon: '🔍' },
+      ],
+      broadcast: actionText.slice(0, 40),
+    }
+  }
+  return {
+    narrative: `You say "${actionText.slice(0, 40)}" — the air at ${loc} shivers faintly, as if the world is listening. New possibilities await.`,
+    choices: [
+      { label: 'Look around', action: 'look', icon: '👁️' },
+      { label: 'Talk', action: 'talk', icon: '💬' },
+      { label: 'Search', action: 'search', icon: '🔍' },
+    ],
+    broadcast: actionText.slice(0, 40),
+  }
+}
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'content-type': 'application/json' } })
+}
+
+async function isAuthenticated(request: Request): Promise<boolean> {
+  const auth = request.headers.get('authorization')
+  const url = Deno.env.get('SUPABASE_URL')
+  const anon = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY') ?? defaultKey()
+  if (!auth?.startsWith('Bearer ') || !url || !anon) return false
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 5000)
+    const r = await fetch(`${url}/auth/v1/user`, { headers: { authorization: auth, apikey: anon }, signal: controller.signal })
+    clearTimeout(timer)
+    return r.ok
+  } catch { return false }
+}
+function defaultKey(): string | undefined { try { const k = JSON.parse(Deno.env.get('SUPABASE_PUBLISHABLE_KEYS') ?? '{}'); return k.default } catch { return undefined } }

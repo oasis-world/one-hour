@@ -1,6 +1,11 @@
 .game-message {
   width: 100%;
   max-width: 440px;
+  box-sizing: border-box;
+  margin-top: 5px;
+}
+@media (max-width: 820px) {
+  .game-message { max-width: none; }
 }
 
 .msg-row:has(.game-message) {
