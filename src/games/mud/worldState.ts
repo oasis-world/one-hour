@@ -43,8 +43,10 @@ export async function loadWorldState(signal?: AbortSignal): Promise<WorldMudStat
     }
     const s = data?.state as WorldMudState | undefined
     if (s && s.worldId === WORLD_ID && s.districts?.length) {
-      saveLocal(s)
-      return s
+      const pruned = removeExpiredPlayers(s)
+      if (pruned !== s) void saveWorldState(pruned)
+      saveLocal(pruned)
+      return pruned
     }
     const local = loadLocal()
     if (local) return local

@@ -4,6 +4,7 @@ import { loadWorldState, saveWorldState, subscribeWorldState, upsertWorldPlayer 
 import { type WorldMudState, type WorldLogEntry, findRoom, findDistrict } from './worldTypes'
 import { requestWorldNarrate, tWorld } from '../../lib/worldMudNarrate'
 import { loadUserProfile } from '../../lib/userProfile'
+import { getCompanionIfAlive } from '../../lib/companionProfile'
 import { useLang } from '../../lib/i18n'
 import { useImeEnter } from '../../lib/ime'
 import { WorldHourglassIcon, DistrictIcon, ChoiceIcon } from './MudIcons'
@@ -13,8 +14,7 @@ function isWorldInstance(id: string): boolean {
   return id === 'world' || id === 'main' || id.length < 10
 }
 
-export default function WorldMudGame({ instanceId }: GameComponentProps) {
-  void instanceId
+export default function WorldMudGame({ instanceId, onlineMembers, hostUserId }: GameComponentProps) {
   const lang = useLang()
   const profile = loadUserProfile()
   const nickname = profile?.nickname ?? 'Traveler'
@@ -62,7 +62,7 @@ export default function WorldMudGame({ instanceId }: GameComponentProps) {
     void loadWorldState().then((w) => {
       if (cancelled) return
       const me: WorldMudState['players'][number] = {
-        userId: profile ? `${profile.nickname}|${profile.role ?? ''}`.slice(0, 40) : `guest-${Date.now()}`,
+        userId: hostUserId ?? (profile ? `${profile.nickname}|${profile.role ?? ''}`.slice(0, 40) : `guest-${Date.now()}`),
         displayName: nickname,
         role: roleLabel,
         avatarStyle: profile?.style ?? null,
@@ -105,6 +105,23 @@ export default function WorldMudGame({ instanceId }: GameComponentProps) {
 
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [world?.log])
 
+  // Heartbeat: keep self alive and prune expired (mirrors one-hour presence 1h TTL)
+  useEffect(() => {
+    if (!world) return
+    const id = window.setInterval(() => {
+      const now = Date.now()
+      const pruned = world.players.filter((p) => p.joinedAt + 60 * 60 * 1000 > now)
+      const selfIdx = pruned.findIndex((p) => p.displayName === nickname)
+      if (selfIdx >= 0) pruned[selfIdx] = { ...pruned[selfIdx], joinedAt: now }
+      if (pruned.length !== world.players.length || selfIdx >= 0) {
+        const next: WorldMudState = { ...world, players: pruned, updatedAt: now }
+        setWorld(next)
+        void saveWorldState(next)
+      }
+    }, 30_000)
+    return () => window.clearInterval(id)
+  }, [world, nickname])
+
   const handleAction = useCallback(async (raw: string) => {
     if (!world || acting || !raw.trim()) return
     const actionText = raw.trim().slice(0, 300)
@@ -139,12 +156,15 @@ export default function WorldMudGame({ instanceId }: GameComponentProps) {
         id: `log-${Date.now()}`, at: Date.now(), userId: nickname, displayName: nickname,
         role: roleLabel, locationId: nextLoc, action: actionText, result: res.broadcast.slice(0, 60), lang: actionLang,
       }
+      const now = Date.now()
       const nextWorld: WorldMudState = {
         ...world,
         log: [...world.log, entry].slice(-80),
         stats: { ...world.stats, totalActions: world.stats.totalActions + 1 },
-        players: world.players.map((p) => (p.displayName === nickname ? { ...p, locationId: nextLoc } : p)),
-        updatedAt: Date.now(),
+        players: world.players
+          .map((p) => (p.displayName === nickname ? { ...p, locationId: nextLoc, joinedAt: now } : p))
+          .filter((p) => p.joinedAt + 60 * 60 * 1000 > now),
+        updatedAt: now,
       }
       setWorld(nextWorld)
       void saveWorldState(nextWorld)
@@ -157,7 +177,32 @@ export default function WorldMudGame({ instanceId }: GameComponentProps) {
 
   const room = useMemo(() => world ? findRoom(world, locationId) : null, [world, locationId])
   const district = useMemo(() => world && room ? findDistrict(world, room.districtId) : null, [world, room])
-  const onlineCount = world?.players.length ?? 0
+  const visiblePlayers = useMemo(() => {
+    const companion = getCompanionIfAlive()
+    const now = Date.now()
+    let list = (world?.players ?? []).filter((p) => {
+      if (p.userId.startsWith('companion-')) return false
+      if (companion && p.displayName === companion.name) return false
+      if (p.joinedAt + 60 * 60 * 1000 <= now) return false
+      return true
+    })
+    // Presence intersection: MUD online ≤ one-hour在线 (no stale accumulation)
+    if (onlineMembers && onlineMembers.length > 0) {
+      const byId = new Set(onlineMembers.map((m) => m.userId))
+      const byName = new Set(onlineMembers.map((m) => m.displayName))
+      const intersected = list.filter((p) => {
+        // real uuid path
+        if (p.userId.includes('-') && p.userId.length >= 20) return byId.has(p.userId)
+        // legacy nickname|role path
+        return byName.has(p.displayName)
+      })
+      // If intersection yields 0 but presence has people, fall back to raw list
+      // (covers first-load race where presence hasn't hydrated yet)
+      if (intersected.length > 0 || onlineMembers.length === 0) list = intersected
+    }
+    return list
+  }, [world, onlineMembers])
+  const onlineCount = visiblePlayers.length
 
   if (loading || !world) {
     return (
@@ -202,7 +247,7 @@ export default function WorldMudGame({ instanceId }: GameComponentProps) {
         <div className="world-mud-online-pop">
           <div className="world-mud-online-pop-head">{onlineCount} {tw('onlineNow')} · {world.stats.totalPlayersEver} {tw('playersEver')}</div>
           <div className="world-mud-online-pop-list">
-            {world.players.slice(0, 24).map((p) => {
+            {visiblePlayers.slice(0, 24).map((p) => {
               const r = findRoom(world, p.locationId)
               return (
                 <div key={p.userId} className="world-mud-online-pop-item">
@@ -212,7 +257,7 @@ export default function WorldMudGame({ instanceId }: GameComponentProps) {
                 </div>
               )
             })}
-            {world.players.length === 0 && <div className="world-mud-online-pop-empty">{tw('noLogYet')}</div>}
+            {visiblePlayers.length === 0 && <div className="world-mud-online-pop-empty">{tw('noLogYet')}</div>}
           </div>
         </div>
       )}
