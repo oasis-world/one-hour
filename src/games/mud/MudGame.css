@@ -109,7 +109,7 @@
   opacity: 0.6;
 }
 .mud-scene {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.75;
   color: var(--mud-ink);
   white-space: pre-wrap;

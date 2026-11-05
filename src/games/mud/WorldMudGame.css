@@ -44,7 +44,7 @@
 
 /* Scene + acting mask */
 .world-mud-scene-wrap { position: relative; }
-.world-mud-scene { font-size: 13.5px; line-height: 1.7; color: var(--wm-ink); white-space: pre-wrap; background: color-mix(in srgb, var(--card-bg, #fff) 94%, transparent); border: 1px solid color-mix(in srgb, var(--border, #e8e0d6) 55%, transparent); border-radius: 12px; padding: 10px 12px; min-height: 48px; }
+.world-mud-scene { font-size: 14.5px; line-height: 1.7; color: var(--wm-ink); white-space: pre-wrap; background: color-mix(in srgb, var(--card-bg, #fff) 94%, transparent); border: 1px solid color-mix(in srgb, var(--border, #e8e0d6) 55%, transparent); border-radius: 12px; padding: 10px 12px; min-height: 48px; }
 .world-mud-acting-mask {
   position: absolute; inset: 0; z-index: 2;
   display: grid; place-items: center;
