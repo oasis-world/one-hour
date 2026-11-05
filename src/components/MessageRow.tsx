@@ -355,6 +355,7 @@ export default function MessageRow({
         {!entry.expiring && (
           <MsgHoverBar
             mine={mine || Boolean(isPrivate)}
+            isGame={Boolean(gameRef)}
             onReact={(emoji) => onReact(entry.id, emoji)}
             onCopy={() => onCopy(entry)}
             onDelete={(anchor) => onOpenMenu(entry, anchor, false, true)}

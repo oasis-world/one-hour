@@ -4,6 +4,7 @@ import { t, useLang } from '../lib/i18n'
 import { REACTION_PALETTE, getQuickEmojis } from '../lib/chatReactions'
 import { suppressNextClick } from '../lib/popoverGuard'
 import { ChevronRightIcon, CopyIcon, EditIcon, ReactIcon, ReplyIcon, TrashIcon } from './icons'
+import { parseGameRef } from '../games/types'
 
 export interface MenuAnchor {
   x: number
@@ -281,8 +282,9 @@ export default function MessageMenu({
           )}
           <div className="msg-menu-sep" aria-hidden="true" />
           {item(t('回复', 'Reply'), <ReplyIcon size={18} />, () => onReply(entry))}
-          {item(t('复制', 'Copy Text'), <CopyIcon size={18} />, () => onCopy(entry))}
-          {mine && (
+          {!parseGameRef(entry.content) &&
+            item(t('复制', 'Copy Text'), <CopyIcon size={18} />, () => onCopy(entry))}
+          {mine && !parseGameRef(entry.content) && (
             <>
               <div className="msg-menu-sep" aria-hidden="true" />
               {item(t('编辑消息', 'Edit Message'), <EditIcon size={18} />, () => onEdit(entry))}

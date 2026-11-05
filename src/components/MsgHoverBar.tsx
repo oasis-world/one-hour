@@ -4,6 +4,7 @@ import { CopyIcon, MoreIcon, TrashIcon } from './icons'
 
 interface Props {
   mine: boolean
+  isGame?: boolean
   onReact: (emoji: string) => void
   onCopy: () => void
   /** Opens the shared confirm dialog anchored at the delete button. */
@@ -20,7 +21,7 @@ interface Props {
  * it the row keeps matching :focus-within after the tap and the bar would
  * stick around after the mouse leaves.
  */
-export default function MsgHoverBar({ mine, onReact, onCopy, onDelete, onMore }: Props) {
+export default function MsgHoverBar({ mine, isGame = false, onReact, onCopy, onDelete, onMore }: Props) {
   return (
     <div className="msg-hoverbar" role="toolbar" aria-label={t('消息操作', 'Message actions')}>
       {getQuickEmojis(4).map((emoji) => (
@@ -40,20 +41,22 @@ export default function MsgHoverBar({ mine, onReact, onCopy, onDelete, onMore }:
         </button>
       ))}
       <span className="msg-hoverbar-sep" aria-hidden="true" />
-      <button
-        type="button"
-        className="msg-hoverbar-btn"
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation()
-          e.currentTarget.blur()
-          onCopy()
-        }}
-        aria-label={t('复制', 'Copy')}
-        title={t('复制', 'Copy')}
-      >
-        <CopyIcon size={18} />
-      </button>
+      {!isGame && (
+        <button
+          type="button"
+          className="msg-hoverbar-btn"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            e.currentTarget.blur()
+            onCopy()
+          }}
+          aria-label={t('复制', 'Copy')}
+          title={t('复制', 'Copy')}
+        >
+          <CopyIcon size={18} />
+        </button>
+      )}
       {mine && (
         <button
           type="button"

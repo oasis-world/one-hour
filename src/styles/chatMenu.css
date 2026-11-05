@@ -201,6 +201,13 @@
   }
 }
 
+/* Mobile long-press sheet: +3px between menu items (phones & tablets) */
+@media (hover: none), (pointer: coarse) {
+  .msg-menu.is-sheet .msg-menu-item {
+    margin-top: 3px;
+  }
+}
+
 .msg-menu-emojis {
   display: flex;
   flex-wrap: nowrap;

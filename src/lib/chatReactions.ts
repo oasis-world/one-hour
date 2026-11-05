@@ -32,13 +32,26 @@ export const QUICK_EMOJIS = ['👍', '❤️', '👏', '🔥', '😄', '☕'] as
 
 /**
  * Full palette behind the "Add Reaction" menu item — popular + decorative,
- * roughly grouped (faces → gestures → symbols → fun).
+ * roughly grouped (faces → gestures → symbols → fun → food → animals/nature → activities/objects).
  */
 export const REACTION_PALETTE = [
   '👍', '❤️', '😂', '😄', '😮', '😢', '🎉', '🔥', '👏',
   '🥰', '😍', '🤣', '😭', '🙏', '💯', '🎊', '✨',
   '🌹', '🍀', '⭐', '👌', '🤝', '💪', '🥳', '😎',
   '🤔', '👀', '🍎', '🍜', '☕', '🐱', '🐶', '🌈', '🎮',
+  // Food & Drink — 10 picks across meals, sweets, fruit, snacks & drinks
+  '🍔', '🍕', '🍣', '🍰', '🍓', '🍦', '🍩', '🍿', '🧋', '🍺',
+  // Animals & Nature / Activities / Travel & Places / Objects — 20 more
+  '🐻', '🦊', '🐼', '🦁', '🦄', '🌸', '🌲', '⚽', '🎸', '✈️',
+  '🚀', '🎁', '💡', '📚', '🎬', '🎧', '🌊', '🏖️', '🎨', '🔮',
+  // People & Smileys — expressive faces & gestures
+  '😇', '🥹', '😋', '🤩', '🥲', '😴', '🫡', '🤗', '😌', '🫶',
+  // More Food & Drink
+  '🥑', '🍇', '🥐', '🥞', '🍱', '🥟', '🍡', '🧁',
+  // More Animals & Nature
+  '🐰', '🐧', '🦉', '🐝', '🐯', '🦝', '🌵', '🍄',
+  // More Activities / Sports / Travel / Objects & Symbols — 12
+  '🏀', '🎯', '🎲', '💎', '🧸', '🎈', '🗼', '🏰', '🌋', '🪄', '🍒', '🦋',
 ] as const
 
 function readStorage(): Storage | null {
