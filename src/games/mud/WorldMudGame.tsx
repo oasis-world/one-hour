@@ -197,7 +197,14 @@ export default function WorldMudGame({ instanceId, onlineMembers, hostUserId }: 
       }
       setLocationId(nextLoc)
       let cleanNarrative = res.narrative
-      if (!narrativeLang.startsWith('zh') && /[\u4e00-\u9fff]/.test(cleanNarrative)) {
+      // Fix: Japanese Kanji shares \u4e00-\u9fff with Chinese — must not strip Kanji from ja narrative.
+      // Only treat Han chars as "Chinese leak" when narrative is non-CJK, or when ja text has Han but zero Kana (suspicious).
+      const hasKana = /[\u3040-\u30FF]/.test(cleanNarrative)
+      const isCjkNarr = narrativeLang.startsWith('zh') || narrativeLang === 'ja' || narrativeLang === 'ko'
+      if (!isCjkNarr && /[\u4e00-\u9fff]/.test(cleanNarrative)) {
+        cleanNarrative = res.broadcast || cleanNarrative.replace(/[\u4e00-\u9fff]+/g, '').trim() || cleanNarrative
+      } else if (narrativeLang === 'ja' && !hasKana && /[\u4e00-\u9fff]/.test(cleanNarrative)) {
+        // ja narrative with Kanji but no Hiragana/Katakana at all — likely Chinese leak, not real Japanese
         cleanNarrative = res.broadcast || cleanNarrative.replace(/[\u4e00-\u9fff]+/g, '').trim() || cleanNarrative
       }
       setNarrative(cleanNarrative)

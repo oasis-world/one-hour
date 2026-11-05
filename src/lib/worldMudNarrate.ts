@@ -87,7 +87,7 @@ function localFallbackNarrate(req: NarrateRequest, world: WorldMudState): Narrat
       const goMap: Record<string, string> = {
         zh: `你沿着${dir === 'north' ? '北' : dir === 'south' ? '南' : dir === 'east' ? '东' : '西'}方前行，来到${targetRoomName}。${targetDesc} 空气中弥漫着新的气息。`,
         'zh-TW': `你沿著${dir === 'north' ? '北' : dir === 'south' ? '南' : dir === 'east' ? '東' : '西'}方前行，來到${targetRoomName}。${targetDesc}`,
-        ja: `${dir}へ進み、${targetRoomName}に到着した。${targetDesc} 空気が変わったのを感じる。`,
+        ja: `${dir}へ進み、${targetRoomName}に到着した。${targetDesc} 冷たい空気が肌を撫で、石壁の埃の匂いと遠くの足音が漂う。`,
         en: `You head ${dir} and arrive at ${targetRoomName}. ${targetDesc} The air feels different here.`,
         fr: `Vous allez vers ${dir} et arrivez à ${targetRoomName}. ${targetDesc}`,
         es: `Avanzas hacia ${dir} y llegas a ${targetRoomName}. ${targetDesc}`,
@@ -153,7 +153,7 @@ function localFallbackNarrate(req: NarrateRequest, world: WorldMudState): Narrat
   const SEARCH: Record<string, { narrative: string; broadcast: string }> = {
     zh: { narrative: `你在${rn('zh')}仔细搜索，指尖划过石缝旧木，发现发光碎片，沙光流转似指引。前方传来轻响，更多秘密在幽处等待。`, broadcast: '搜索' },
     'zh-TW': { narrative: `你在${rn('zh-TW')}仔細搜索，石縫間發現發光碎片，沙光流轉指引。前方輕響，秘密待掘。`, broadcast: '搜索' },
-    ja: { narrative: `${rn('ja')}を隅々まで探し、光る欠片を見つけた。砂時計の光が脉打ち、奥から微かな物音が手招きする。`, broadcast: '捜索' },
+    ja: { narrative: `${rn('ja')}を隅々まで探し、石の隙間から光る欠片を見つけた。砂時計の光が脉打ち、埃の匂いと奥からの微かな物音が次の手がかりを手招きする。`, broadcast: '捜索' },
     fr: { narrative: `Vous fouillez ${rn('fr')}. Éclat luisant, lueur du sablier ondule. Un bruit ténu promet d’autres secrets.`, broadcast: 'fouillé' },
     es: { narrative: `Registras ${rn('es')} con cuidado. Fragmento brillante, luz del reloj nada. Un leve rumor promete secretos.`, broadcast: 'buscó' },
     de: { narrative: `Du suchst in ${rn('de')} gründlich. Leuchtender Splitter, Sanduhrlicht fließt. Fernes Geräusch verheißt Geheimnisse.`, broadcast: 'gesucht' },
@@ -207,7 +207,7 @@ function localFallbackNarrate(req: NarrateRequest, world: WorldMudState): Narrat
       broadcast: req.actionText.slice(0, 40),
     }
   }
-  if (narrativeLang === 'ja') return { narrative: `あなたは「${req.actionText}」と口にした。${room ? `${rName2}の空気が微かに震え、あなたの行動が世界に波紋を広げる。` : ''} 新たな可能性が前方で手招きし、砂時計の光が次の一歩を照らす。`, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: req.actionText.slice(0, 40) }
+  if (narrativeLang === 'ja') return { narrative: `あなたは「${req.actionText}」と口にした。${room ? `${rName2}の冷たい空気が微かに震え、石壁の埃の匂いと共にあなたの行動が波紋を広げる。` : ''} 新たな可能性が前方で手招きし、砂時計の光が次の一歩を仄かに照らす。`, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: req.actionText.slice(0, 40) }
   if (narrativeLang === 'fr') return { narrative: `Vous dites « ${req.actionText} » — le monde semble écouter. ${room ? `À ${rName2}, votre geste fait frémir l’air, une ondulation parcourt ${dName2}.` : ''} De nouvelles possibilités s’ouvrent, la lueur du sablier montre la suite.`, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: req.actionText.slice(0, 40) }
   if (narrativeLang === 'ko') return { narrative: `당신은 “${req.actionText}”라고 말했다. ${room ? `${rName2}의 공기가 미세하게 떨리며 당신의 행동이 파문을 일으킨다.` : ''} 새로운 가능성이 앞에서 손짓하고 모래시계 빛이 다음 걸음을 비춘다.`, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: req.actionText.slice(0, 40) }
   if (narrativeLang === 'ar') return { narrative: `تقول “${req.actionText}” — يبدو أن العالم ينصت. ${room ? `في ${rName2}، يهتز الهواء مع فعلك.` : ''} إمكانيات جديدة تلوح، وضوء الساعة يرشدك.`, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: req.actionText.slice(0, 40) }
