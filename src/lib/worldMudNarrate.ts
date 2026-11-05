@@ -135,16 +135,16 @@ function localFallbackNarrate(req: NarrateRequest, world: WorldMudState): Narrat
   const rn = (l: Lang) => room ? roomNameOf(room.id, l) : (l.startsWith('zh') ? '这里' : l === 'ja' ? 'ここ' : l === 'ar' ? 'هنا' : 'here')
   const dn = (l: Lang) => district ? districtNameOf(district.id, l) : (l.startsWith('zh') ? '这片街区' : 'this district')
   const TALK: Record<string, { narrative: string; broadcast: string }> = {
-    zh: { narrative: `你在${rn('zh')}与人攀谈。炉火噼啪，酒杯轻碰，陌生人递来眼神——关于${dn('zh')}的传闻流传。微风拂过，你融入世界，新线索在前，沙漏光指引下一步。`, broadcast: '与人交谈' },
-    'zh-TW': { narrative: `你在${rn('zh-TW')}與人攀談。爐火劈啪，陌生人遞來眼神——關於${dn('zh-TW')}的傳聞。微風中，新线索浮現。`, broadcast: '與人交談' },
-    ja: { narrative: `あなたは${rn('ja')}で話しかけた。暖炉が弾け、見知らぬ者が${dn('ja')}の噂を囁く。世界に溶け込み、新たな手がかりが現れる。`, broadcast: '誰かと話した' },
-    fr: { narrative: `Vous parlez à ${rn('fr')}. Le feu crépite, un inconnu confie une rumeur sur ${dn('fr')}. L’air frémit, une piste se dessine, la lueur guide.`, broadcast: 'a parlé' },
-    es: { narrative: `Hablas en ${rn('es')}. El fuego crepita, un desconocido susurra sobre ${dn('es')}. Vibras, una pista asoma, el reloj guía.`, broadcast: 'habló' },
-    de: { narrative: `Du sprichst in ${rn('de')}. Feuer knistert, ein Fremder flüstert über ${dn('de')}. Luft bebt, Hinweis naht, Sanduhr leuchtet.`, broadcast: 'sprach' },
-    ko: { narrative: `${rn('ko')}에서 대화했다. 난로 불꽃 속 낯선 이가 ${dn('ko')} 소문을 속삭인다. 공기가 떨리고 새 단서가 떠오른다.`, broadcast: '대화' },
-    it: { narrative: `Parli a ${rn('it')}. Fuoco scoppietta, uno sconosciuto sussurra su ${dn('it')}. Aria vibra, indizio appare.`, broadcast: 'parlato' },
-    ar: { narrative: `تتحدث في ${rn('ar')}. النار تفرقع، غريب يهمس عن ${dn('ar')}. يهتز الهواء وخيط جديد يظهر.`, broadcast: 'تحدث' },
-    en: { narrative: `You talk at ${rn('en')}. Fire crackles, stranger whispers of ${dn('en')}. Air shivers, new lead glimmers, light guides.`, broadcast: 'talked' },
+    zh: { narrative: `你在${rn('zh')}与人攀谈。炉火噼啪，酒杯轻碰，陌生人递来眼神——关于${dn('zh')}的传闻在空气中流转，带着陈旧纸张与香料的气味。微风拂过，你感到自己正在融入这个世界，沙漏的光在远处轻轻指引着下一步。`, broadcast: '与人交谈' },
+    'zh-TW': { narrative: `你在${rn('zh-TW')}與人攀談。爐火劈啪，陌生人遞來眼神——關於${dn('zh-TW')}的傳聞流轉。微風中，你融入世界，新線索在前。`, broadcast: '與人交談' },
+    ja: { narrative: `あなたは${rn('ja')}で誰かに話しかけた。暖炉の火がパチパチと弾け、埃と古い紙の匂いと共に見知らぬ者が${dn('ja')}にまつわる噂を囁く。冷たい石壁が微かに共鳴し、あなたは次第に世界に溶け込み、新たな手がかりが仄かに浮かぶ。`, broadcast: '誰かと話した' },
+    fr: { narrative: `Vous parlez à ${rn('fr')}. Le feu crépite, un inconnu confie une rumeur sur ${dn('fr')}, mêlée d’odeur de vieux papier. L’air frémit, vous vous sentez chez vous, la lueur du sablier montre la suite.`, broadcast: 'a parlé' },
+    es: { narrative: `Hablas en ${rn('es')}. El fuego crepita, un desconocido susurra sobre ${dn('es')} con olor a papel viejo. Vibras, te sientes parte, el reloj guía tu próximo paso.`, broadcast: 'habló' },
+    de: { narrative: `Du sprichst in ${rn('de')}. Feuer knistert, ein Fremder flüstert über ${dn('de')} mit Geruch nach altem Papier. Luft bebt, du bist angekommen, Sanduhr leuchtet den Weg.`, broadcast: 'sprach' },
+    ko: { narrative: `${rn('ko')}에서 대화했다. 난로 불꽃과 먼지 냄새 속 낯선 이가 ${dn('ko')} 소문을 속삭인다. 공기가 떨리고, 당신은 세계에 스며들어 새 단서가 떠오른다.`, broadcast: '대화' },
+    it: { narrative: `Parli a ${rn('it')}. Fuoco scoppietta, uno sconosciuto sussurra su ${dn('it')} con odore di carta vecchia. Aria vibra, ti senti a casa, luce indica.`, broadcast: 'parlato' },
+    ar: { narrative: `تتحدث في ${rn('ar')}. النار تفرقع، غريب يهمس عن ${dn('ar')} برائحة ورق قديم. يهتز الهواء وتشعر بانتماء، ضوء الساعة يرشدك.`, broadcast: 'تحدث' },
+    en: { narrative: `You talk at ${rn('en')}. Fire crackles, a stranger whispers of ${dn('en')} with scent of old paper. Air shivers, you feel at home, light guides your next step.`, broadcast: 'talked' },
   }
   if (actLower === 'talk') {
     const t = TALK[narrativeLang] ?? TALK[uiLang(narrativeLang)] ?? TALK.en

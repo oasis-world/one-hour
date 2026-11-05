@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
     ? (uiLang.startsWith('en')
       ? 'CRITICAL LANGUAGE RULE: Respond ONLY in English. All narrative/choices/broadcast must be 100% English.'
       : `CRITICAL LANGUAGE RULE: Respond ONLY in ${uiLangName}. All narrative/choices/broadcast must be 100% that language.`)
-    : `CRITICAL LANGUAGE RULE: NARRATIVE must be ONLY in ${narrLangName} (code ${narrLang}). CHOICES+hint must be ONLY in ${uiLangName} (code ${uiLang}). Broadcast may be in ${narrLangName}. Never mix.`
+    : `CRITICAL LANGUAGE RULE: NARRATIVE must be ONLY in ${narrLangName} (code ${narrLang}). CHOICES+hint must be ONLY in ${uiLangName} (code ${uiLang}). Broadcast may be in ${narrLangName}. Never mix. For Japanese (ja), narrative MUST be natural, vivid Japanese (not just transliteration), at least 150 Japanese characters, 3 sentences, rich sensory detail — never a few words. For ALL languages, narrative length must be equal: never short in one language and long in another.`
   const sysPrompt = `You are the living narrator of a persistent shared MUD world "The Eternal Hourglass".
 World: one eternal city where every soul lives 1 hour. Districts: plaza/ruin/lab/forest/ocean/city/tavern/academy. No fixed plot — AI + players co-evolve it.
 Player: ${playerDesc}, at ${roomName ?? locationId} in district ${districtId ?? 'plaza'}.
@@ -143,15 +143,15 @@ function fallback(narrLang: string, actionText: string, locationId?: string, roo
   const isZhNarr = narrLang.startsWith('zh')
   const loc = roomName ?? locationId ?? (isZhNarr ? '未知之地' : 'unknown')
   let narrative: string
-  if (isZhNarr) narrative = `你说道“${actionText.slice(0, 40)}”，${loc}的空气微微颤动，似乎在回应你。前方有新的可能在等待。`
-  else if (narrLang === 'ja') narrative = `あなたは「${actionText.slice(0, 40)}」と告げる。${loc}の空気がわずかに揺らぎ、世界が応えているようだ。新たな可能性が目の前に広がる。`
-  else if (narrLang === 'ar') narrative = `تقول “${actionText.slice(0, 40)}” — يهتز الهواء في ${loc} كما لو أن العالم ينصت. إمكانيات جديدة بانتظارك.`
-  else if (narrLang === 'ko') narrative = `당신은 “${actionText.slice(0, 40)}”라고 말한다. ${loc}의 공기가 미세하게 떨린다. 새로운 가능성이 기다린다.`
-  else if (narrLang === 'fr') narrative = `Vous dites « ${actionText.slice(0, 40)} » — l’air à ${loc} frémit, comme si le monde écoutait.`
-  else if (narrLang === 'es') narrative = `Dices “${actionText.slice(0, 40)}” — el aire en ${loc} vibra como si el mundo escuchara.`
-  else if (narrLang === 'de') narrative = `Du sagst „${actionText.slice(0, 40)}“ — die Luft in ${loc} zittert, als würde die Welt lauschen.`
-  else if (narrLang === 'it') narrative = `Dici “${actionText.slice(0, 40)}” — l’aria a ${loc} vibra come se il mondo ascoltasse.`
-  else narrative = `You say "${actionText.slice(0, 40)}" — the air at ${loc} shivers faintly, as if the world is listening. New possibilities await.`
+  if (isZhNarr) narrative = `你说道“${actionText.slice(0, 40)}”，${loc}的空气微微颤动，墙面渗出细密水珠，远处传来低沉回响。前方有新的可能在等待，沙漏的光轻轻指引着下一步，仿佛在邀请你深入探索。`
+  else if (narrLang === 'ja') narrative = `あなたは「${actionText.slice(0, 40)}」と告げた。${loc}の冷たい空気が微かに震え、石壁からは埃の匂いと誰かの吐息が漂う。新たな可能性が目の前に広がり、砂時計の光が次の道を仄かに照らし出す。`
+  else if (narrLang === 'ar') narrative = `تقول “${actionText.slice(0, 40)}” — يهتز الهواء في ${loc}، وتفوح رائحة الغبار والحجر، وهمس بعيد يتردد. إمكانيات جديدة بانتظارك، وضوء الساعة يرشدك إلى الأمام.`
+  else if (narrLang === 'ko') narrative = `당신은 “${actionText.slice(0, 40)}”라고 말했다. ${loc}의 차가운 공기가 미세하게 떨리고, 벽에서는 먼지 냄새와 낮은 울림이 퍼진다. 새로운 가능성이 눈앞에 펼쳐지고, 모래시계 빛이 다음 길을 비춘다.`
+  else if (narrLang === 'fr') narrative = `Vous dites « ${actionText.slice(0, 40)} » — l’air à ${loc} frémit, une odeur de pierre humide flotte, un murmure lointain répond. De nouvelles possibilités s’ouvrent, la lueur du sablier montre la suite.`
+  else if (narrLang === 'es') narrative = `Dices “${actionText.slice(0, 40)}” — el aire en ${loc} vibra, huele a piedra húmeda y un murmullo lejano responde. Nuevas posibilidades se abren, la luz del reloj guía tu próximo paso.`
+  else if (narrLang === 'de') narrative = `Du sagst „${actionText.slice(0, 40)}“ — die Luft in ${loc} zittert, feuchter Stein riecht, ein fernes Murmeln antwortet. Neue Möglichkeiten öffnen sich, das Sanduhrlicht weist den nächsten Schritt.`
+  else if (narrLang === 'it') narrative = `Dici “${actionText.slice(0, 40)}” — l’aria a ${loc} vibra, odore di pietra umida, un mormorio lontano risponde. Nuove possibilità si aprono, la luce della clessidra indica il prossimo passo.`
+  else narrative = `You say "${actionText.slice(0, 40)}" — the air at ${loc} shivers, damp stone scent hangs, a distant murmur answers. New possibilities await ahead, the hourglass light guiding your next step.`
   const choicesMap: Record<string, Array<{ label: string; action: string; icon?: string }>> = {
     zh: [{ label: '观察四周', action: 'look', icon: '👁️' }, { label: '与人交谈', action: 'talk', icon: '💬' }, { label: '搜索', action: 'search', icon: '🔍' }],
     'zh-TW': [{ label: '觀察四周', action: 'look', icon: '👁️' }, { label: '與人交談', action: 'talk', icon: '💬' }, { label: '搜索', action: 'search', icon: '🔍' }],
