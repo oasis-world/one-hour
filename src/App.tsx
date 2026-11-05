@@ -48,6 +48,8 @@ import { requestCompanionGreeting, requestCompanionReply, toHistory } from './li
 import { containsCompanionMention } from './lib/mention'
 import { createCompanionGame, gameTitle } from './lib/companionGame'
 import { isMudInviteIntent } from './lib/mudRecreate'
+import { applyRoomReactionChange, recordEmojiUse, summarizeRoomReactions, type RoomReactionRecord } from './lib/chatReactions'
+import { clearLocalReactions, loadLocalReactions, pruneLocalReactions, removeLocalReaction, removeLocalReactionsForMessage, saveLocalReaction } from './lib/localReactions'
 
 /**
  * 一小时 / one-hour — the ephemeral chat room. Every message, text or
@@ -191,6 +193,8 @@ export default function App() {
       if (currentUserId) expireUserMessages(currentUserId)
       clearCompanionProfile()
       void clearCompanionMessages()
+      void clearLocalReactions()
+      setLocalReactionRows([])
       const summary: PendingSummary = {
         stats: loadStats(),
         profileExpiresAt: exp,
@@ -285,6 +289,8 @@ export default function App() {
   const privateMessagesRef = useRef<CompanionMessage[]>([])
   useEffect(() => { privateMessagesRef.current = privateMessages }, [privateMessages])
   const mudCardCreatingRef = useRef(false)
+  // Reactions for local messages (companion chats + MUD card) — persisted in IndexedDB
+  const [localReactionRows, setLocalReactionRows] = useState<RoomReactionRecord[]>([])
   useEffect(() => subscribeCompanion(setCompanion), [])
   useEffect(() => {
     const tick = () => { const alive = getCompanionIfAlive(); setCompanion((prev) => (prev?.id !== alive?.id || prev?.expiresAt !== alive?.expiresAt ? alive : prev)) }
@@ -314,6 +320,15 @@ export default function App() {
     }, 10_000)
     return () => window.clearInterval(id)
   }, [companion])
+  // Local reactions for companion / MUD card messages — load once and prune dangling rows
+  useEffect(() => {
+    void loadLocalReactions().then(setLocalReactionRows).catch(() => {})
+  }, [])
+  useEffect(() => {
+    if (privateMessages.length === 0) return
+    const validIds = new Set(privateMessages.map((m) => m.id))
+    void pruneLocalReactions(validIds).then(() => loadLocalReactions().then(setLocalReactionRows).catch(() => {})).catch(() => {})
+  }, [privateMessages])
   // World MUD private card — local only, but world progress is global via Supabase
   const triggerWorldMudCard = useCallback(async () => {
     if (!companion || !profile) return
@@ -414,7 +429,9 @@ export default function App() {
     expireAnonymousProfile(currentUserId)
     clearCompanionProfile()
     void clearCompanionMessages()
+    void clearLocalReactions()
     setPrivateMessages([])
+    setLocalReactionRows([])
     setCompanion(null)
     resetStats()
     clearPendingSummary()
@@ -619,6 +636,33 @@ export default function App() {
     all.sort((a, b) => a.at - b.at || a.id.localeCompare(b.id))
     return all
   }, [room.entries, privateChatEntries])
+  // Merge local reactions (IndexedDB) with cloud reactions for display
+  const mergedReactions = useMemo(() => {
+    const selfId = room.identity?.userId ?? null
+    const local = summarizeRoomReactions(localReactionRows, selfId)
+    // cloud + local (local keys are companion/MUD ids, no overlap risk)
+    return { ...room.reactions, ...local }
+  }, [room.reactions, localReactionRows, room.identity])
+  const handleLocalReact = useCallback((messageId: string, emoji: string) => {
+    const selfId = room.identity?.userId
+    if (!selfId) return
+    const active = !localReactionRows.some(
+      (r) => r.messageId === messageId && r.userId === selfId && r.emoji === emoji,
+    )
+    if (active) {
+      const target = privateChatEntries.find((e) => e.id === messageId)
+      if (target && target.userId !== selfId) recordInteraction(target.userId, target.displayName, selfId)
+    }
+    const change = { messageId, userId: selfId, emoji, active }
+    setLocalReactionRows((prev) => applyRoomReactionChange(prev, change))
+    recordEmojiUse(emoji)
+    if (active) void saveLocalReaction({ messageId, userId: selfId, emoji })
+    else void removeLocalReaction(messageId, selfId, emoji)
+  }, [room.identity, localReactionRows, privateChatEntries])
+  const handleReact = useCallback((messageId: string, emoji: string) => {
+    if (privateIds.has(messageId)) handleLocalReact(messageId, emoji)
+    else room.toggleReaction(messageId, emoji)
+  }, [privateIds, handleLocalReact, room])
   const displayPresence = useMemo(() => { // eslint-disable-line react-hooks/preserve-manual-memoization
     if (!companion) return room.presence
     const companionMember = {
@@ -793,18 +837,20 @@ export default function App() {
               layoutKey={fold === 'unfolding'}
               incomingMessageSequence={room.incomingMessageSequence}
               sentMessageSequence={sentMessageSequence}
-              reactions={room.reactions}
+              reactions={mergedReactions}
               onImageClick={openImage}
               onRetry={room.retry}
               onRemove={(id) => {
                 if (privateIds.has(id)) {
                   void removeCompanionMessage(id)
+                  void removeLocalReactionsForMessage(id)
                   setPrivateMessages((prev) => prev.filter((m) => m.id !== id))
+                  setLocalReactionRows((prev) => prev.filter((r) => r.messageId !== id))
                 } else room.remove(id)
               }}
               onToast={showToast}
               onLoadOlder={room.loadOlder}
-              onReact={room.toggleReaction}
+              onReact={handleReact}
               onReply={setReplyTo}
               companionTyping={companionTyping}
               companion={companion ? { name: companion.name, style: companion.style, seed: companion.seed, avatarUrl: companion.avatarUrl ?? null } : null}

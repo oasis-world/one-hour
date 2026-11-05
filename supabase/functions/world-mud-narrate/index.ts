@@ -23,7 +23,11 @@ Deno.serve(async (req) => {
   if (typeof actionText !== 'string' || !actionText.trim()) return json({ error: 'Missing actionText' }, 400)
 
   const apiKey = Deno.env.get('BASETEN_API_KEY')
-  if (!apiKey) return json(fallback(reqLang(lang), actionText, locationId, roomName))
+  if (!apiKey) {
+    console.warn('[world-mud-narrate] missing BASETEN_API_KEY — returning fallback (check Supabase Edge Secrets)')
+    const fb = fallback(reqLang(lang), actionText, locationId, roomName)
+    return json({ ...fb, _fallback: 'missing-baseten-key', _debug: 'BASETEN_API_KEY not set in Edge Secrets' })
+  }
 
   const playerDesc = `${player?.displayName ?? 'Traveler'} (${player?.role ?? 'adventurer'})`
   const logSnippet = Array.isArray(recentLog) ? recentLog.slice(-6).map((e: unknown) => {
@@ -68,7 +72,8 @@ Never break JSON. Never include Chinese when language is English.`
           { role: 'system', content: sysPrompt },
           { role: 'user', content: `Player action: "${actionText}"\nCurrent room: ${roomName ?? locationId}\nYou MUST respond in ${outLang} only — see CRITICAL LANGUAGE RULE above.` },
         ],
-        max_completion_tokens: 800,
+        // muse-spark is a reasoning model — 800 tokens yields empty (reasoning consumes budget); align with companion-chat
+        max_completion_tokens: 20000,
         temperature: 0.9,
         top_p: 0.95,
         response_format: { type: 'json_object' } as unknown as Record<string, unknown>,
@@ -77,21 +82,35 @@ Never break JSON. Never include Chinese when language is English.`
     })
     if (!upstream.ok) {
       const t = await upstream.text().catch(() => '')
-      console.warn('[world-mud-narrate] upstream', upstream.status, t.slice(0, 400))
-      return json(fallback(reqLang(lang), actionText, locationId, roomName))
+      console.warn('[world-mud-narrate] upstream', upstream.status, t.slice(0, 600))
+      const fb = fallback(reqLang(lang), actionText, locationId, roomName)
+      return json({ ...fb, _fallback: `upstream-${upstream.status}`, _debug: t.slice(0, 300) })
     }
     const result = await upstream.json() as Record<string, unknown>
+    const usage = result.usage as Record<string, unknown> | undefined
+    console.log('[world-mud-narrate] upstream ok', { model: BASETEN_MODEL, usage, finishReason: (result.choices as unknown as Array<{ finish_reason?: string }>)?.[0]?.finish_reason })
     const choice = (result.choices as unknown[] | undefined)?.[0] as Record<string, unknown> | undefined
     const msg = (choice?.message ?? {}) as Record<string, unknown>
+    // Baseten/muse may put reasoning in separate fields — try all known slots
     let text = ''
-    if (typeof msg.content === 'string') text = msg.content
+    if (typeof msg.content === 'string' && msg.content.trim()) text = msg.content
     else if (Array.isArray(msg.content)) text = (msg.content as unknown[]).map((p: unknown) => (p as { text?: string })?.text ?? '').join('')
+    // fallback slots for reasoning models
+    if (!text.trim() && typeof (msg as { reasoning_content?: unknown }).reasoning_content === 'string') text = (msg as { reasoning_content: string }).reasoning_content
+    if (!text.trim() && typeof (choice as { text?: unknown })?.text === 'string') text = (choice as { text: string }).text
+    if (!text.trim() && typeof (result as { output_text?: unknown }).output_text === 'string') text = (result as { output_text: string }).output_text
     text = text.trim()
-    if (!text) return json(fallback(reqLang(lang), actionText, locationId, roomName))
+    if (!text) {
+      const full = JSON.stringify(result)
+      console.warn('[world-mud-narrate] empty upstream content', full.slice(0, 1200), { usage })
+      const fb = fallback(reqLang(lang), actionText, locationId, roomName)
+      return json({ ...fb, _fallback: 'empty-upstream', _debug: `empty content, usage=${JSON.stringify(usage ?? {}).slice(0,200)}, finish=${(choice as { finish_reason?: string })?.finish_reason ?? 'unknown'}` })
+    }
     const parsed = (() => { try { return JSON.parse(text) as Record<string, unknown> } catch { return null } })()
     if (!parsed || typeof parsed.narrative !== 'string' || !Array.isArray(parsed.choices)) {
-      console.warn('[world-mud-narrate] bad JSON', text.slice(0, 300))
-      return json(fallback(reqLang(lang), actionText, locationId, roomName))
+      console.warn('[world-mud-narrate] bad JSON', text.slice(0, 600))
+      const fb = fallback(reqLang(lang), actionText, locationId, roomName)
+      return json({ ...fb, _fallback: 'bad-json', _debug: text.slice(0, 300) })
     }
     return json({
       narrative: (parsed.narrative as string).slice(0, 800),
@@ -103,8 +122,9 @@ Never break JSON. Never include Chinese when language is English.`
       hint: typeof parsed.hint === 'string' ? parsed.hint.slice(0, 80) : undefined,
     })
   } catch (e) {
-    console.warn('[world-mud-narrate] error', (e as Error).message)
-    return json(fallback(reqLang(lang), actionText, locationId, roomName))
+    console.warn('[world-mud-narrate] error', (e as Error).message, (e as Error).stack?.slice(0, 500))
+    const fb = fallback(reqLang(lang), actionText, locationId, roomName)
+    return json({ ...fb, _fallback: 'exception', _debug: (e as Error).message })
   }
 })
 

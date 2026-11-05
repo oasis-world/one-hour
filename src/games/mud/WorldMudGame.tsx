@@ -128,7 +128,6 @@ export default function WorldMudGame({ instanceId, onlineMembers, hostUserId }: 
     setActing(true)
     setInput('')
     const curLoc = locationId
-    // language captured at action time — edge must obey it
     const actionLang = lang
     try {
       const res = await requestWorldNarrate(
@@ -168,8 +167,7 @@ export default function WorldMudGame({ instanceId, onlineMembers, hostUserId }: 
       }
       setWorld(nextWorld)
       void saveWorldState(nextWorld)
-    } catch (e) {
-      console.warn('[world] action failed', e)
+    } catch {
       setToast(tw('helpText'))
       window.setTimeout(() => setToast(null), 2500)
     } finally { setActing(false) }

@@ -46,7 +46,6 @@ function fallbackChoices(lang: string, locationId: string, world: WorldMudState)
   const choices: Array<{ label: string; action: string; icon?: string }> = []
   if (isZh) {
     choices.push({ label: '观察四周', action: 'look', icon: '👁️' })
-    // add directional moves first
     for (const [dir, target] of exits.slice(0, 2)) {
       const targetRoom = findRoom(world, target)
       const dirZh = dir === 'north' ? '北' : dir === 'south' ? '南' : dir === 'east' ? '东' : '西'
@@ -74,7 +73,6 @@ function localFallbackNarrate(req: NarrateRequest, world: WorldMudState): Narrat
   const district = room ? findDistrict(world, room.districtId) : null
   const actLower = action.toLowerCase()
 
-  // movement
   if (actLower.startsWith('go ')) {
     const dir = actLower.slice(3).trim()
     const targetId = room?.exits[dir]
@@ -121,6 +119,49 @@ function localFallbackNarrate(req: NarrateRequest, world: WorldMudState): Narrat
     }
   }
 
+  if (actLower === 'talk') {
+    const rName = isZh ? (room?.name ?? '这里') : (room?.nameEn ?? 'here')
+    if (isZh) {
+      return {
+        narrative: `你在${rName}与人攀谈。炉火噼啪、酒杯轻碰，陌生人递来一个眼神——关于${district?.name ?? '这片街区'}的传闻正悄悄流传。你感到自己正在融入这个世界。`,
+        choices: fallbackChoices(req.lang, req.locationId, world),
+        broadcast: '与人交谈',
+      }
+    }
+    return {
+      narrative: `You strike up a conversation at ${rName}. A stranger leans in, sharing a rumor about ${district?.nameEn ?? 'this district'}. You feel a little more at home here.`,
+      choices: fallbackChoices(req.lang, req.locationId, world),
+      broadcast: 'chatted with someone',
+    }
+  }
+  if (actLower === 'search') {
+    const rName = isZh ? (room?.name ?? '这里') : (room?.nameEn ?? 'here')
+    if (isZh) {
+      return {
+        narrative: `你在${rName}仔细搜索，指尖划过石缝与旧木，竟然找到一枚发亮的碎片——沙漏的光在它表面流动，像是有人刻意留下的记号。`,
+        choices: fallbackChoices(req.lang, req.locationId, world),
+        broadcast: '搜索了一番',
+      }
+    }
+    return {
+      narrative: `You search ${rName} carefully and uncover a glinting shard — the hourglass light swims across it, as if someone left it for you.`,
+      choices: fallbackChoices(req.lang, req.locationId, world),
+      broadcast: 'searched the area',
+    }
+  }
+  if (actLower === 'inventory' || actLower === 'inv' || actLower === '背包') {
+    if (isZh) {
+      return { narrative: `你打开背包：里面只有一小时旅人标配——一枚沙漏、一张发黄的便条，写着“别忘了，你是来写故事的”。`, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: '查看了背包' }
+    }
+    return { narrative: `You check your pack: an hourglass and a yellowed note — “remember, you’re here to write a story.”`, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: 'checked inventory' }
+  }
+  if (actLower === 'help') {
+    if (isZh) {
+      return { narrative: `提示：你可以直接用自然语言描述想做的事（如“和酒馆老板聊聊”），或用传统指令 look / go north / talk / search。点地图可快速跳转相邻区域。`, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: '请求了帮助' }
+    }
+    return { narrative: `Tip: just describe what you want to do in natural language, or use classic commands: look / go north / talk / search. Tap the map to jump to nearby rooms.`, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: 'asked for help' }
+  }
+
   const dName2 = isZh ? (district?.name ?? '') : (district?.nameEn ?? '')
   const rName2 = isZh ? (room?.name ?? '') : (room?.nameEn ?? '')
   if (isZh) {
@@ -142,47 +183,52 @@ export async function requestWorldNarrate(req: NarrateRequest, world: WorldMudSt
   const room = findRoom(world, req.locationId)
   const district = room ? findDistrict(world, room.districtId) : null
 
-  if (isSupabaseConfigured()) {
-    try {
-      const client = await getSupabaseClient()
-      const { data, error } = await client.functions.invoke('world-mud-narrate', {
-        body: {
-          actionText: action,
-          locationId: req.locationId,
-          districtId: district?.id ?? 'plaza',
-          roomName: room?.nameEn ?? room?.name ?? req.locationId,
-          player: req.player,
-          lang: req.lang,
-          recentLog: req.recentLog.slice(-6),
-          globalEvent: req.globalEvent ?? null,
-        },
-      })
-      if (!error && data) {
-        const narrative = typeof data.narrative === 'string' ? data.narrative.trim() : ''
-        const rawChoices = Array.isArray(data.choices) ? data.choices : []
-        const broadcast = typeof data.broadcast === 'string' ? data.broadcast.trim() : action
-        if (narrative && rawChoices.length >= 2) {
-          const choices = rawChoices
-            .filter((c: unknown) => c && typeof (c as { label?: unknown }).label === 'string' && typeof (c as { action?: unknown }).action === 'string')
-            .slice(0, 4)
-            .map((c: { label: string; action: string; icon?: string }) => ({ label: c.label.slice(0, 28), action: c.action.slice(0, 32), icon: c.icon }))
-          if (choices.length >= 2) {
-            return {
-              narrative: narrative.slice(0, 800),
-              choices,
-              hint: typeof data.hint === 'string' ? data.hint.slice(0, 80) : undefined,
-              broadcast: broadcast.slice(0, 60),
-            }
+  if (!isSupabaseConfigured()) {
+    return localFallbackNarrate(req, world)
+  }
+
+  try {
+    const client = await getSupabaseClient()
+    const { data, error } = await client.functions.invoke('world-mud-narrate', {
+      body: {
+        actionText: action,
+        locationId: req.locationId,
+        districtId: district?.id ?? 'plaza',
+        roomName: room?.nameEn ?? room?.name ?? req.locationId,
+        player: req.player,
+        lang: req.lang,
+        recentLog: req.recentLog.slice(-6),
+        globalEvent: req.globalEvent ?? null,
+      },
+    })
+
+    if (!error && data) {
+      // Edge fallback carries _fallback marker — treat as failure and use local
+      if ((data as Record<string, unknown>)._fallback) {
+        return localFallbackNarrate(req, world)
+      }
+      const narrative = typeof data.narrative === 'string' ? data.narrative.trim() : ''
+      const rawChoices = Array.isArray(data.choices) ? data.choices : []
+      const broadcast = typeof data.broadcast === 'string' ? data.broadcast.trim() : action
+      if (narrative && rawChoices.length >= 2) {
+        const choices = rawChoices
+          .filter((c: unknown) => c && typeof (c as { label?: unknown }).label === 'string' && typeof (c as { action?: unknown }).action === 'string')
+          .slice(0, 4)
+          .map((c: { label: string; action: string; icon?: string }) => ({ label: c.label.slice(0, 28), action: c.action.slice(0, 32), icon: c.icon }))
+        if (choices.length >= 2) {
+          return {
+            narrative: narrative.slice(0, 800),
+            choices,
+            hint: typeof data.hint === 'string' ? data.hint.slice(0, 80) : undefined,
+            broadcast: broadcast.slice(0, 60),
           }
         }
       }
-      if (error && !/502|503|not configured|not found/i.test(error.message)) {
-        console.warn('[world] narrate cloud returned error', error.message)
-      }
-    } catch (e) {
-      console.warn('[world] narrate cloud failed', (e as Error).message)
     }
+  } catch {
+    // fall through to local
   }
+
   return localFallbackNarrate(req, world)
 }
 

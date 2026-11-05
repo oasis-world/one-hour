@@ -4,6 +4,8 @@
  *  - outbox:   pending sends incl. the image Blob, retried with backoff
  *  - kv:       small key/value mirror used as a fallback when localStorage
  *              is cleared (anonymous session recovery, profile, expiry).
+ *  - companion_messages: private companion chats (local, 1h TTL)
+ *  - local_reactions: emoji reactions for local messages (companion + MUD cards)
  * Everything is best-effort: an unavailable IndexedDB (private mode,
  * quota) degrades to memory-only — the chat keeps working.
  */
@@ -12,9 +14,10 @@ export const MESSAGES_STORE = 'messages'
 export const OUTBOX_STORE = 'outbox'
 export const KV_STORE = 'kv'
 export const COMPANION_STORE = 'companion_messages'
+export const LOCAL_REACTIONS_STORE = 'local_reactions'
 
 const DB_NAME = 'one-hour-chat'
-const DB_VERSION = 3
+const DB_VERSION = 4
 
 let dbPromise: Promise<IDBDatabase | null> | null = null
 
@@ -37,6 +40,9 @@ function openDb(): Promise<IDBDatabase | null> {
         }
         if (!db.objectStoreNames.contains(COMPANION_STORE)) {
           db.createObjectStore(COMPANION_STORE, { keyPath: 'id' })
+        }
+        if (!db.objectStoreNames.contains(LOCAL_REACTIONS_STORE)) {
+          db.createObjectStore(LOCAL_REACTIONS_STORE, { keyPath: 'id' })
         }
       }
       request.onsuccess = () => resolve(request.result)
