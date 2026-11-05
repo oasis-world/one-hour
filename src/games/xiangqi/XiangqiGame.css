@@ -44,16 +44,36 @@
 }
 .xiangqi-heading { display: flex; align-items: center; gap: 15px; flex: 1; min-width: 0; }
 .xiangqi-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   min-width: 0;
   margin-left: auto;
   margin-right: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.14);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   overflow: hidden;
-  text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 600;
   line-height: 1.2;
-  opacity: 0.7;
+  letter-spacing: 0.02em;
+  opacity: 1;
+  animation: game-status-breathe 2.6s ease-in-out infinite;
+}
+.app-shell.theme-warm .xiangqi-status {
+  background: rgba(180,140,60,0.14);
+  border-color: rgba(140,100,30,0.22);
+  color: #5a3d14;
+}
+@keyframes game-status-breathe {
+  0%, 100% { opacity: 0.86; transform: scale(1); box-shadow: 0 0 0 0 rgba(250,204,21,0), 0 1px 4px rgba(0,0,0,0.08); }
+  50% { opacity: 1; transform: scale(1.045); box-shadow: 0 0 0 2px rgba(250,204,21,0.14), 0 0 12px 2px rgba(250,204,21,0.20), 0 3px 8px rgba(0,0,0,0.12); }
 }
 .xiangqi-head{position:relative}.xiangqi-spectator-control { position: static; display: flex; flex: 0 0 auto; min-width: 0; margin-left: auto; }
 .xiangqi-spectator-trigger {
@@ -64,15 +84,25 @@
   justify-content: flex-end;
   gap: 6px;
   width: auto;
-  padding: 0;
-  border: 0;
-  background: transparent;
+  padding: 3px 9px;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   color: inherit;
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
+  animation: game-status-breathe 2.6s ease-in-out infinite;
+}
+.app-shell.theme-warm .xiangqi-status.xiangqi-spectator-trigger {
+  background: rgba(180,140,60,0.14);
+  border-color: rgba(140,100,30,0.22);
+  color: #5a3d14;
 }
 .xiangqi-status.xiangqi-spectator-trigger { display: inline-flex; }
 .xiangqi-spectator-trigger { position: relative; }
@@ -176,6 +206,7 @@
   font-weight: 700;
   color: #facc15;
 }
+.app-shell.theme-warm .xiangqi-result { color: #000; }
 .xiangqi-result:empty { display: none; }
 .xiangqi-result:not(:empty) { margin: 4px 0; }
 .xiangqi-board {
@@ -430,11 +461,7 @@
   line-height: 1.35;
   text-align: center;
   pointer-events: none;
-  animation: xiangqi-toast-enter 0.2s ease both;
-}
-@keyframes xiangqi-toast-enter {
-  from { opacity: 0; transform: translate(-50%, -46%); }
-  to { opacity: 1; transform: translate(-50%, -50%); }
+  animation: xiangqi-toast-pop 2s ease both;
 }
 .app-shell.theme-warm .xiangqi-capture-toast {
   --line: rgba(96,62,29,0.32);
@@ -449,16 +476,17 @@
   font-size: 15px;
   letter-spacing: 0.04em;
   box-shadow: 0 0 0 4px rgba(169,31,36,0.2), 0 8px 28px rgba(91,8,12,0.5);
-  animation: xiangqi-check-alert 0.65s ease-in-out infinite alternate;
+  animation: xiangqi-check-pop 2s ease both;
 }
 .xiangqi-capture-toast.is-winner {
   padding: 11px 24px;
   border: 2px solid #fff0b8;
+  border-radius: 999px;
   background: linear-gradient(135deg, #8b641e, #c49332 52%, #79531a);
   color: #fff9e6;
   font-size: 16px;
   box-shadow: 0 0 0 4px rgba(196,147,50,0.2), 0 8px 28px rgba(62,39,7,0.42);
-  animation: xiangqi-winner-glow 1.2s ease-in-out 3;
+  animation: xiangqi-winner-pop 2s ease both;
 }
 .xiangqi-capture-toast.is-winner::before { content: '★'; margin-right: 8px; color: #fff0b8; }
 .xiangqi-start-toast {
@@ -466,46 +494,107 @@
   top: 50%;
   left: 50%;
   z-index: 9;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   transform: translate(-50%, -50%);
   width: max-content;
   max-width: 84%;
-  padding: 10px 18px;
-  border: none;
-  border-radius: 12px;
-  background: var(--surface-raised);
-  color: var(--ink);
-  backdrop-filter: blur(12px) saturate(1.2);
-  -webkit-backdrop-filter: blur(12px) saturate(1.2);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-  font-size: 15px;
-  font-weight: 400;
+  padding: 11px 20px 11px 16px;
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 14px;
+  background:
+    radial-gradient(120% 140% at 15% 20%, rgba(255,235,160,0.28), transparent 45%),
+    linear-gradient(135deg, rgba(34,38,50,0.96), rgba(22,26,36,0.97));
+  color: #fff;
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.38), 0 0 0 1px rgba(255,255,255,0.06), inset 0 1px 0 rgba(255,255,255,0.14);
+  font-size: 14px;
+  font-weight: 700;
   line-height: 1.35;
+  letter-spacing: 0.02em;
   text-align: center;
   pointer-events: none;
-  animation: xiangqi-start-fade 2.5s ease both;
+  animation: game-start-pop 2s ease both;
 }
-@keyframes xiangqi-start-fade {
-  0% { opacity: 0; transform: translate(-50%, -46%); }
-  8% { opacity: 1; transform: translate(-50%, -50%); }
-  92% { opacity: 1; transform: translate(-50%, -50%); }
-  100% { opacity: 0; transform: translate(-50%, -50%); }
+.xiangqi-start-toast::before {
+  content: '✦';
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #facc15, #f59e0b);
+  color: #422006;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(250,204,21,0.45);
+}
+.app-shell.theme-warm .xiangqi-start-toast {
+  background:
+    radial-gradient(120% 140% at 15% 20%, rgba(255,248,220,0.9), transparent 45%),
+    linear-gradient(135deg, rgba(255,252,240,0.98), rgba(255,244,215,0.97));
+  color: #4a2f0a;
+  border-color: rgba(140,100,30,0.18);
+  box-shadow: 0 8px 28px rgba(90,60,15,0.18), 0 0 0 1px rgba(140,100,30,0.1);
+}
+@keyframes game-start-pop {
+  0% { opacity: 0; transform: translate(-50%, -46%) scale(0.92); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  82% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+}
+@keyframes xiangqi-toast-pop {
+  0% { opacity: 0; transform: translate(-50%, -46%) scale(0.92); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  82% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+}
+@keyframes xiangqi-winner-pop {
+  0% { opacity: 0; transform: translate(-50%, -46%) scale(0.92); box-shadow: 0 0 0 3px rgba(196,147,50,0.1), 0 8px 24px rgba(62,39,7,0.25); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 0 4px rgba(196,147,50,0.2), 0 8px 28px rgba(62,39,7,0.42); }
+  50% { box-shadow: 0 0 0 8px rgba(255,213,100,0.26), 0 8px 30px rgba(62,39,7,0.52); }
+  82% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+}
+@keyframes xiangqi-check-pop {
+  0% { opacity: 0; transform: translate(-50%, -46%) scale(0.92); box-shadow: 0 0 0 3px rgba(169,31,36,0.1), 0 8px 24px rgba(91,8,12,0.3); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 0 4px rgba(169,31,36,0.2), 0 8px 28px rgba(91,8,12,0.5); }
+  50% { box-shadow: 0 0 0 8px rgba(255,74,63,0.3), 0 8px 30px rgba(91,8,12,0.62); }
+  82% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
 }
 .xiangqi-board--flipped .xiangqi-start-toast {
-  animation-name: xiangqi-start-fade-flipped;
+  animation-name: game-start-pop-flipped;
 }
-@keyframes xiangqi-start-fade-flipped {
-  0% { opacity: 0; transform: translate(-50%, -46%) scaleY(-1); }
-  8% { opacity: 1; transform: translate(-50%, -50%) scaleY(-1); }
-  92% { opacity: 1; transform: translate(-50%, -50%) scaleY(-1); }
-  100% { opacity: 0; transform: translate(-50%, -50%) scaleY(-1); }
+@keyframes game-start-pop-flipped {
+  0% { opacity: 0; transform: translate(-50%, -46%) scaleY(-1) scale(0.92); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scaleY(-1) scale(1); }
+  82% { opacity: 1; transform: translate(-50%, -50%) scaleY(-1) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scaleY(-1) scale(0.96); }
 }
-@keyframes xiangqi-winner-glow {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(196,147,50,0.16), 0 8px 24px rgba(62,39,7,0.35); }
-  50% { box-shadow: 0 0 0 8px rgba(255,213,100,0.28), 0 8px 30px rgba(62,39,7,0.52); }
+.xiangqi-board--flipped .xiangqi-capture-toast { animation-name: xiangqi-toast-pop-flipped; }
+.xiangqi-board--flipped .xiangqi-capture-toast.is-check { animation-name: xiangqi-check-pop-flipped; }
+.xiangqi-board--flipped .xiangqi-capture-toast.is-winner { animation-name: xiangqi-winner-pop-flipped; }
+@keyframes xiangqi-toast-pop-flipped {
+  0% { opacity: 0; transform: translate(-50%, -46%) scaleY(-1) scale(0.92); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scaleY(-1) scale(1); }
+  82% { opacity: 1; transform: translate(-50%, -50%) scaleY(-1) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scaleY(-1) scale(0.96); }
 }
-@keyframes xiangqi-check-alert {
-  from { box-shadow: 0 0 0 3px rgba(169,31,36,0.16), 0 8px 24px rgba(91,8,12,0.4); }
-  to { box-shadow: 0 0 0 8px rgba(255,74,63,0.3), 0 8px 30px rgba(91,8,12,0.62); }
+@keyframes xiangqi-check-pop-flipped {
+  0% { opacity: 0; transform: translate(-50%, -46%) scaleY(-1) scale(0.92); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scaleY(-1) scale(1); }
+  82% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scaleY(-1) scale(0.96); }
+}
+@keyframes xiangqi-winner-pop-flipped {
+  0% { opacity: 0; transform: translate(-50%, -46%) scaleY(-1) scale(0.92); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scaleY(-1) scale(1); }
+  82% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scaleY(-1) scale(0.96); }
 }
 .xiangqi-piece {
   position: relative;
@@ -672,3 +761,8 @@
   .xiangqi-player { gap: 4px; padding: 4px 5px; font-size: 11px; }
 }
 @keyframes spectator-pop-rise{from{opacity:0;transform:translateX(-50%) translateY(8px) scale(.92)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
+@media (prefers-reduced-motion: reduce) {
+  .xiangqi-status, .xiangqi-spectator-trigger { animation: none; }
+  .xiangqi-capture-toast, .xiangqi-start-toast { animation: none; opacity: 1; transform: translate(-50%, -50%); }
+  .xiangqi-board--flipped .xiangqi-capture-toast, .xiangqi-board--flipped .xiangqi-start-toast { animation: none; transform: translate(-50%, -50%) scaleY(-1); }
+}

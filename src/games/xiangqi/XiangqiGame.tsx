@@ -210,7 +210,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       setCaptureToastIsCheck(false)
       setCaptureToastIsWinner(true)
       if (captureToastTimerRef.current !== null) window.clearTimeout(captureToastTimerRef.current)
-      captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 4000)
+      captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 2000)
       return
     }
     const move = after.lastMove
@@ -222,11 +222,18 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     if (!movedPiece || after.board[fromR]?.[fromC] !== 0 || after.board[toR]?.[toC] !== movedPiece) return
     const checkedSide = before.turn === 1 ? 'black' : 'red'
     if (inCheck(after.board, checkedSide)) {
+      // 仅被将军的一方才提示：我将军对方时不打扰，对方将军我时才提醒
+      if (myColor) {
+        const mySide = sideOfColor(myColor)
+        if (checkedSide !== mySide) return
+      } else {
+        return
+      }
       setCaptureToast(t('将军！危险！', 'CHECK! King in danger!'))
       setCaptureToastIsCheck(true)
       setCaptureToastIsWinner(false)
       if (captureToastTimerRef.current !== null) window.clearTimeout(captureToastTimerRef.current)
-      captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 4000)
+      captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 2000)
       return
     }
     if (!captured) return
@@ -237,13 +244,13 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     setCaptureToastIsCheck(false)
     setCaptureToastIsWinner(false)
     if (captureToastTimerRef.current !== null) window.clearTimeout(captureToastTimerRef.current)
-    captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 3400)
-  }, [])
+    captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 2000)
+  }, [myColor])
 
   const showStartToast = useCallback(() => {
     setStartToast(t('游戏开始', 'Game start'))
     if (startToastTimerRef.current !== null) window.clearTimeout(startToastTimerRef.current)
-    startToastTimerRef.current = window.setTimeout(() => setStartToast(''), 2500)
+    startToastTimerRef.current = window.setTimeout(() => setStartToast(''), 2000)
   }, [])
 
   const showHintToast = useCallback((msg: string) => {
