@@ -12,7 +12,7 @@ import OnlineList from '../../components/OnlineList'
 import type { PresenceMember } from '../../lib/chatTypes'
 import { setPopoverOpen } from '../../lib/popoverGuard'
 import { withTimeout } from '../../lib/withTimeout'
-import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGamePresenceUsers, isGameHostAuthority, removeStaleGameChannel, sendGameBroadcast, watchGameChannelClose } from '../realtime'
+import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGamePresenceUsers, installGameWakeRecovery, isGameHostAuthority, pokeGameSocket, removeStaleGameChannel, sendGameBroadcast, watchGameChannelClose } from '../realtime'
 import { chooseAiMove } from './ai'
 import { requestCloudMove } from '../cloudAi'
 import { buildXiangqiHints } from './cloudHints'
@@ -124,6 +124,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   const channelKey = `${instanceId}:${selfId ?? ''}:${displayName}:${avatarUrl ?? ''}:${avatarStyle ?? ''}:${avatarSeed ?? ''}`
   const channelReady = readyKey === channelKey
   const channelRef = useRef<ReturnType<Awaited<ReturnType<typeof getSupabaseClient>>['channel']> | null>(null)
+  const supabaseClientRef = useRef<Awaited<ReturnType<typeof getSupabaseClient>> | null>(null)
   const boardElementRef = useRef<HTMLDivElement>(null)
   const renderedBoardRef = useRef(state.board)
   const moveAnimationCleanupRef = useRef<(() => void) | null>(null)
@@ -451,6 +452,8 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     const channelSlotController = new AbortController()
     let releaseChannelSlot: (() => void) | null = null
     let channel: ReturnType<Awaited<ReturnType<typeof getSupabaseClient>>['channel']> | null = null
+    let supabaseClient: Awaited<ReturnType<typeof getSupabaseClient>> | null = null
+    let wakeCleanup: (() => void) | null = null
     const releaseSlot = () => {
       const release = releaseChannelSlot
       releaseChannelSlot = null
@@ -492,6 +495,8 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
         return null
       })
       if (!client || cancelled) return
+      supabaseClient = client
+      supabaseClientRef.current = client
       releaseChannelSlot = await acquireGameChannelSlot(channelSlotController.signal)
       if (!releaseChannelSlot || cancelled) {
         releaseSlot()
@@ -506,6 +511,13 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       channel = client.channel(topic, { config: { presence: { key: presenceKey } } })
       channelRef.current = channel
       watchGameChannelClose(channel, 'Xiangqi', instanceId, () => !cancelled)
+      pokeGameSocket(client, channel)
+      wakeCleanup = installGameWakeRecovery({
+        getChannel: () => channelRef.current,
+        getClient: () => supabaseClient,
+        shouldCheck: () => !cancelled,
+        onStale: (reason) => retryChannel(reason),
+      })
 
       const initializeIfNeeded = () => {
         if (!cloudStateChecked || stateLoadedRef.current || cancelled) return
@@ -792,6 +804,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
 
     return () => {
       cancelled = true
+      wakeCleanup?.()
       cloudRequestController.abort()
       channelSlotController.abort()
       if (stateSyncTimer !== null) window.clearInterval(stateSyncTimer)
@@ -850,6 +863,8 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   const sendJoin = () => {
     if (!selfId || joinStatus === 'joining') return
     if (!isRealtimeReady()) {
+      const ch = channelRef.current
+      if (ch && supabaseClientRef.current) pokeGameSocket(supabaseClientRef.current, ch)
       setJoinStatus('retry')
       return
     }

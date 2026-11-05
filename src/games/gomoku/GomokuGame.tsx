@@ -12,7 +12,7 @@ import OnlineList from '../../components/OnlineList'
 import type { PresenceMember } from '../../lib/chatTypes'
 import { setPopoverOpen } from '../../lib/popoverGuard'
 import { withTimeout } from '../../lib/withTimeout'
-import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGamePresenceUsers, isGameHostAuthority, removeStaleGameChannel, sendGameBroadcast, watchGameChannelClose } from '../realtime'
+import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, getGamePresenceUsers, installGameWakeRecovery, isGameHostAuthority, pokeGameSocket, removeStaleGameChannel, sendGameBroadcast, watchGameChannelClose } from '../realtime'
 import { chooseAiMove } from './ai'
 import { requestCloudMove } from '../cloudAi'
 import { buildGomokuHints } from './cloudHints'
@@ -109,6 +109,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   const channelKey = `${instanceId}:${selfId ?? ''}:${displayName}:${avatarUrl ?? ''}:${avatarStyle ?? ''}:${avatarSeed ?? ''}`
   const channelReady = readyChannelKey === channelKey
   const channelRef = useRef<ReturnType<Awaited<ReturnType<typeof getSupabaseClient>>['channel']> | null>(null)
+  const supabaseClientRef = useRef<Awaited<ReturnType<typeof getSupabaseClient>> | null>(null)
   const stateRef = useRef(state)
   const stateLoadedRef = useRef(false)
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve())
@@ -290,6 +291,8 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
     const channelSlotController = new AbortController()
     let releaseChannelSlot: (() => void) | null = null
     let channel: ReturnType<Awaited<ReturnType<typeof getSupabaseClient>>['channel']> | null = null
+    let supabaseClient: Awaited<ReturnType<typeof getSupabaseClient>> | null = null
+    let wakeCleanup: (() => void) | null = null
     const releaseSlot = () => {
       const release = releaseChannelSlot
       releaseChannelSlot = null
@@ -331,6 +334,8 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
         return null
       })
       if (!client || cancelled) return
+      supabaseClient = client
+      supabaseClientRef.current = client
       releaseChannelSlot = await acquireGameChannelSlot(channelSlotController.signal)
       if (!releaseChannelSlot || cancelled) {
         releaseSlot()
@@ -347,6 +352,15 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
       })
       channelRef.current = channel
       watchGameChannelClose(channel, 'Gomoku', instanceId, () => !cancelled)
+      // Opportunistically heal a stale socket left by iOS background suspend.
+      pokeGameSocket(client, channel)
+      // Wake-up healing: iOS background kills the WebSocket without a CLOSED event.
+      wakeCleanup = installGameWakeRecovery({
+        getChannel: () => channelRef.current,
+        getClient: () => supabaseClient,
+        shouldCheck: () => !cancelled,
+        onStale: (reason) => retryChannel(reason),
+      })
 
       const initializeIfNeeded = () => {
         if (!cloudStateChecked || stateLoadedRef.current || cancelled) return
@@ -639,6 +653,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
 
     return () => {
       cancelled = true
+      wakeCleanup?.()
       cloudRequestController.abort()
       channelSlotController.abort()
       if (stateSyncTimer !== null) window.clearInterval(stateSyncTimer)
@@ -700,6 +715,9 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   const sendJoin = () => {
     if (!selfId || joinStatus === 'joining') return
     if (!isRealtimeReady()) {
+      // Try to heal the socket immediately — the user explicitly tapped join.
+      const ch = channelRef.current
+      if (ch && supabaseClientRef.current) pokeGameSocket(supabaseClientRef.current, ch)
       setJoinStatus('retry')
       return
     }

@@ -11,7 +11,7 @@ import { ChessCrownIcon } from '../../components/icons'
 import OnlineList from '../../components/OnlineList'
 import { setPopoverOpen } from '../../lib/popoverGuard'
 import { recordGameResult, recordInteraction } from '../../lib/lifetimeStats'
-import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, isGameHostAuthority, removeStaleGameChannel, watchGameChannelClose } from '../realtime'
+import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, installGameWakeRecovery, isGameHostAuthority, pokeGameSocket, removeStaleGameChannel, watchGameChannelClose } from '../realtime'
 import { createInitialState, isChessState, joinChess, addChessAi, inCheck, legalMoves, removeChessPlayer, restartChessRound, tryMove, type ChessState, type Color, type Piece, type Square } from './logic' // Square imported via logic
 import { chooseChessAiMove } from './ai'
 import { requestCloudMove } from '../cloudAi'
@@ -82,6 +82,7 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
     return ()=>window.removeEventListener('resize',update)
   },[spectatorsOpen])
   const stateRef=useRef(state),channelRef=useRef<GameChannel|null>(null)
+  const supabaseClientRef=useRef<Awaited<ReturnType<typeof getSupabaseClient>>|null>(null)
   const renderedBoardRef=useRef(state.board)
   const boardRef=useRef<HTMLDivElement>(null)
   const moveCleanupRef=useRef<(()=>void)|null>(null)
@@ -208,6 +209,8 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
     if (!selfId || !isSupabaseConfigured()) return
     let cancelled = false
     let ch: GameChannel | null = null
+    let supabaseClient: Awaited<ReturnType<typeof getSupabaseClient>> | null = null
+    let wakeCleanup: (() => void) | null = null
     const abort = new AbortController()
     const slotCtrl = new AbortController()
     let releaseSlot: (() => void) | null = null
@@ -228,6 +231,7 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
     void (async () => {
       const client = await getSupabaseClient().catch((e: unknown) => { retry('client init failed', e); return null })
       if (!client || cancelled) return
+      supabaseClient = client; supabaseClientRef.current = client
       const slot = await acquireGameChannelSlot(slotCtrl.signal); if (cancelled || !slot) return
       releaseSlot = slot
       const topic = `game:chess:${instanceId}`
@@ -235,6 +239,8 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
       const active = client.channel(topic, { config: { presence: { key: getGamePresenceKey(selfId) } } })
       ch = active; channelRef.current = active
       watchGameChannelClose(active, 'Chess', instanceId, () => !cancelled)
+      pokeGameSocket(client, active)
+      wakeCleanup = installGameWakeRecovery({ getChannel: () => channelRef.current, getClient: () => supabaseClient, shouldCheck: () => !cancelled, onStale: (reason) => retry(reason) })
       active.on('broadcast', { event: 'state' }, ({ payload }: { payload: unknown }) => { if (isChessState(payload, instanceId)) { if (!stateHydratedRef.current) { renderedBoardRef.current = payload.board; stateHydratedRef.current = true } stateRef.current = payload; setState(payload); setReady(true); if (payload.players.some((player) => player.userId === selfId)) setJoinStatus('idle') } })
       active.on('broadcast', { event: 'join' }, ({ payload }: { payload: unknown }) => {
         if (stateRef.current.hostId !== selfId || !payload || typeof payload !== 'object') return
@@ -281,6 +287,7 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
     })()
     return () => {
       cancelled = true; abort.abort(); slotCtrl.abort()
+      wakeCleanup?.()
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer)
       if (stableTimer !== null) window.clearTimeout(stableTimer)
       releaseSlot?.(); channelRef.current = null
@@ -328,7 +335,13 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
   const targets=new Set(selected?legalMoves(state).filter(m=>m.from[0]===selected[0]&&m.from[1]===selected[1]).map(m=>`${m.to[0]}-${m.to[1]}`):[])
 
   const join=()=>{
-    if(!selfId||joinStatus==='joining'||!ready)return
+    if(!selfId||joinStatus==='joining')return
+    if(!ready || !canSendGameBroadcast(channelRef.current)){
+      const ch=channelRef.current
+      if(ch && supabaseClientRef.current) pokeGameSocket(supabaseClientRef.current,ch)
+      setJoinStatus('retry')
+      return
+    }
     setJoinStatus('joining')
     const player={userId:selfId,displayName,avatarUrl,avatarStyle,avatarSeed,color:'w' as Color,score:0}
     if(selfId===stateRef.current.hostId){applyState(joinChess(stateRef.current,player));setJoinStatus('idle');return}
@@ -337,7 +350,7 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
     window.setTimeout(()=>{if(!stateRef.current.players.some(p=>p.userId===selfId))setJoinStatus('retry')},10000)
   }
   const joinAi=()=>{
-    if(!selfId||!ready)return
+    if(!selfId||!ready || !canSendGameBroadcast(channelRef.current))return
     if(selfId===stateRef.current.hostId){
       const raw=addChessAi(stateRef.current)
       if(raw){
