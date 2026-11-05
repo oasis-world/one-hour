@@ -7,12 +7,15 @@ import { isSupabaseConfigured } from './supabaseConfig'
 import type { WorldMudState, WorldMudScene, WorldLogEntry } from '../games/mud/worldTypes'
 import { findRoom, findDistrict } from '../games/mud/worldTypes'
 import { getLang } from './i18n'
+import { roomNameOf, districtNameOf, getDistrictDesc } from './worldI18n'
+import type { Lang } from './i18n'
 
 export interface NarrateRequest {
   actionText: string
   locationId: string
   player: { displayName: string; role: string }
-  lang: string
+  lang: string // UI language — controls button labels (choices)
+  narrativeLang?: string // input language — controls narrative; defaults to lang
   recentLog: WorldLogEntry[]
   globalEvent?: string | null
 }
@@ -67,7 +70,8 @@ function fallbackChoices(lang: string, locationId: string, world: WorldMudState)
 }
 
 function localFallbackNarrate(req: NarrateRequest, world: WorldMudState): NarrateResponse {
-  const isZh = req.lang.startsWith('zh')
+  const narrativeLang = req.narrativeLang ?? req.lang
+  const isZh = narrativeLang.startsWith('zh')
   const action = normalizeCommand(req.actionText)
   const room = findRoom(world, req.locationId)
   const district = room ? findDistrict(world, room.districtId) : null
@@ -78,23 +82,30 @@ function localFallbackNarrate(req: NarrateRequest, world: WorldMudState): Narrat
     const targetId = room?.exits[dir]
     if (targetId) {
       const target = findRoom(world, targetId)
-      if (isZh) {
-        return {
-          narrative: `你沿着${dir === 'north' ? '北' : dir === 'south' ? '南' : dir === 'east' ? '东' : '西'}方前行，来到${target?.name ?? '未知之地'}。${target ? findDistrict(world, target.districtId)?.description ?? '' : ''} 空气中弥漫着新的气息。`,
-          choices: fallbackChoices(req.lang, targetId, world),
-          hint: isZh ? `已移动到 ${target?.name}` : `Moved to ${target?.nameEn}`,
-          broadcast: isZh ? `前往了 ${target?.name}` : `traveled to ${target?.nameEn}`,
-        }
+      const targetRoomName = target ? roomNameOf(target.id, narrativeLang as Lang) : (isZh ? '未知之地' : 'unknown')
+      const targetDesc = target ? getDistrictDesc(findDistrict(world, target.districtId)!, narrativeLang as Lang) : ''
+      const goMap: Record<string, string> = {
+        zh: `你沿着${dir === 'north' ? '北' : dir === 'south' ? '南' : dir === 'east' ? '东' : '西'}方前行，来到${targetRoomName}。${targetDesc} 空气中弥漫着新的气息。`,
+        'zh-TW': `你沿著${dir === 'north' ? '北' : dir === 'south' ? '南' : dir === 'east' ? '東' : '西'}方前行，來到${targetRoomName}。${targetDesc}`,
+        ja: `${dir}へ進み、${targetRoomName}に到着した。${targetDesc} 空気が変わったのを感じる。`,
+        en: `You head ${dir} and arrive at ${targetRoomName}. ${targetDesc} The air feels different here.`,
+        fr: `Vous allez vers ${dir} et arrivez à ${targetRoomName}. ${targetDesc}`,
+        es: `Avanzas hacia ${dir} y llegas a ${targetRoomName}. ${targetDesc}`,
+        de: `Du gehst nach ${dir} und erreichst ${targetRoomName}. ${targetDesc}`,
+        ko: `${dir}쪽으로 이동해 ${targetRoomName}에 도착했다. ${targetDesc}`,
+        it: `Vai verso ${dir} e arrivi a ${targetRoomName}. ${targetDesc}`,
+        ar: `تتجه ${dir} وتصل إلى ${targetRoomName}. ${targetDesc}`,
       }
       return {
-        narrative: `You head ${dir} and arrive at ${target?.nameEn ?? 'unknown'}. ${findDistrict(world, target?.districtId ?? 'plaza')?.description ?? ''} The air feels different here.`,
+        narrative: goMap[narrativeLang] ?? goMap[isZh ? 'zh' : 'en'],
         choices: fallbackChoices(req.lang, targetId, world),
-        hint: `Moved to ${target?.nameEn}`,
-        broadcast: `traveled to ${target?.nameEn}`,
+        hint: `Moved to ${targetRoomName}`,
+        broadcast: `traveled to ${targetRoomName}`,
       }
     }
+    const blocked: Record<string, string> = { zh: '此路不通。试试其他方向，或使用“观察”了解出口。', 'zh-TW': '此路不通。試試其他方向。', ja: 'その方向には進めない。別の方向を試して。', fr: 'Vous ne pouvez pas aller par là.', es: 'No puedes ir por ahí.', de: 'Du kannst nicht dorthin gehen.', ko: '그쪽으로는 갈 수 없다.', it: 'Non puoi andare da quella parte.', ar: 'لا يمكنك الذهاب من هناك.', en: `You can't go that way. Try another direction or "look" to see exits.` }
     return {
-      narrative: isZh ? `此路不通。试试其他方向，或使用“观察”了解出口。` : `You can't go that way. Try another direction or "look" to see exits.`,
+      narrative: blocked[narrativeLang] ?? blocked.en,
       choices: fallbackChoices(req.lang, req.locationId, world),
       broadcast: isZh ? '尝试移动但碰壁了' : 'tried to move but hit a wall',
     }
@@ -102,77 +113,106 @@ function localFallbackNarrate(req: NarrateRequest, world: WorldMudState): Narrat
 
   if (actLower === 'look' || actLower === 'l') {
     const exits = room ? Object.entries(room.exits).map(([d]) => d).join(', ') : '—'
-    const dDesc = isZh ? (district?.description ?? '') : (district?.descriptionEn ?? '')
-    const dName = isZh ? (district?.name ?? '') : (district?.nameEn ?? '')
-    const rName = isZh ? (room?.name ?? '未知之地') : (room?.nameEn ?? 'Unknown')
-    if (isZh) {
-      return {
-        narrative: `你在${dName}·${rName}。${dDesc} 你注意到：${room?.danger ? '空气中有一丝紧张感。' : '这里相对平静。'} 出口：${exits || '无'}。`,
-        choices: fallbackChoices(req.lang, req.locationId, world),
-        broadcast: '环顾四周',
-      }
+    const dDesc = district ? getDistrictDesc(district, narrativeLang as Lang) : ''
+    const dName = district ? districtNameOf(district.id, narrativeLang as Lang) : ''
+    const rName = room ? roomNameOf(room.id, narrativeLang as Lang) : (isZh ? '未知之地' : 'Unknown')
+    const tenseMap: Record<string, string> = {
+      zh: '空气中有一丝紧张感。', 'zh-TW': '空氣中有一絲緊張感。', ja: '空気に緊張感が漂う。', fr: 'Une tension flotte dans l’air.',
+      es: 'Hay tensión en el aire.', de: 'Spannung liegt in der Luft.', ko: '공기에 긴장감이 감돈다.', it: 'Tensione nell’aria.', ar: 'توتر في الهواء.', en: 'There is a faint tension in the air.',
     }
+    const calmMap: Record<string, string> = {
+      zh: '这里相对平静。', 'zh-TW': '這裡相對平靜。', ja: 'ここは比較的穏やかだ。', fr: 'Ici, c’est relativement calme.', es: 'Aquí está relativamente tranquilo.',
+      de: 'Hier ist es relativ ruhig.', ko: '여기는 비교적 평온하다.', it: 'Qui è relativamente calmo.', ar: 'المكان هادئ نسبياً.', en: 'It feels relatively calm.',
+    }
+    const danger = room?.danger ? (tenseMap[narrativeLang] ?? tenseMap.en) : (calmMap[narrativeLang] ?? calmMap.en)
     return {
-      narrative: `You are at ${dName} — ${rName}. ${dDesc} ${room?.danger ? 'There is a faint tension in the air.' : 'It feels relatively calm.'} Exits: ${exits || 'none'}.`,
+      narrative: `${dName}·${rName}。${dDesc} ${danger} 出口：${exits || '—'}。`,
       choices: fallbackChoices(req.lang, req.locationId, world),
-      broadcast: 'looked around',
+      broadcast: narrativeLang.startsWith('zh') ? '环顾四周' : narrativeLang === 'ja' ? '周囲を見た' : 'looked around',
     }
   }
 
+  const rn = (l: Lang) => room ? roomNameOf(room.id, l) : (l.startsWith('zh') ? '这里' : l === 'ja' ? 'ここ' : l === 'ar' ? 'هنا' : 'here')
+  const dn = (l: Lang) => district ? districtNameOf(district.id, l) : (l.startsWith('zh') ? '这片街区' : 'this district')
+  const TALK: Record<string, { narrative: string; broadcast: string }> = {
+    zh: { narrative: `你在${rn('zh')}与人攀谈。炉火噼啪，酒杯轻碰，陌生人递来眼神——关于${dn('zh')}的传闻流传。微风拂过，你融入世界，新线索在前，沙漏光指引下一步。`, broadcast: '与人交谈' },
+    'zh-TW': { narrative: `你在${rn('zh-TW')}與人攀談。爐火劈啪，陌生人遞來眼神——關於${dn('zh-TW')}的傳聞。微風中，新线索浮現。`, broadcast: '與人交談' },
+    ja: { narrative: `あなたは${rn('ja')}で話しかけた。暖炉が弾け、見知らぬ者が${dn('ja')}の噂を囁く。世界に溶け込み、新たな手がかりが現れる。`, broadcast: '誰かと話した' },
+    fr: { narrative: `Vous parlez à ${rn('fr')}. Le feu crépite, un inconnu confie une rumeur sur ${dn('fr')}. L’air frémit, une piste se dessine, la lueur guide.`, broadcast: 'a parlé' },
+    es: { narrative: `Hablas en ${rn('es')}. El fuego crepita, un desconocido susurra sobre ${dn('es')}. Vibras, una pista asoma, el reloj guía.`, broadcast: 'habló' },
+    de: { narrative: `Du sprichst in ${rn('de')}. Feuer knistert, ein Fremder flüstert über ${dn('de')}. Luft bebt, Hinweis naht, Sanduhr leuchtet.`, broadcast: 'sprach' },
+    ko: { narrative: `${rn('ko')}에서 대화했다. 난로 불꽃 속 낯선 이가 ${dn('ko')} 소문을 속삭인다. 공기가 떨리고 새 단서가 떠오른다.`, broadcast: '대화' },
+    it: { narrative: `Parli a ${rn('it')}. Fuoco scoppietta, uno sconosciuto sussurra su ${dn('it')}. Aria vibra, indizio appare.`, broadcast: 'parlato' },
+    ar: { narrative: `تتحدث في ${rn('ar')}. النار تفرقع، غريب يهمس عن ${dn('ar')}. يهتز الهواء وخيط جديد يظهر.`, broadcast: 'تحدث' },
+    en: { narrative: `You talk at ${rn('en')}. Fire crackles, stranger whispers of ${dn('en')}. Air shivers, new lead glimmers, light guides.`, broadcast: 'talked' },
+  }
   if (actLower === 'talk') {
-    const rName = isZh ? (room?.name ?? '这里') : (room?.nameEn ?? 'here')
-    if (isZh) {
-      return {
-        narrative: `你在${rName}与人攀谈。炉火噼啪、酒杯轻碰，陌生人递来一个眼神——关于${district?.name ?? '这片街区'}的传闻正悄悄流传。你感到自己正在融入这个世界。`,
-        choices: fallbackChoices(req.lang, req.locationId, world),
-        broadcast: '与人交谈',
-      }
-    }
-    return {
-      narrative: `You strike up a conversation at ${rName}. A stranger leans in, sharing a rumor about ${district?.nameEn ?? 'this district'}. You feel a little more at home here.`,
-      choices: fallbackChoices(req.lang, req.locationId, world),
-      broadcast: 'chatted with someone',
-    }
+    const t = TALK[narrativeLang] ?? TALK[uiLang(narrativeLang)] ?? TALK.en
+    return { narrative: t.narrative, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: t.broadcast }
+  }
+  const SEARCH: Record<string, { narrative: string; broadcast: string }> = {
+    zh: { narrative: `你在${rn('zh')}仔细搜索，指尖划过石缝旧木，发现发光碎片，沙光流转似指引。前方传来轻响，更多秘密在幽处等待。`, broadcast: '搜索' },
+    'zh-TW': { narrative: `你在${rn('zh-TW')}仔細搜索，石縫間發現發光碎片，沙光流轉指引。前方輕響，秘密待掘。`, broadcast: '搜索' },
+    ja: { narrative: `${rn('ja')}を隅々まで探し、光る欠片を見つけた。砂時計の光が脉打ち、奥から微かな物音が手招きする。`, broadcast: '捜索' },
+    fr: { narrative: `Vous fouillez ${rn('fr')}. Éclat luisant, lueur du sablier ondule. Un bruit ténu promet d’autres secrets.`, broadcast: 'fouillé' },
+    es: { narrative: `Registras ${rn('es')} con cuidado. Fragmento brillante, luz del reloj nada. Un leve rumor promete secretos.`, broadcast: 'buscó' },
+    de: { narrative: `Du suchst in ${rn('de')} gründlich. Leuchtender Splitter, Sanduhrlicht fließt. Fernes Geräusch verheißt Geheimnisse.`, broadcast: 'gesucht' },
+    ko: { narrative: `${rn('ko')}를 꼼꼼히 수색해 빛나는 파편을 찾았다. 모래시계 빛이 흐르고, 저편에서 가벼운 소리가 더 많은 비밀을 알린다.`, broadcast: '수색' },
+    it: { narrative: `Perquisisci ${rn('it')} con cura. Frammento lucente, luce scorre. Un fruscio lontano promette segreti.`, broadcast: 'cercato' },
+    ar: { narrative: `تفتش ${rn('ar')} بعناية. شظية لامعة، ضوء يسري كرسالة. همس خافت يعد بالمزيد.`, broadcast: 'فتش' },
+    en: { narrative: `You search ${rn('en')} carefully. A glinting shard appears, hourglass light swims. A faint sound promises more.`, broadcast: 'searched' },
   }
   if (actLower === 'search') {
-    const rName = isZh ? (room?.name ?? '这里') : (room?.nameEn ?? 'here')
-    if (isZh) {
-      return {
-        narrative: `你在${rName}仔细搜索，指尖划过石缝与旧木，竟然找到一枚发亮的碎片——沙漏的光在它表面流动，像是有人刻意留下的记号。`,
-        choices: fallbackChoices(req.lang, req.locationId, world),
-        broadcast: '搜索了一番',
-      }
-    }
-    return {
-      narrative: `You search ${rName} carefully and uncover a glinting shard — the hourglass light swims across it, as if someone left it for you.`,
-      choices: fallbackChoices(req.lang, req.locationId, world),
-      broadcast: 'searched the area',
-    }
+    const t = SEARCH[narrativeLang] ?? SEARCH.en
+    return { narrative: t.narrative, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: t.broadcast }
   }
+  function uiLang(l: string): string { return l.startsWith('zh') ? 'zh' : l }
   if (actLower === 'inventory' || actLower === 'inv' || actLower === '背包') {
-    if (isZh) {
-      return { narrative: `你打开背包：里面只有一小时旅人标配——一枚沙漏、一张发黄的便条，写着“别忘了，你是来写故事的”。`, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: '查看了背包' }
+    const inv: Record<string, string> = {
+      zh: `你打开背包：里面只有一小时旅人标配——一枚沙漏、一张发黄的便条，写着“别忘了，你是来写故事的”。指尖触到沙粒的温热，前方的路似乎也在呼应。`,
+      'zh-TW': `你打開背包：裡面只有一小時旅人標配——一枚沙漏、一張發黃的便條，寫著「別忘了，你是來寫故事的」。`,
+      ja: `荷物を改めると、一時間の旅人の装備だけが入っている——砂時計と黄ばんだメモ、「君は物語を書きに来たことを忘れるな」と書かれている。砂の温もりが指先に伝わり、前途が呼応するように感じた。`,
+      fr: `Vous ouvrez votre sac : un sablier et un mot jauni — « n’oublie pas, tu es venu écrire une histoire ». Le sable tiède frémit sous vos doigts, comme si le chemin devant vous répondait.`,
+      es: `Abres tu mochila: un reloj de arena y una nota amarillenta — «recuerda, viniste a escribir una historia». La arena tibia vibra bajo tus dedos, como si el camino respondiera.`,
+      de: `Du öffnest dein Gepäck: eine Sanduhr und ein vergilbter Zettel — „Vergiss nicht, du bist gekommen, um eine Geschichte zu schreiben.“ Warmer Sand vibriert unter deinen Fingern.`,
+      ko: `가방을 열자 한 시간 여행자의 기본 장비만 들어 있다 — 모래시계와 누렇게 바랜 쪽지, “넌 이야기를 쓰러 왔다는 걸 잊지 마”라고 적혀 있다. 따뜻한 모래가 손끝에서 떨린다.`,
+      it: `Apri lo zaino: una clessidra e un biglietto ingiallito — “ricorda, sei venuto a scrivere una storia”. La sabbia tiepida vibra sotto le dita.`,
+      ar: `تفتح حقيبتك: ساعة رملية وورقة مصفرة — “تذكر، جئت لتكتب قصة”. الرمل الدافئ يهتز تحت أصابعك.`,
+      en: `You check your pack: an hourglass and a yellowed note — “remember, you’re here to write a story.” Warm sand hums under your fingers, as if the road ahead is listening.`,
     }
-    return { narrative: `You check your pack: an hourglass and a yellowed note — “remember, you’re here to write a story.”`, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: 'checked inventory' }
+    return { narrative: inv[narrativeLang] ?? inv.en, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: narrativeLang.startsWith('zh') ? '查看了背包' : 'checked inventory' }
   }
   if (actLower === 'help') {
-    if (isZh) {
-      return { narrative: `提示：你可以直接用自然语言描述想做的事（如“和酒馆老板聊聊”），或用传统指令 look / go north / talk / search。点地图可快速跳转相邻区域。`, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: '请求了帮助' }
+    const help: Record<string, string> = {
+      zh: `提示：你可以直接用自然语言描述想做的事（如“和酒馆老板聊聊”），或用传统指令 look / go north / talk / search。点地图可快速跳转相邻区域。远方的沙漏轻响，提醒你时间有限——大胆去探索吧。`,
+      'zh-TW': `提示：你可以直接用自然語言描述想做的事，或用傳統指令。點地圖可快速跳轉。`,
+      ja: `ヒント：やりたいことを自然な言葉で書いてください。伝統的なコマンド（look / go north / talk / search）も使えます。地図をタップすると近くの部屋へ素早く移動できます。砂時計の音が時間を告げています。`,
+      fr: `Astuce : décrivez simplement ce que vous voulez faire en langage naturel, ou utilisez les commandes classiques. Touchez la carte pour sauter vers une salle voisine.`,
+      es: `Consejo: describe lo que quieres hacer en lenguaje natural o usa comandos clásicos. Toca el mapa para saltar a salas cercanas.`,
+      de: `Tipp: Beschreibe einfach in natürlicher Sprache, was du tun willst, oder nutze klassische Befehle. Tippe auf die Karte, um zu springen.`,
+      ko: `팁: 자연어로 하고 싶은ことを 말하거나 전통 명령어를 사용하세요. 지도를 탭하면 nearby 방으로 이동합니다.`,
+      it: `Suggerimento: descrivi in linguaggio naturale cosa vuoi fare o usa i comandi classici. Tocca la mappa per saltare.`,
+      ar: `تلميح: صف ما تريد فعله بلغة طبيعية أو استخدم الأوامر التقليدية. انقر على الخريطة للانتقال.`,
+      en: `Tip: just describe what you want to do in natural language, or use classic commands: look / go north / talk / search. Tap the map to jump to nearby rooms. The hourglass ticks — make it count.`,
     }
-    return { narrative: `Tip: just describe what you want to do in natural language, or use classic commands: look / go north / talk / search. Tap the map to jump to nearby rooms.`, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: 'asked for help' }
+    return { narrative: help[narrativeLang] ?? help.en, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: narrativeLang.startsWith('zh') ? '请求了帮助' : 'asked for help' }
   }
 
-  const dName2 = isZh ? (district?.name ?? '') : (district?.nameEn ?? '')
-  const rName2 = isZh ? (room?.name ?? '') : (room?.nameEn ?? '')
-  if (isZh) {
+  const dName2 = district ? districtNameOf(district.id, narrativeLang as Lang) : ''
+  const rName2 = room ? roomNameOf(room.id, narrativeLang as Lang) : ''
+  if (narrativeLang.startsWith('zh')) {
     return {
-      narrative: `你说道：“${req.actionText}” —— 世界仿佛听见了。${room ? `在${dName2}·${rName2}，你的行动引起了微妙的变化。` : ''} 前方似乎有新的可能在等待。`,
+      narrative: `你说道：“${req.actionText}” —— 世界仿佛听见了。${room ? `在${dName2}·${rName2}，你的行动引起了微妙的变化，空气中泛起细微涟漪。` : ''} 前方似乎有新的可能在等待，沙漏的光指引着下一步。`,
       choices: fallbackChoices(req.lang, req.locationId, world),
       broadcast: req.actionText.slice(0, 40),
     }
   }
+  if (narrativeLang === 'ja') return { narrative: `あなたは「${req.actionText}」と口にした。${room ? `${rName2}の空気が微かに震え、あなたの行動が世界に波紋を広げる。` : ''} 新たな可能性が前方で手招きし、砂時計の光が次の一歩を照らす。`, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: req.actionText.slice(0, 40) }
+  if (narrativeLang === 'fr') return { narrative: `Vous dites « ${req.actionText} » — le monde semble écouter. ${room ? `À ${rName2}, votre geste fait frémir l’air, une ondulation parcourt ${dName2}.` : ''} De nouvelles possibilités s’ouvrent, la lueur du sablier montre la suite.`, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: req.actionText.slice(0, 40) }
+  if (narrativeLang === 'ko') return { narrative: `당신은 “${req.actionText}”라고 말했다. ${room ? `${rName2}의 공기가 미세하게 떨리며 당신의 행동이 파문을 일으킨다.` : ''} 새로운 가능성이 앞에서 손짓하고 모래시계 빛이 다음 걸음을 비춘다.`, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: req.actionText.slice(0, 40) }
+  if (narrativeLang === 'ar') return { narrative: `تقول “${req.actionText}” — يبدو أن العالم ينصت. ${room ? `في ${rName2}، يهتز الهواء مع فعلك.` : ''} إمكانيات جديدة تلوح، وضوء الساعة يرشدك.`, choices: fallbackChoices(req.lang, req.locationId, world), broadcast: req.actionText.slice(0, 40) }
   return {
-    narrative: `You say: "${req.actionText}" — the world seems to listen. ${room ? `At ${dName2} — ${rName2}, your action stirs subtle changes.` : ''} New possibilities await ahead.`,
+    narrative: `You say: "${req.actionText}" — the world seems to listen. ${room ? `At ${dName2} — ${rName2}, your action stirs subtle changes, ripples spreading through the air.` : ''} New possibilities await ahead, the hourglass light guiding your next step.`,
     choices: fallbackChoices(req.lang, req.locationId, world),
     broadcast: req.actionText.slice(0, 40),
   }
@@ -189,6 +229,7 @@ export async function requestWorldNarrate(req: NarrateRequest, world: WorldMudSt
 
   try {
     const client = await getSupabaseClient()
+    const narrativeLang = req.narrativeLang ?? req.lang
     const { data, error } = await client.functions.invoke('world-mud-narrate', {
       body: {
         actionText: action,
@@ -196,7 +237,8 @@ export async function requestWorldNarrate(req: NarrateRequest, world: WorldMudSt
         districtId: district?.id ?? 'plaza',
         roomName: room?.nameEn ?? room?.name ?? req.locationId,
         player: req.player,
-        lang: req.lang,
+        lang: req.lang, // UI lang for choices
+        narrativeLang,
         recentLog: req.recentLog.slice(-6),
         globalEvent: req.globalEvent ?? null,
       },

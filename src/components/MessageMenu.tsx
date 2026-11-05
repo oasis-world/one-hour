@@ -18,6 +18,8 @@ const MIN_FIT = 4
 interface Props {
   entry: ChatEntry
   mine: boolean
+  /** Local private messages (companion/MUD) — owner may delete regardless of author */
+  canDelete?: boolean
   anchor: MenuAnchor
   /** Mobile bottom sheet: centered above the safe area, not at the anchor. */
   sheet: boolean
@@ -42,6 +44,7 @@ interface Props {
 export default function MessageMenu({
   entry,
   mine,
+  canDelete = mine,
   anchor,
   sheet,
   initialConfirm = false,
@@ -283,6 +286,11 @@ export default function MessageMenu({
             <>
               <div className="msg-menu-sep" aria-hidden="true" />
               {item(t('编辑消息', 'Edit Message'), <EditIcon size={18} />, () => onEdit(entry))}
+            </>
+          )}
+          {canDelete && (
+            <>
+              {!mine && <div className="msg-menu-sep" aria-hidden="true" />}
               {item(
                 t('删除消息', 'Delete Message'),
                 <TrashIcon size={18} />,

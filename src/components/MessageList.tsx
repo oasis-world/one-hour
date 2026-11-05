@@ -187,9 +187,9 @@ export default function MessageList({
 
   const removeEntry = (entry: ChatEntry) => {
     setMenu(null)
-    // The author deletes — anonymous travelers included (the menu itself
-    // only offers Delete on the player's own messages).
-    if (entry.userId !== selfId) return
+    const isPrivate = isPrivateId?.(entry.id) ?? false
+    // Local private messages (user + companion/MUD) are owned by this device — allow deleting either side
+    if (!isPrivate && entry.userId !== selfId) return
     const gameRef = parseGameRef(entry.content)
     if (gameRef?.type === 'gomoku') void deleteGomokuState(gameRef.instanceId)
     if (gameRef?.type === 'xiangqi') void deleteXiangqiState(gameRef.instanceId)
@@ -411,6 +411,7 @@ export default function MessageList({
           key={`${menu.entry.id}:${menu.confirm ? 'confirm' : 'menu'}`}
           entry={menu.entry}
           mine={menu.entry.userId === selfId}
+          canDelete={menu.entry.userId === selfId || (isPrivateId?.(menu.entry.id) ?? false)}
           anchor={menu.anchor}
           sheet={menu.sheet}
           initialConfirm={menu.confirm}

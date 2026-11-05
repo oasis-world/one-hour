@@ -305,17 +305,23 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
               className="composer-companion-btn"
               aria-label={t('提及助手', 'Mention companion')}
               title={companion.name}
-              onMouseDown={keepFocus}
-              onPointerDown={keepFocus}
               onClick={() => {
                 const tag = `@${companion.name} `
-                setDraft((prev) => {
-                  if (prev.includes(tag)) return prev
-                  if (!prev) return tag
-                  return prev.startsWith('@') ? `${tag}${prev}` : `${tag}${prev}`
-                })
+                let next = draft
+                if (!draft.includes(tag)) {
+                  next = !draft ? tag : draft.startsWith('@') ? `${tag}${draft}` : `${tag}${draft}`
+                  setDraft(next)
+                }
                 onMentionCompanion?.()
-                window.setTimeout(() => inputRef.current?.focus(), 0)
+                const el = inputRef.current
+                if (el) {
+                  el.focus()
+                  // Cursor after the inserted tag; delay one frame so React has flushed the new value
+                  requestAnimationFrame(() => {
+                    try { el.setSelectionRange(next.length, next.length) } catch { /* ignore */ }
+                    requestAnimationFrame(() => { try { el.setSelectionRange(next.length, next.length) } catch { /* ignore */ } })
+                  })
+                }
               }}
             >
               <AvatarBadge look={{ style: companion.style, seed: companion.seed, avatarUrl: companion.avatarUrl ?? null }} size={24} />
