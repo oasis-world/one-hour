@@ -982,7 +982,7 @@ button {
 .app-shell.theme-warm .author-pop-portal .account-pop { background: #fcf3dc; }
 
 .msg-name {
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
@@ -1010,7 +1010,7 @@ button {
 }
 
 .msg-body {
-  font-size: 14.5px;
+  font-size: 15.5px;
   line-height: 1.55;
   color: var(--ink);
   white-space: pre-wrap;
@@ -1291,7 +1291,7 @@ button {
 }
 
 .msg-countdown-text {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--ink-mute);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;

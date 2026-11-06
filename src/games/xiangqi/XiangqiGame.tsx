@@ -210,7 +210,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       setCaptureToastIsCheck(false)
       setCaptureToastIsWinner(true)
       if (captureToastTimerRef.current !== null) window.clearTimeout(captureToastTimerRef.current)
-      captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 2000)
+      captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 3000)
       return
     }
     const move = after.lastMove
@@ -233,7 +233,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
       setCaptureToastIsCheck(true)
       setCaptureToastIsWinner(false)
       if (captureToastTimerRef.current !== null) window.clearTimeout(captureToastTimerRef.current)
-      captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 2000)
+      captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 3000)
       return
     }
     if (!captured) return
@@ -244,13 +244,13 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     setCaptureToastIsCheck(false)
     setCaptureToastIsWinner(false)
     if (captureToastTimerRef.current !== null) window.clearTimeout(captureToastTimerRef.current)
-    captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 2000)
+    captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 3000)
   }, [myColor])
 
   const showStartToast = useCallback(() => {
     setStartToast(t('游戏开始', 'Game start'))
     if (startToastTimerRef.current !== null) window.clearTimeout(startToastTimerRef.current)
-    startToastTimerRef.current = window.setTimeout(() => setStartToast(''), 2000)
+    startToastTimerRef.current = window.setTimeout(() => setStartToast(''), 3000)
   }, [])
 
   const showHintToast = useCallback((msg: string) => {

@@ -193,5 +193,13 @@
     top: calc(100% + 8px);
     bottom: auto;
     width: min(270px, calc(100vw - 28px));
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .settings-pop .settings-row,
+  .language-picker-pop .settings-row {
+    font-size: 15px;
   }
 }

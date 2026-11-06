@@ -138,7 +138,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
     const winner = state.players.find((player) => player.userId === state.winnerId)?.displayName ?? 'Player'
     setWinnerToast(t('{{winner}} 获胜！', '{{winner}} wins!').replace('{{winner}}', winner))
     if (winnerToastTimerRef.current !== null) window.clearTimeout(winnerToastTimerRef.current)
-    winnerToastTimerRef.current = window.setTimeout(() => setWinnerToast(''), 2000)
+    winnerToastTimerRef.current = window.setTimeout(() => setWinnerToast(''), 3000)
   }, [state.status, state.winnerId, state.round, state.players])
 
   useEffect(() => {
@@ -222,7 +222,7 @@ export default function GomokuGame({ instanceId, hostUserId, onlineMembers = [] 
   const showStartToast = useCallback(() => {
     setStartToast(t('游戏开始', 'Game start'))
     if (startToastTimerRef.current !== null) window.clearTimeout(startToastTimerRef.current)
-    startToastTimerRef.current = window.setTimeout(() => setStartToast(''), 2000)
+    startToastTimerRef.current = window.setTimeout(() => setStartToast(''), 3000)
   }, [])
 
   const showHintToast = useCallback((msg: string) => {

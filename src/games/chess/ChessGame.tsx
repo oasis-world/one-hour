@@ -97,7 +97,7 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
     stateRef.current=next;setState(next);void saveChessState(instanceId,next)
     void channelRef.current?.send({type:'broadcast',event:'state',payload:next})
   },[instanceId])
-  const showMoveToast=useCallback((message:string,kind:''|'check'|'winner',duration=2000)=>{
+  const showMoveToast=useCallback((message:string,kind:''|'check'|'winner',duration=3000)=>{
     setMoveToast(message);setMoveToastKind(kind)
     if(moveToastTimerRef.current!==null)window.clearTimeout(moveToastTimerRef.current)
     moveToastTimerRef.current=window.setTimeout(()=>setMoveToast(''),duration)
@@ -105,7 +105,7 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
   const showStartToast=useCallback(()=>{
     setStartToast(t('游戏开始','Game start'))
     if(startToastTimerRef.current!==null)window.clearTimeout(startToastTimerRef.current)
-    startToastTimerRef.current=window.setTimeout(()=>setStartToast(''),2000)
+    startToastTimerRef.current=window.setTimeout(()=>setStartToast(''),3000)
   },[])
   const showHintToast=useCallback((msg:string)=>{
     setHintToast(msg)
@@ -164,14 +164,14 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
     if(state.status==='result'){
       if(state.winnerId){
         const winner=state.players.find(player=>player.userId===state.winnerId)?.displayName??'Player'
-        window.setTimeout(()=>showMoveToast(t('{{winner}} 获胜！','{{winner}} wins!').replace('{{winner}}',winner),'winner',2000),0)
-      }else window.setTimeout(()=>showMoveToast(t('平局','Draw'),'winner',2000),0)
+        window.setTimeout(()=>showMoveToast(t('{{winner}} 获胜！','{{winner}} wins!').replace('{{winner}}',winner),'winner',3000),0)
+      }else window.setTimeout(()=>showMoveToast(t('平局','Draw'),'winner',3000),0)
       return
     }
     if(inCheck(state.board,state.turn)){
       const viewerColor = state.players.find(p=>p.userId===selfId)?.color ?? null
       if(viewerColor && state.turn===viewerColor){
-        window.setTimeout(()=>showMoveToast(t('将军！你的王受到攻击！','CHECK! Your king is in danger!'),'check',2000),0)
+        window.setTimeout(()=>showMoveToast(t('将军！你的王受到攻击！','CHECK! Your king is in danger!'),'check',3000),0)
       }
       return
     }
@@ -183,7 +183,7 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
     const victim=before.players.find(player=>player.color===other)?.displayName??t(other==='w'?'白方':'黑方',other==='w'?'White side':'Black side')
     const piece=PIECE_NAMES[captured]??['棋子','piece']
     const pieceName=t(piece[0],piece[1])
-    window.setTimeout(()=>showMoveToast(t('{{attacker}} 吃掉了 {{victim}} 的 {{piece}}','{{attacker}} captured {{victim}}’s {{piece}}').replace('{{attacker}}',attacker).replace('{{victim}}',victim).replace('{{piece}}',pieceName),'',2000),0)
+    window.setTimeout(()=>showMoveToast(t('{{attacker}} 吃掉了 {{victim}} 的 {{piece}}','{{attacker}} captured {{victim}}’s {{piece}}').replace('{{attacker}}',attacker).replace('{{victim}}',victim).replace('{{piece}}',pieceName),'',3000),0)
   },[state,ready,selfId,showMoveToast,showStartToast])
 
   useEffect(()=>{

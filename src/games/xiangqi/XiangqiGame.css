@@ -461,7 +461,7 @@
   line-height: 1.35;
   text-align: center;
   pointer-events: none;
-  animation: xiangqi-toast-pop 2s ease both;
+  animation: xiangqi-toast-pop 3s ease both;
 }
 .app-shell.theme-warm .xiangqi-capture-toast {
   --line: rgba(96,62,29,0.32);
@@ -476,7 +476,7 @@
   font-size: 15px;
   letter-spacing: 0.04em;
   box-shadow: 0 0 0 4px rgba(169,31,36,0.2), 0 8px 28px rgba(91,8,12,0.5);
-  animation: xiangqi-check-pop 2s ease both;
+  animation: xiangqi-check-pop 3s ease both;
 }
 .xiangqi-capture-toast.is-winner {
   padding: 11px 24px;
@@ -486,7 +486,7 @@
   color: #fff9e6;
   font-size: 16px;
   box-shadow: 0 0 0 4px rgba(196,147,50,0.2), 0 8px 28px rgba(62,39,7,0.42);
-  animation: xiangqi-winner-pop 2s ease both;
+  animation: xiangqi-winner-pop 3s ease both;
 }
 .xiangqi-capture-toast.is-winner::before { content: '★'; margin-right: 8px; color: #fff0b8; }
 .xiangqi-start-toast {
@@ -516,7 +516,7 @@
   letter-spacing: 0.02em;
   text-align: center;
   pointer-events: none;
-  animation: game-start-pop 2s ease both;
+  animation: game-start-pop 3s ease both;
 }
 .xiangqi-start-toast::before {
   content: '✦';
