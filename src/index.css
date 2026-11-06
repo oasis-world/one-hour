@@ -1949,7 +1949,7 @@ button {
 
 .plus-menu-item {
   display: grid;
-  grid-template-columns: 17px minmax(0, 1fr) auto;
+  grid-template-columns: 19px minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 11px;
   width: 100%;
@@ -1958,7 +1958,7 @@ button {
   border-radius: 12px;
   background: transparent;
   color: var(--ink);
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 600;
   text-align: left;
   white-space: nowrap;
@@ -1974,7 +1974,7 @@ button {
   color: var(--accent);
   flex-shrink: 0;
 }
-.plus-menu-item > svg { width: 17px; height: 17px; }
+.plus-menu-item > svg { width: 19px; height: 19px; }
 
 .emoji-panel {
   --emoji-panel-bg: #181a20;

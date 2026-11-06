@@ -97,7 +97,7 @@
   background: none;
   color: var(--ink-soft);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 650;
   cursor: pointer;
   transition: background 0.14s ease, color 0.14s ease;
@@ -200,6 +200,6 @@
 
   .settings-pop .settings-row,
   .language-picker-pop .settings-row {
-    font-size: 15px;
+    font-size: 14px;
   }
 }
