@@ -38,9 +38,9 @@ npm run dev
 
 > 未配置 env 时应用照常运行（单机模式），消息只存本地、一小时后同样消失。随机背景图的 Unsplash Access Key 为可选：未配置时使用 picsum 的 Unsplash 图源。
 
-### 云端游戏 AI（可选）
+### 云端 AI（可选）
 
-游戏 AI 默认先调用 OpenCode Go 的 Muse Spark 1.3 Contributor；请求失败或返回非法走法时自动使用本地 AI。模型只会收到当前棋盘、行棋方、少量规则状态和合法候选走法，不会收到玩家昵称或聊天内容。该 Contributor 模型可能使用请求内容改进模型。
+伙伴聊天、游戏 AI、MUD 场景和世界叙事只走 **OpenCode Go 的 Muse Spark 1.3 Contributor**（`OPENCODE_API_KEY`）；请求失败时伙伴聊天走本地模板、游戏走本地 AI、MUD/世界走模板回退。模型只会收到当前棋盘/当前行动等任务上下文，不会收到玩家昵称或完整聊天记录之外的信息。该 Contributor 模型可能使用请求内容改进模型。
 
 1. 在 Supabase 项目设置中启用 Anonymous sign-ins，并在 OpenCode Go 工作区隐私设置中允许使用请求数据训练的付费端点（模型仅在支持的地区提供）。
 2. 本地开发时，将 `supabase/functions/.env.example` 复制为 `supabase/functions/.env`，填入 `OPENCODE_API_KEY`。该文件已加入 `.gitignore`。
@@ -48,6 +48,9 @@ npm run dev
 
    ```bash
    supabase functions deploy game-ai-move --project-ref <你的 Supabase project ref>
+   supabase functions deploy companion-chat --project-ref <你的 Supabase project ref>
+   supabase functions deploy mud-generate --project-ref <你的 Supabase project ref>
+   supabase functions deploy world-mud-narrate --project-ref <你的 Supabase project ref>
    supabase secrets set OPENCODE_API_KEY=oc_sk_你的密钥
    ```
 

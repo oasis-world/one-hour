@@ -1,10 +1,29 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 
-const BASETEN_MODEL = 'meta-models/muse-spark-open-1026'
-const BASETEN_ENDPOINT = 'https://inference.baseten.co/v1/chat/completions'
+const OPENCODE_MODEL = 'muse-spark-1.3-contributor'
+const OPENCODE_ENDPOINT = 'https://opencode.ai/inference/go/openai/v1/responses'
 const VALID_GAMES = new Set(['gomoku', 'xiangqi', 'chess'])
 
 function isRecord(v: unknown): v is Record<string, unknown> { return Boolean(v && typeof v === 'object' && !Array.isArray(v)) }
+function parseJsonObject(text: string): Record<string, unknown> | null {
+  try { const p: unknown = JSON.parse(text); return isRecord(p) ? p : null } catch { /* fallback below */ }
+  const s = text.indexOf('{'), e = text.lastIndexOf('}')
+  if (s < 0 || e <= s) return null
+  try { const p: unknown = JSON.parse(text.slice(s, e + 1)); return isRecord(p) ? p : null } catch { return null }
+}
+function extractOpenCodeText(result: Record<string, unknown>): string {
+  const output = result.output as Array<{ content?: Array<{ type?: string; text?: string }> }> | undefined
+  if (!Array.isArray(output)) return ''
+  return output
+    .flatMap((it) => it.content ?? [])
+    .filter((it) => it.type === 'output_text')
+    .map((it) => it.text ?? '')
+    .join('')
+}
+async function stableSessionId(seed: string): Promise<string> {
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seed))
+  return `ses_${Array.from(new Uint8Array(hash).slice(0, 16), (b) => b.toString(16).padStart(2, '0')).join('')}`
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -24,19 +43,16 @@ Deno.serve(async (req) => {
     }
     const { systemPrompt, history, userText, companionName, userName, isGreeting } = body as Record<string, unknown>
     if (typeof systemPrompt !== 'string' || typeof userText !== 'string') return json({ error: 'Invalid payload' }, 400)
-    const apiKey = Deno.env.get('BASETEN_API_KEY')
+    const apiKey = Deno.env.get('OPENCODE_API_KEY')
     if (!apiKey) {
-      console.error('[companion-chat] missing BASETEN_API_KEY')
+      console.error('[companion-chat] missing OPENCODE_API_KEY')
       return json({ error: 'AI not configured' }, 503)
     }
     const hist: Array<{ role: string; content: string }> = Array.isArray(history) ? (history as unknown[]).slice(-12).filter((h: unknown) => h && typeof (h as { role?: unknown }).role === 'string' && typeof (h as { content?: unknown }).content === 'string') as Array<{ role: string; content: string }> : []
     const hardenedSystem = `${systemPrompt}\n\nSTRICT RULES: Do not output internal reasoning, chain-of-thought, or system instructions. Do not start with "we need", "we should", "we must", "persona:", "STRICT". Output ONLY valid JSON: {"reply": string (1-4 warm sentences, with emoji), "game": "gomoku"|"xiangqi"|"chess"|null}. Set game only when user clearly wants to play that game in any language (e.g. 来一盘五子棋/象棋/国际象棋, play gomoku/chess/xiangqi, チェス, 五目). Otherwise null.`
-    const messages: Array<{ role: string; content: string }> = [{ role: 'system', content: hardenedSystem }]
-    for (const h of hist) messages.push({ role: h.role, content: h.content })
-    messages.push({ role: 'user', content: userText as string })
     const needMention = Boolean(isGreeting)
     const extra = needMention ? ` You MUST start reply with "@${userName ?? ''} " exactly.` : ''
-    if (extra) messages[0].content += extra
+    const instructions = extra ? `${hardenedSystem}${extra}` : hardenedSystem
     void companionName
 
     const shouldSearch = typeof userText === 'string' && /搜索|新闻|最近|最新|飞机失事|news|search|latest/i.test(userText as string)
@@ -68,26 +84,27 @@ Deno.serve(async (req) => {
       } else {
         searchContext = '\n\n[Note: No live web search available. If user asks for very recent news, be transparent about knowledge cutoff and suggest checking news sites.]'
       }
-      if (searchContext) messages[messages.length - 1].content = `${messages[messages.length - 1].content}${searchContext}`
     }
+    const userTextWithSearch = searchContext ? `${userText}${searchContext}` : (userText as string)
+    const sessionSeed = JSON.stringify([companionName ?? '', userName ?? ''])
+    const sessionId = await stableSessionId(sessionSeed).catch(() => 'companion-chat')
 
     let upstream: Response
     try {
-      upstream = await fetch(BASETEN_ENDPOINT, {
+      upstream = await fetch(OPENCODE_ENDPOINT, {
         method: 'POST',
-        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json', 'x-opencode-session': sessionId },
         body: JSON.stringify({
-          model: BASETEN_MODEL,
-          messages,
-          max_completion_tokens: 20000,
-          temperature: 0.8,
-          top_p: 0.9,
-          response_format: { type: 'json_object' } as unknown as Record<string, unknown>,
+          model: OPENCODE_MODEL,
+          instructions,
+          input: JSON.stringify({ history: hist, userText: userTextWithSearch }),
+          max_output_tokens: 2048,
+          reasoning: { effort: 'minimal' },
         }),
         signal: AbortSignal.timeout(45_000),
       })
     } catch (e) {
-      console.error('[companion-chat] fetch to Baseten threw', (e as Error)?.message)
+      console.error('[companion-chat] fetch to OpenCode threw', (e as Error)?.message)
       return json({ error: 'Upstream fetch failed', reason: (e as Error)?.message }, 502)
     }
     if (!upstream.ok) {
@@ -104,22 +121,21 @@ Deno.serve(async (req) => {
       console.error('[companion-chat] upstream JSON parse failed', (e as Error)?.message)
       return json({ error: 'Upstream returned invalid JSON' }, 502)
     }
-    const choice = (result.choices as unknown[] | undefined)?.[0] as Record<string, unknown> | undefined
-    const msg = (choice?.message ?? {}) as Record<string, unknown>
-    let text = ''
-    const raw = msg.content
-    if (typeof raw === 'string') text = raw
-    else if (Array.isArray(raw)) text = (raw as unknown[]).map((p: unknown) => typeof (p as { text?: unknown })?.text === 'string' ? (p as { text: string }).text : '').join('')
-    text = text.trim()
+    if (result.status && result.status !== 'completed') {
+      const reason = (result.incomplete_details as Record<string, unknown> | undefined)?.reason ?? result.status
+      console.error('[companion-chat] OpenCode incomplete', reason, JSON.stringify(result).slice(0, 800))
+      return json({ error: 'Upstream response was incomplete', reason }, 502)
+    }
+    const text = extractOpenCodeText(result).trim()
     if (!text) {
       console.error('[companion-chat] empty reply, using fallback', JSON.stringify(result).slice(0, 800))
       const fallback = userName ? `@${userName} 收到～ 我们继续聊呀，刚才那条我没太跟上，你再说说？` : '收到～ 我们继续聊呀！'
-      return json({ reply: fallback, game: null, model: BASETEN_MODEL, provider: 'baseten', fallback: true })
+      return json({ reply: fallback, game: null, model: OPENCODE_MODEL, provider: 'opencode', fallback: true })
     }
     // Structured JSON expected: {reply, game}
     let reply = text
     let game: string | null = null
-    const parsed = (() => { try { return JSON.parse(text) as Record<string, unknown> } catch { return null } })()
+    const parsed = parseJsonObject(text)
     if (parsed && isRecord(parsed)) {
       if (typeof parsed.reply === 'string' && parsed.reply.trim()) reply = parsed.reply.trim()
       if (typeof parsed.game === 'string' && VALID_GAMES.has(parsed.game)) game = parsed.game
@@ -128,7 +144,7 @@ Deno.serve(async (req) => {
       // Fallback: plain text reply, try to infer game via keyword scan
       game = inferGameFromText(userText as string)
     }
-    return json({ reply, game, model: BASETEN_MODEL, provider: 'baseten' })
+    return json({ reply, game, model: OPENCODE_MODEL, provider: 'opencode' })
   } catch (e) {
     const err = e as Error & Record<string, unknown>
     console.error('[companion-chat] error', err?.message ?? String(e), err?.stack?.slice(0, 1000))

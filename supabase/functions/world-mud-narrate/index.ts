@@ -1,7 +1,28 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 
-const BASETEN_MODEL = 'meta-models/muse-spark-open-1026'
-const BASETEN_ENDPOINT = 'https://inference.baseten.co/v1/chat/completions'
+const OPENCODE_MODEL = 'muse-spark-1.3-contributor'
+const OPENCODE_ENDPOINT = 'https://opencode.ai/inference/go/openai/v1/responses'
+
+function isRecord(v: unknown): v is Record<string, unknown> { return Boolean(v && typeof v === 'object' && !Array.isArray(v)) }
+function parseJsonObject(text: string): Record<string, unknown> | null {
+  try { const p: unknown = JSON.parse(text); return isRecord(p) ? p : null } catch { /* fallback below */ }
+  const s = text.indexOf('{'), e = text.lastIndexOf('}')
+  if (s < 0 || e <= s) return null
+  try { const p: unknown = JSON.parse(text.slice(s, e + 1)); return isRecord(p) ? p : null } catch { return null }
+}
+function extractOpenCodeText(result: Record<string, unknown>): string {
+  const output = result.output as Array<{ content?: Array<{ type?: string; text?: string }> }> | undefined
+  if (!Array.isArray(output)) return ''
+  return output
+    .flatMap((it) => it.content ?? [])
+    .filter((it) => it.type === 'output_text')
+    .map((it) => it.text ?? '')
+    .join('')
+}
+async function stableSessionId(seed: string): Promise<string> {
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seed))
+  return `ses_${Array.from(new Uint8Array(hash).slice(0, 16), (b) => b.toString(16).padStart(2, '0')).join('')}`
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -22,11 +43,11 @@ Deno.serve(async (req) => {
   }
   if (typeof actionText !== 'string' || !actionText.trim()) return json({ error: 'Missing actionText' }, 400)
 
-  const apiKey = Deno.env.get('BASETEN_API_KEY')
+  const apiKey = Deno.env.get('OPENCODE_API_KEY')
   if (!apiKey) {
-    console.warn('[world-mud-narrate] missing BASETEN_API_KEY — returning fallback (check Supabase Edge Secrets)')
+    console.warn('[world-mud-narrate] missing OPENCODE_API_KEY — returning fallback (check Supabase Edge Secrets)')
     const fb = fallback(reqLang(narrativeLang ?? lang), actionText, locationId, roomName, reqLang(lang))
-    return json({ ...fb, _fallback: 'missing-baseten-key', _debug: 'BASETEN_API_KEY not set in Edge Secrets' })
+    return json({ ...fb, _fallback: 'missing-opencode-key', _debug: 'OPENCODE_API_KEY not set in Edge Secrets' })
   }
 
   const playerDesc = `${player?.displayName ?? 'Traveler'} (${player?.role ?? 'adventurer'})`
@@ -72,19 +93,16 @@ No fixed NPC dialogue — improvise NPCs as needed.
 Never break JSON.`
 
   try {
-    const upstream = await fetch(BASETEN_ENDPOINT, {
+    const sessionId = await stableSessionId(JSON.stringify([locationId ?? '', districtId ?? '', playerDesc])).catch(() => 'world-mud-narrate')
+    const upstream = await fetch(OPENCODE_ENDPOINT, {
       method: 'POST',
-      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json', 'x-opencode-session': sessionId },
       body: JSON.stringify({
-        model: BASETEN_MODEL,
-        messages: [
-          { role: 'system', content: sysPrompt },
-          { role: 'user', content: `Player action: "${actionText}"\nCurrent room: ${roomName ?? locationId}\nNarrative: MUST be ${narrLangName} only. Choices: MUST be ${uiLangName} only. Never swap.` },
-        ],
-        max_completion_tokens: 20000,
-        temperature: 0.9,
-        top_p: 0.95,
-        response_format: { type: 'json_object' } as unknown as Record<string, unknown>,
+        model: OPENCODE_MODEL,
+        instructions: sysPrompt,
+        input: JSON.stringify({ actionText, locationId, districtId, roomName, player, lang, narrativeLang, recentLog: logSnippet, globalEvent }),
+        max_output_tokens: 4096,
+        reasoning: { effort: 'minimal' },
       }),
       signal: AbortSignal.timeout(20000),
     })
@@ -96,25 +114,21 @@ Never break JSON.`
     }
     const result = await upstream.json() as Record<string, unknown>
     const usage = result.usage as Record<string, unknown> | undefined
-    console.log('[world-mud-narrate] upstream ok', { model: BASETEN_MODEL, usage, finishReason: (result.choices as unknown as Array<{ finish_reason?: string }>)?.[0]?.finish_reason })
-    const choice = (result.choices as unknown[] | undefined)?.[0] as Record<string, unknown> | undefined
-    const msg = (choice?.message ?? {}) as Record<string, unknown>
-    // Baseten/muse may put reasoning in separate fields — try all known slots
-    let text = ''
-    if (typeof msg.content === 'string' && msg.content.trim()) text = msg.content
-    else if (Array.isArray(msg.content)) text = (msg.content as unknown[]).map((p: unknown) => (p as { text?: string })?.text ?? '').join('')
-    // fallback slots for reasoning models
-    if (!text.trim() && typeof (msg as { reasoning_content?: unknown }).reasoning_content === 'string') text = (msg as { reasoning_content: string }).reasoning_content
-    if (!text.trim() && typeof (choice as { text?: unknown })?.text === 'string') text = (choice as { text: string }).text
-    if (!text.trim() && typeof (result as { output_text?: unknown }).output_text === 'string') text = (result as { output_text: string }).output_text
-    text = text.trim()
+    if (result.status && result.status !== 'completed') {
+      const reason = (result.incomplete_details as Record<string, unknown> | undefined)?.reason ?? result.status
+      console.warn('[world-mud-narrate] OpenCode incomplete', reason, JSON.stringify(result).slice(0, 800))
+      const fb = fallback(reqLang(narrLang), actionText, locationId, roomName, uiLang)
+      return json({ ...fb, _fallback: 'incomplete-upstream', _debug: String(reason) })
+    }
+    console.log('[world-mud-narrate] upstream ok', { model: OPENCODE_MODEL, usage })
+    const text = extractOpenCodeText(result).trim()
     if (!text) {
       const full = JSON.stringify(result)
       console.warn('[world-mud-narrate] empty upstream content', full.slice(0, 1200), { usage })
       const fb = fallback(reqLang(narrLang), actionText, locationId, roomName, uiLang)
-      return json({ ...fb, _fallback: 'empty-upstream', _debug: `empty content, usage=${JSON.stringify(usage ?? {}).slice(0,200)}, finish=${(choice as { finish_reason?: string })?.finish_reason ?? 'unknown'}` })
+      return json({ ...fb, _fallback: 'empty-upstream', _debug: `empty content, usage=${JSON.stringify(usage ?? {}).slice(0, 200)}` })
     }
-    const parsed = (() => { try { return JSON.parse(text) as Record<string, unknown> } catch { return null } })()
+    const parsed = parseJsonObject(text)
     if (!parsed || typeof parsed.narrative !== 'string' || !Array.isArray(parsed.choices)) {
       console.warn('[world-mud-narrate] bad JSON', text.slice(0, 600))
       const fb = fallback(reqLang(narrLang), actionText, locationId, roomName, uiLang)

@@ -1,5 +1,5 @@
 /**
- * World MUD narration — Baseten LLM + deterministic fallback.
+ * World MUD narration — OpenCode Go LLM + deterministic fallback.
  * Supports both freeform natural language and button actions.
  */
 import { getSupabaseClient } from './supabaseClient'

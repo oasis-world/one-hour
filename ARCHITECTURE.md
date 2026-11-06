@@ -114,11 +114,11 @@ i18n：`i18n.ts/translations.ts`，中英日法西德韩意阿拉伯等 10 种�
 
 ## 六、云函数（`supabase/functions/`）
 
-通用模式：CORS、仅 POST、`Bearer` 经 Supabase `/auth/v1/user` 校验（5s 超时）、上游统一 `Baseten muse-spark-open-1026`（`https://inference.baseten.co/v1/chat/completions`，OpenAI 兼容格式）。
+通用模式：CORS、仅 POST、`Bearer` 经 Supabase `/auth/v1/user` 校验（5s 超时）、上游统一 `OpenCode Go muse-spark-1.3-contributor`（`https://opencode.ai/inference/go/openai/v1/responses`，Responses 格式，`instructions` + `input`，`reasoning: {effort: 'minimal'}`）。
 
 | 函数 | 入参 | 出参/行为 |
 |---|---|---|
-| `companion-chat` | `systemPrompt/history/userText/companionName/userName/isGreeting` | 强制 JSON `{reply, game}`；加固提示禁泄露 reasoning；问候强制 `@userName` 开头；含新闻关键词走 Tavily 搜索注入（无 key 时提示 cutoff 透明）；上游 45s 超时、20000 tokens；空回复/纯文本时关键词推断 game 兜底。 |
+| `companion-chat` | `systemPrompt/history/userText/companionName/userName/isGreeting` | 强制 JSON `{reply, game}`；加固提示禁泄露 reasoning；问候强制 `@userName` 开头；含新闻关键词走 Tavily 搜索注入（无 key 时提示 cutoff 透明）；上游 45s 超时、2048 tokens；空回复/纯文本时关键词推断 game 兜底。 |
 | `world-mud-narrate` | `actionText/locationId/districtId/roomName/player/lang/recentLog/globalEvent` | JSON `{narrative(≤800), choices(≤4，snake_case action), broadcast(≤60), hint}`；**严格单语言规则**（英文时禁中文字符）；20s 超时；无 key/失败时 zh/ja/en 模板回退。 |
 | `mud-generate` | `blueprint/party/lang` | 返回 `sceneText + choices`；客户端校验 ≥2 选项、截断 label/action 24 字符、scene 600 字符。 |
 | `game-ai-move` | 走法请求 | 云 AI 落子（桌游云模式）。 |

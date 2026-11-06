@@ -1,7 +1,28 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 
-const BASETEN_MODEL = 'meta-models/muse-spark-open-1026'
-const BASETEN_ENDPOINT = 'https://inference.baseten.co/v1/chat/completions'
+const OPENCODE_MODEL = 'muse-spark-1.3-contributor'
+const OPENCODE_ENDPOINT = 'https://opencode.ai/inference/go/openai/v1/responses'
+
+function isRecord(v: unknown): v is Record<string, unknown> { return Boolean(v && typeof v === 'object' && !Array.isArray(v)) }
+function parseJsonObject(text: string): Record<string, unknown> | null {
+  try { const p: unknown = JSON.parse(text); return isRecord(p) ? p : null } catch { /* fallback below */ }
+  const s = text.indexOf('{'), e = text.lastIndexOf('}')
+  if (s < 0 || e <= s) return null
+  try { const p: unknown = JSON.parse(text.slice(s, e + 1)); return isRecord(p) ? p : null } catch { return null }
+}
+function extractOpenCodeText(result: Record<string, unknown>): string {
+  const output = result.output as Array<{ content?: Array<{ type?: string; text?: string }> }> | undefined
+  if (!Array.isArray(output)) return ''
+  return output
+    .flatMap((it) => it.content ?? [])
+    .filter((it) => it.type === 'output_text')
+    .map((it) => it.text ?? '')
+    .join('')
+}
+async function stableSessionId(seed: string): Promise<string> {
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seed))
+  return `ses_${Array.from(new Uint8Array(hash).slice(0, 16), (b) => b.toString(16).padStart(2, '0')).join('')}`
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -17,7 +38,7 @@ Deno.serve(async (req) => {
   if (!blueprint || !Array.isArray(party)) return json({ error: 'Invalid payload' }, 400)
 
   // If AI not configured, return a deterministic template so client never sees 502
-  const apiKey = Deno.env.get('BASETEN_API_KEY')
+  const apiKey = Deno.env.get('OPENCODE_API_KEY')
   if (!apiKey) {
     return json(fallbackScene(blueprint as Record<string, unknown>, party as unknown[], lang as string))
   }
@@ -31,15 +52,16 @@ Write an opening scene (2-3 sentences, vivid, incorporate players' roles) and 2-
 Output ONLY valid JSON: {"sceneText": string (1-3 vivid sentences), "choices": [{"label": string (2-8 chars), "action": string (snake_case)}]}`
 
   try {
-    const upstream = await fetch(BASETEN_ENDPOINT, {
+    const sessionId = await stableSessionId(JSON.stringify([bp.titleEn ?? bp.title ?? '', partyDesc])).catch(() => 'mud-generate')
+    const upstream = await fetch(OPENCODE_ENDPOINT, {
       method: 'POST',
-      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json', 'x-opencode-session': sessionId },
       body: JSON.stringify({
-        model: BASETEN_MODEL,
-        messages: [{ role: 'system', content: sysPrompt }, { role: 'user', content: `Create opening scene for ${bp.titleEn ?? bp.title} with party ${partyDesc}` }],
-        max_completion_tokens: 600,
-        temperature: 0.8,
-        response_format: { type: 'json_object' } as unknown as Record<string, unknown>,
+        model: OPENCODE_MODEL,
+        instructions: sysPrompt,
+        input: JSON.stringify({ blueprint, party }),
+        max_output_tokens: 2048,
+        reasoning: { effort: 'minimal' },
       }),
       signal: AbortSignal.timeout(15000),
     })
@@ -49,18 +71,16 @@ Output ONLY valid JSON: {"sceneText": string (1-3 vivid sentences), "choices": [
       return json(fallbackScene(blueprint as Record<string, unknown>, party as unknown[], lang as string))
     }
     const result = await upstream.json() as Record<string, unknown>
-    const choice = (result.choices as unknown[] | undefined)?.[0] as Record<string, unknown> | undefined
-    const msg = (choice?.message ?? {}) as Record<string, unknown>
-    let text = typeof msg.content === 'string' ? msg.content : ''
-    if (Array.isArray(msg.content)) {
-      text = (msg.content as unknown[]).map((p: unknown) => typeof (p as { text?: unknown })?.text === 'string' ? (p as { text: string }).text : '').join('')
+    if (result.status && result.status !== 'completed') {
+      console.warn('[mud-generate] OpenCode incomplete', result.status)
+      return json(fallbackScene(blueprint as Record<string, unknown>, party as unknown[], lang as string))
     }
-    text = text.trim()
+    const text = extractOpenCodeText(result).trim()
     if (!text) {
       console.warn('[mud-generate] empty reply, fallback')
       return json(fallbackScene(blueprint as Record<string, unknown>, party as unknown[], lang as string))
     }
-    const parsed = (() => { try { return JSON.parse(text) as Record<string, unknown> } catch { return null } })()
+    const parsed = parseJsonObject(text)
     if (!parsed || typeof parsed.sceneText !== 'string' || !Array.isArray(parsed.choices)) {
       console.warn('[mud-generate] invalid AI JSON, fallback', text.slice(0, 200))
       return json(fallbackScene(blueprint as Record<string, unknown>, party as unknown[], lang as string))
