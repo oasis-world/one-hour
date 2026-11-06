@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import type { ChatEntry, MessageReply } from '../lib/chatTypes'
-import { useLang, COMPOSER_PLACEHOLDER, t } from '../lib/i18n'
+import { COMPOSER_PLACEHOLDER, COMPOSER_PRIVATE_PLACEHOLDER, useLang, t } from '../lib/i18n'
 import { useImeEnter } from '../lib/ime'
 import { setPopoverOpen, suppressNextClick } from '../lib/popoverGuard'
 import { markFilePickerOpened } from '../lib/filePickerGuard'
@@ -29,6 +29,8 @@ interface Props {
   onMenuOpenChange?: (open: boolean) => void
   companion?: CompanionProfile | null
   onMentionCompanion?: () => void
+  privateMode?: boolean
+  onExitPrivateChat?: () => void
 }
 
 function isCoarsePointer(): boolean {
@@ -62,7 +64,7 @@ function useMobileFormFactor(): boolean {
  * or emoji button toggles its popover (a click outside closes it); there
  * is no hover-to-open.
  */
-export default function Composer({ onSend, replyTo, onClearReply, editing, onClearEditing, onEdit, onImagePicked, onImagesPicked, onMenuOpenChange, onStartGame, companion, onMentionCompanion }: Props) {
+export default function Composer({ onSend, replyTo, onClearReply, editing, onClearEditing, onEdit, onImagePicked, onImagesPicked, onMenuOpenChange, onStartGame, companion, onMentionCompanion, privateMode, onExitPrivateChat }: Props) {
   const lang = useLang()
   const [draft, setDraft] = useState(editing?.content ?? '')
   const [plusOpen, setPlusOpen] = useState(false)
@@ -184,6 +186,18 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
   // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
   useEffect(() => { updateMentionState(draft) }, [draft, companion])
 
+  // Entering private mode should focus the field (mobile: keyboard pops).
+  const prevPrivateRef = useRef(privateMode)
+  useEffect(() => {
+    if (privateMode && !prevPrivateRef.current) {
+      inputRef.current?.focus()
+      try {
+        const el = inputRef.current
+        if (el) el.setSelectionRange(el.value.length, el.value.length)
+      } catch {}
+    }
+    prevPrivateRef.current = privateMode
+  }, [privateMode])
   // Warm the HEIC decoder while the user browses the plus menu, so a
   // first HEIC pick doesn't pay the chunk-download latency mid-send.
   useEffect(() => {
@@ -261,6 +275,13 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
 
   return (
     <div className="composer-dock" ref={rootRef}>
+      {privateMode && onExitPrivateChat && (
+        <div className="composer-private-bar">
+          <button type="button" className="composer-private-exit" onClick={onExitPrivateChat}>
+            {t('退出私聊', 'Exit private chat')}
+          </button>
+        </div>
+      )}
       {replyTo && (
         <div className="composer-reply-preview">
           <div className="composer-reply-copy">
@@ -303,7 +324,7 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
             <button
               type="button"
               className="composer-companion-btn"
-              aria-label={t('提及助手', 'Mention companion')}
+              aria-label={t('提及伙伴', 'Mention companion')}
               title={companion.name}
               onClick={() => {
                 const tag = `@${companion.name} `
@@ -442,7 +463,7 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
           value={draft}
           rows={1}
           maxLength={1000}
-          placeholder={COMPOSER_PLACEHOLDER[lang]}
+          placeholder={privateMode ? (COMPOSER_PRIVATE_PLACEHOLDER[lang] ?? COMPOSER_PLACEHOLDER[lang]) : COMPOSER_PLACEHOLDER[lang]}
           onChange={(e) => { setDraft(e.target.value) }}
           {...ime.imeProps}
           onKeyDown={(e) => {

@@ -38,6 +38,8 @@ interface Props {
   onCopy: (entry: ChatEntry) => void
   onJumpToReply: (id: string) => void
   isPrivate?: boolean
+  onEnterPrivateChat?: () => void
+  privateMode?: boolean
 }
 
 /** Touch form factors (phones, tablets) get the long-press sheet. */
@@ -70,18 +72,40 @@ function isSingleEmoji(text: string): boolean {
   return /[\p{Extended_Pictographic}\p{Regional_Indicator}\u20E3]/u.test(trimmed)
 }
 
-function renderMessageContent(content: string, extraNames?: string[]): ReactNode {
+function renderMessageContent(content: string, extraNames?: string[], highlightName?: string): ReactNode {
   if (!content) return content
   // Mentions (@name) take precedence — they need blue bold spans
   const mentionParts = parseMentions(content, extraNames)
   const hasMention = mentionParts.some((p) => p.type === 'mention')
   if (hasMention) {
-    return mentionParts.map((p, i) => p.type === 'mention' ? <span key={i} className="msg-mention">{p.value}</span> : <span key={i}>{renderEmojiText(p.value)}</span>)
+    return mentionParts.map((p, i) => {
+      if (p.type === 'mention') return <span key={i} className="msg-mention">{p.value}</span>
+      // Within text parts, also highlight partner name for greeting (bold blue without @)
+      if (highlightName && p.value.includes(highlightName)) {
+        return <span key={i}>{renderWithHighlight(p.value, highlightName)}</span>
+      }
+      return <span key={i}>{renderEmojiText(p.value)}</span>
+    })
+  }
+  // No @mentions but greeting: highlight bare partner name as mention
+  if (highlightName && content.includes(highlightName)) {
+    return renderWithHighlight(content, highlightName)
   }
   if (isSingleEmoji(content)) {
     return <span className="msg-emoji-single">{content}</span>
   }
   return renderEmojiText(content)
+}
+
+function renderWithHighlight(text: string, name: string): ReactNode {
+  const parts = text.split(name)
+  if (parts.length === 1) return renderEmojiText(text)
+  const out: ReactNode[] = []
+  parts.forEach((seg, i) => {
+    if (seg) out.push(<span key={`t-${i}`}>{renderEmojiText(seg)}</span>)
+    if (i < parts.length - 1) out.push(<span key={`h-${i}`} className="msg-mention">{name}</span>)
+  })
+  return <>{out}</>
 }
 
 function renderEmojiText(text: string): ReactNode {
@@ -121,6 +145,8 @@ export default function MessageRow({
   onCopy,
   onJumpToReply,
   isPrivate,
+  onEnterPrivateChat,
+  privateMode,
 }: Props) {
   const imageSrc = entry.imageUrl ?? entry.localImage ?? null
   const messageMedia = findMessageMedia(entry.content)
@@ -142,13 +168,45 @@ export default function MessageRow({
   const positionAuthor = (target: HTMLElement) => {
     const rect = target.getBoundingClientRect()
     const left = Math.max(12, Math.min(rect.left, window.innerWidth - 284))
-    const top = window.innerHeight - rect.bottom > 130 ? rect.bottom + 8 : rect.top - 112
+    // Bottom-near avatars must flip upward, otherwise the card is hidden
+    // behind the composer / viewport edge. Estimate popup height (avatar
+    // 52px + name/role/countdown + optional private button) ≈ 150px.
+    const POPUP_H = 150
+    const GAP = 8
+    const PAD = 12
+    const spaceBelow = window.innerHeight - rect.bottom
+    const isBottomHalf = rect.top > window.innerHeight - 220
+    let top: number
+    if (isBottomHalf || spaceBelow < POPUP_H + GAP) {
+      top = rect.top - POPUP_H - GAP
+    } else {
+      top = rect.bottom + GAP
+    }
+    // Clamp so the card never leaves the viewport.
+    top = Math.max(PAD, Math.min(top, window.innerHeight - POPUP_H - PAD))
     setAuthorPosition({ left, top })
   }
   const toggleAuthor = (event: MouseEvent<HTMLElement>) => {
     positionAuthor(event.currentTarget)
     setPortalRoot(event.currentTarget.closest<HTMLElement>('.app-shell'))
     setAuthorOpen((open) => !open)
+  }
+  const focusComposer = () => {
+    const el = document.querySelector('.composer-input') as HTMLTextAreaElement | null
+    if (!el) return
+    el.focus()
+    try {
+      const len = el.value.length
+      el.setSelectionRange(len, len)
+    } catch {}
+  }
+  const handleEnterPrivate = () => {
+    setAuthorOpen(false)
+    onEnterPrivateChat?.()
+    // Must focus synchronously inside the click gesture so mobile keyboards open.
+    focusComposer()
+    // Re-assert after React commits privateMode (placeholder/size change).
+    requestAnimationFrame(() => focusComposer())
   }
 
   useEffect(() => {
@@ -304,7 +362,7 @@ export default function MessageRow({
           {gameRef ? (
             <GameMessage content={entry.content} hostUserId={entry.userId} onlineMembers={onlineMembers} />
           ) : (
-            renderMessageContent(displayContent, mentionNames)
+            renderMessageContent(displayContent, mentionNames, entry.isGreeting ? entry.displayName : undefined)
           )}
           {entry.editedAt && (
             <span className="msg-edited">{t('（已编辑）', ' (edited)')}</span>
@@ -352,6 +410,11 @@ export default function MessageRow({
         {!entry.expiring && reactions && (
           <MsgReactions reactions={reactions} onToggle={(emoji) => onReact(entry.id, emoji)} />
         )}
+        {entry.isGreeting && isPrivate && !mine && !privateMode && onEnterPrivateChat && (
+          <button type="button" className="msg-greeting-private-btn" onClick={handleEnterPrivate}>
+            {t('进入私聊', 'Private chat')}
+          </button>
+        )}
         {!entry.expiring && (
           <MsgHoverBar
             mine={mine || Boolean(isPrivate)}
@@ -369,7 +432,12 @@ export default function MessageRow({
           className="author-pop-portal"
           style={{ left: authorPosition.left, top: authorPosition.top }}
         >
-            <MessageAuthorCard member={author} expired={Boolean(entry.farewell)} />
+            <MessageAuthorCard
+              member={author}
+              expired={Boolean(entry.farewell)}
+              onPrivateChat={handleEnterPrivate}
+              isCompanion={Boolean(isPrivate && !mine)}
+            />
         </div>,
         portalRoot ?? document.body,
       )}

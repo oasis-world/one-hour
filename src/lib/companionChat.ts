@@ -39,7 +39,7 @@ export async function requestCompanionReply(
 
 export async function requestCompanionGreeting(companion: CompanionProfile): Promise<string> {
   const user = loadUserProfile()
-  if (!user) return `@${companion.name} 你好呀！我是你的助手，随时@我聊天吧～`
+  if (!user) return `@${companion.name} 你好呀！我是你的伙伴，随时@我聊天吧～`
   const systemPrompt = buildCompanionSystemPrompt(user, companion)
   const greetingPrompt = buildGreetingPrompt(user, companion)
   if (isSupabaseConfigured()) {

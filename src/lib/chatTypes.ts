@@ -44,6 +44,8 @@ export interface ChatEntry extends ChatMessage {
   localImage?: string
   /** Set the moment the hour runs out — drives the dissolve animation. */
   expiring?: boolean
+  /** Companion greeting marker — renders the private-chat entry button. */
+  isGreeting?: boolean
 }
 
 export interface PresenceMember {

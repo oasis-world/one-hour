@@ -729,6 +729,20 @@ button {
   padding-bottom: 216px;
 }
 
+/* Private-bar reserve — mirrors reply-preview/multiline logic */
+.chat-column:has(.composer-private-bar) .chat-log-wrap {
+  padding-bottom: 130px;
+}
+.chat-column:has(.composer-private-bar):has(.composer-reply-preview) .chat-log-wrap {
+  padding-bottom: 180px;
+}
+.chat-column:has(.composer-private-bar):has(.composer.is-multiline) .chat-log-wrap {
+  padding-bottom: 194px;
+}
+.chat-column:has(.composer-private-bar):has(.composer.is-multiline):has(.composer-reply-preview) .chat-log-wrap {
+  padding-bottom: 250px;
+}
+
 /* Square corners — the chat column reads as a full-height panel. */
 .chat-list-backdrop {
   position: absolute;
@@ -1466,7 +1480,7 @@ button {
   position: absolute;
   bottom: 104px;
   right: 18px;
-  z-index: 10;
+  z-index: 20;
   width: 34px;
   height: 34px;
   display: grid;
@@ -1486,6 +1500,15 @@ button {
 .chat-jump:hover {
   color: var(--ink);
   transform: translateY(-2px);
+}
+.chat-column:has(.composer-private-bar) .chat-jump {
+  bottom: 138px;
+}
+.chat-column:has(.composer-private-bar):has(.composer-reply-preview) .chat-jump {
+  bottom: 188px;
+}
+.chat-column:has(.composer-private-bar):has(.composer.is-multiline) .chat-jump {
+  bottom: 202px;
 }
 
 .chat-jump-count {
@@ -1625,6 +1648,18 @@ button {
 
 .app-shell.is-keyboard-open:has(.composer.is-multiline):has(.composer-reply-preview) .chat-log-wrap {
   padding-bottom: 190px;
+}
+.app-shell.is-keyboard-open:has(.composer-private-bar) .chat-log-wrap {
+  padding-bottom: 100px;
+}
+.app-shell.is-keyboard-open:has(.composer-private-bar):has(.composer-reply-preview) .chat-log-wrap {
+  padding-bottom: 150px;
+}
+.app-shell.is-keyboard-open:has(.composer-private-bar):has(.composer.is-multiline) .chat-log-wrap {
+  padding-bottom: 174px;
+}
+.app-shell.is-keyboard-open:has(.composer-private-bar):has(.composer.is-multiline):has(.composer-reply-preview) .chat-log-wrap {
+  padding-bottom: 224px;
 }
 
 .app-shell.is-keyboard-open .settings-bar {
@@ -2682,6 +2717,70 @@ button {
 .mention-item-main { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
 .mention-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mention-role { font-size: 11px; opacity: 0.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Greeting private-chat entry button */
+.msg-greeting-private-btn {
+  margin-top: 8px;
+  align-self: flex-start;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.14s ease, transform 0.12s ease;
+}
+.msg-greeting-private-btn:hover { filter: brightness(1.08); }
+.msg-greeting-private-btn:active { transform: scale(0.97); }
+
+/* Composer private-mode bar — sits at top-left of the input dock */
+.composer-private-bar {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  padding-left: 2px;
+  box-sizing: border-box;
+}
+.composer-private-bar .composer-private-exit {
+  margin-top: 10px !important;
+  margin-bottom: 10px !important;
+}
+.composer-private-exit {
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: #e9977a;
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.14s ease, filter 0.14s ease, transform 0.12s ease;
+}
+.composer-private-exit:hover { background: #e07f5f; filter: brightness(1.02); }
+.composer-private-exit:active { transform: scale(0.97); }
+
+/* Avatar popup private-chat action */
+.account-pop-actions {
+  display: flex;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--line-soft);
+  margin-top: 10px;
+}
+.account-pop-private-btn {
+  flex: 1;
+  min-height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.14s ease;
+}
+.account-pop-private-btn:hover { filter: brightness(1.07); }
 
 /* Companion typing indicator */
 .msg-row.is-typing { opacity: 0.95; }

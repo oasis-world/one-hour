@@ -35,7 +35,7 @@ function LegacyMudGame({ instanceId, hostUserId }: GameComponentProps) {
   }, [instanceId])
 
   if (loading) return <div className="mud-card mud-loading">Loading adventure…</div>
-  if (!state) return <div className="mud-card mud-empty">Adventure not found — it may have expired. Try the new world: ask the assistant for MUD.</div>
+  if (!state) return <div className="mud-card mud-empty">Adventure not found — it may have expired. Try the new world: ask the companion for MUD.</div>
 
   const isZh = state.lang.startsWith('zh')
   const room = state.blueprint.rooms[Math.min(state.step, state.blueprint.rooms.length - 1)]
@@ -75,7 +75,7 @@ function LegacyMudGame({ instanceId, hostUserId }: GameComponentProps) {
         <div className="mud-progress-bar" style={{ width: `${((state.step + 1) / state.blueprint.rooms.length) * 100}%` }} />
       </div>
       <div className="mud-footer">
-        <span className="mud-hint">{isZh ? '旧版存档，仅本地可玩。试试与助手对话进入永恒沙漏世界。' : 'Legacy save. Ask the assistant for the Eternal Hourglass world.'}</span>
+        <span className="mud-hint">{isZh ? '旧版存档，仅本地可玩。试试与伙伴对话进入永恒沙漏世界。' : 'Legacy save. Ask the companion for the Eternal Hourglass world.'}</span>
         {hostUserId && state.step >= state.blueprint.rooms.length - 1 && (
           <span className="mud-finish">{isZh ? '🎉 冒险完成！' : '🎉 Adventure complete!'}</span>
         )}

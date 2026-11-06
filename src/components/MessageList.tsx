@@ -39,6 +39,8 @@ interface Props {
   companion?: { name: string; style: string; seed: string; avatarUrl?: string | null } | null
   userTyping?: boolean
   selfProfile?: { nickname: string; style: string | null; seed: string | null; avatarUrl?: string | null } | null
+  privateMode?: boolean
+  onEnterPrivateChat?: () => void
 }
 
 interface OpenMenu {
@@ -78,6 +80,8 @@ export default function MessageList({
   companion,
   userTyping,
   selfProfile,
+  privateMode,
+  onEnterPrivateChat,
 }: Props) {
   useLang() // re-render on language flips
   const logRef = useRef<HTMLDivElement>(null)
@@ -302,10 +306,12 @@ export default function MessageList({
             onCopy={copyEntry}
             onJumpToReply={jumpToReply}
             isPrivate={isPrivateId?.(entry.id) ?? false}
+            privateMode={privateMode}
+            onEnterPrivateChat={onEnterPrivateChat}
           />
         ))}
         {companionTyping && companion && (
-          <div className="msg-row is-private is-typing" aria-live="polite" aria-label={t('助手正在输入', 'Companion is typing')}>
+          <div className="msg-row is-private is-typing" aria-live="polite" aria-label={t('伙伴正在输入', 'Companion is typing')}>
             <div className="msg-gutter">
               <AvatarBadge look={{ style: companion.style, seed: companion.seed, avatarUrl: companion.avatarUrl ?? null }} size={35} className="msg-avatar-img" />
             </div>

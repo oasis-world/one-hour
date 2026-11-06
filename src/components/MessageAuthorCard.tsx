@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { PresenceMember } from '../lib/chatTypes'
 import { fetchCloudProfile } from '../lib/profileCloud'
 import type { CloudProfileSnapshot } from '../lib/profileCloud'
+import { t } from '../lib/i18n'
 import AvatarBadge from './AvatarBadge'
 
 function countdown(ms: number): string {
@@ -13,10 +14,14 @@ export default function MessageAuthorCard({
   member,
   className,
   expired = false,
+  onPrivateChat,
+  isCompanion = false,
 }: {
   member: PresenceMember
   className?: string
   expired?: boolean
+  onPrivateChat?: () => void
+  isCompanion?: boolean
 }) {
   const [now, setNow] = useState<number | null>(null)
   const [cloudProfile, setCloudProfile] = useState<CloudProfileSnapshot | null>(null)
@@ -64,6 +69,13 @@ export default function MessageAuthorCard({
           <span className="account-pop-countdown">{countdown(remaining)}</span>
         </div>
       </div>
+      {isCompanion && onPrivateChat && (
+        <div className="account-pop-actions">
+          <button type="button" className="account-pop-private-btn" onClick={() => onPrivateChat()}>
+            {t('进入私聊', 'Private chat')}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

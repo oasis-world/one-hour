@@ -6,6 +6,7 @@ export interface CompanionMessage {
   content: string
   at: number
   expiresAt: number
+  kind?: 'greeting'
 }
 
 function newId(): string {

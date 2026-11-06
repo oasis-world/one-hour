@@ -93,6 +93,19 @@ export const COMPOSER_PLACEHOLDER: Record<Lang, string> = {
   ar: 'قل شيئاً…',
 }
 
+export const COMPOSER_PRIVATE_PLACEHOLDER: Record<Lang, string> = {
+  zh: '和伙伴聊天中…',
+  'zh-TW': '和夥伴聊天中…',
+  en: 'Chat with companion…',
+  ja: 'コンパニオンとチャット中…',
+  fr: 'Chat avec le compagnon…',
+  es: 'Chat con el compañero…',
+  de: 'Chat mit Begleiter…',
+  ko: '동반자와 채팅 중…',
+  it: 'Chat con il compagno…',
+  ar: 'دردشة مع الرفيق…',
+}
+
 export const LANG_LABELS: Record<Lang, string> = {
   zh: '简体中文',
   'zh-TW': '繁體中文',

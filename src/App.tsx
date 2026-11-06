@@ -48,6 +48,7 @@ import { requestCompanionGreeting, requestCompanionReply, toHistory } from './li
 import { containsCompanionMention } from './lib/mention'
 import { createCompanionGame, gameTitle } from './lib/companionGame'
 import { isMudInviteIntent } from './lib/mudRecreate'
+import { isEnterPrivateChatIntent } from './lib/privateChatIntent'
 import { applyRoomReactionChange, recordEmojiUse, summarizeRoomReactions, type RoomReactionRecord } from './lib/chatReactions'
 import { clearLocalReactions, loadLocalReactions, pruneLocalReactions, removeLocalReaction, removeLocalReactionsForMessage, saveLocalReaction } from './lib/localReactions'
 
@@ -283,11 +284,36 @@ export default function App() {
   }
 
   const [companion, setCompanion] = useState<CompanionProfile | null>(() => getCompanionIfAlive())
+  const PRIVATE_MODE_KEY = 'one-hour-private-mode'
+  const [privateMode, setPrivateMode] = useState<boolean>(() => {
+    try { return globalThis.localStorage?.getItem(PRIVATE_MODE_KEY) === '1' } catch { return false }
+  })
+  useEffect(() => {
+    try {
+      if (privateMode) globalThis.localStorage?.setItem(PRIVATE_MODE_KEY, '1')
+      else globalThis.localStorage?.removeItem(PRIVATE_MODE_KEY)
+    } catch { /* noop */ }
+  }, [privateMode])
+  // Companion expiry clears private mode
+  useEffect(() => { if (!companion) setPrivateMode(false) }, [companion])
   const [privateMessages, setPrivateMessages] = useState<CompanionMessage[]>([])
   const [companionTyping, setCompanionTyping] = useState(false)
   const [userTyping, setUserTyping] = useState(false)
   const privateMessagesRef = useRef<CompanionMessage[]>([])
   useEffect(() => { privateMessagesRef.current = privateMessages }, [privateMessages])
+  const enterPrivateChat = useCallback(() => {
+    setPrivateMode(true)
+    const el = document.querySelector('.composer-input') as HTMLTextAreaElement | null
+    if (el) {
+      el.focus()
+      try { const len = el.value.length; el.setSelectionRange(len, len) } catch {}
+      requestAnimationFrame(() => {
+        const el2 = document.querySelector('.composer-input') as HTMLTextAreaElement | null
+        el2?.focus()
+      })
+    }
+  }, [])
+  const exitPrivateChat = useCallback(() => setPrivateMode(false), [])
   const mudCardCreatingRef = useRef(false)
   // Reactions for local messages (companion chats + MUD card) — persisted in IndexedDB
   const [localReactionRows, setLocalReactionRows] = useState<RoomReactionRecord[]>([])
@@ -424,7 +450,8 @@ export default function App() {
         return
       }
       setCompanionTyping(false)
-      const msg = createCompanionReply(greetingText)
+      const msg = createCompanionReply(greetingText) as CompanionMessage
+      msg.kind = 'greeting'
       await saveCompanionMessage(msg)
       setPrivateMessages((prev) => [...prev, msg])
       setSentMessageSequence((s) => s + 1)
@@ -527,7 +554,7 @@ export default function App() {
       setSentMessageSequence((s) => s + 1)
       if (result.game) {
         void handleCompanionGame(result.game)
-        const sys = createCompanionReply(t(`已为你创建${gameTitle(result.game, t)}对局，助手已加入`, `Created ${gameTitle(result.game, t)} — your companion has joined`))
+        const sys = createCompanionReply(t(`已为你创建${gameTitle(result.game, t)}对局，伙伴已加入`, `Created ${gameTitle(result.game, t)} — your companion has joined`))
         await saveCompanionMessage(sys)
         setPrivateMessages((prev) => [...prev, sys])
       }
@@ -536,7 +563,11 @@ export default function App() {
   }
 
   const handleSend = (text: string, reply?: MessageReply | null) => {
-    if (companion && containsCompanionMention(text, companion)) {
+    const isMention = companion ? containsCompanionMention(text, companion) : false
+    const isIntent = isEnterPrivateChatIntent(text)
+    const wantsPrivate = Boolean(companion && (privateMode || isMention || isIntent))
+    if (wantsPrivate && companion) {
+      if (isIntent) setPrivateMode(true)
       void sendPrivateAndReply(text)
       return
     }
@@ -652,6 +683,7 @@ export default function App() {
         avatarUrl: isUser ? (profile?.avatarUrl ?? null) : (companion.avatarUrl ?? null),
         authorRole: isUser ? (profile?.role ?? null) : companion.role,
         content: m.content, at: m.at, expiresAt: Math.min(companionMessageExpiresAt(m.at), companion.expiresAt),
+        isGreeting: m.kind === 'greeting' && m.from === 'companion',
       }
     })
   }, [privateMessages, companion, profile, room.identity])
@@ -882,6 +914,8 @@ export default function App() {
               userTyping={userTyping}
               selfProfile={profile ? { nickname: profile.nickname, style: profile.style ?? null, seed: profile.seed ?? null, avatarUrl: profile.avatarUrl ?? null } : null}
               onEdit={handleStartEdit}
+              privateMode={privateMode}
+              onEnterPrivateChat={enterPrivateChat}
             />
 
             {room.identity ? (
@@ -898,6 +932,8 @@ export default function App() {
                 onMenuOpenChange={handleMenuOpenChange}
                 onStartGame={handleStartGame}
                 companion={companion}
+                privateMode={privateMode}
+                onExitPrivateChat={exitPrivateChat}
               />
             ) : (
               <div className="composer-dock">

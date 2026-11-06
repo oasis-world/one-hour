@@ -22,11 +22,11 @@ const listeners = new Set<(c: CompanionProfile | null) => void>()
 
 function companionRole(lang: Lang): string {
   const map: Record<string, string> = {
-    zh: '你的助手', 'zh-TW': '你的助手', en: 'Your companion',
-    ja: 'あなたの助手', fr: 'Ton assistant', es: 'Tu asistente',
-    de: 'Dein Assistent', ko: '당신의 어시스턴트', it: 'Il tuo assistente', ar: 'مساعدك',
+    zh: '你的伙伴', 'zh-TW': '你的夥伴', en: 'Your companion',
+    ja: 'あなたのコンパニオン', fr: 'Ton compagnon', es: 'Tu compañero',
+    de: 'Dein Begleiter', ko: '당신의 동반자', it: 'Il tuo compagno', ar: 'رفيقك',
   }
-  return map[lang] ?? map[getLang()] ?? '你的助手'
+  return map[lang] ?? map[getLang()] ?? '你的伙伴'
 }
 
 export function loadCompanionProfile(): CompanionProfile | null {
