@@ -482,9 +482,12 @@ button {
 .online-pop-row {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 10px;
   padding: 8px 9px;
   border-radius: 12px;
+  text-align: left;
+  color: var(--ink);
 }
 
 .online-pop-row:hover {
@@ -509,11 +512,12 @@ button {
 .online-pop-name {
   flex: 1;
   min-width: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: left;
 }
 
 .online-pop-empty {
@@ -2664,20 +2668,29 @@ button {
   background: rgba(255, 122, 69, 0.09);
   border-left-color: #ff7a45;
 }
+/* Clickable rows: the <button> below is the visual row. Neutralise the
+   outer <li> padding/hover so "others" don't get a second inset layer
+   that pushes them right of the (non-clickable) self row. */
 .online-pop-row.is-clickable {
-  border-radius: 8px;
+  padding: 0;
+  border-radius: 12px;
+}
+.online-pop-row.is-clickable:hover {
+  background: transparent;
 }
 .online-pop-row-btn {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 10px;
   width: 100%;
-  padding: 6px 8px;
+  padding: 8px 9px;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   background: transparent;
   cursor: pointer;
   text-align: left;
+  color: var(--ink);
 }
 .online-pop-row-btn:hover {
   background: var(--row-hover);
@@ -2685,12 +2698,16 @@ button {
 .online-pop-main {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  flex: 1;
   min-width: 0;
   gap: 1px;
+  text-align: left;
 }
 .online-pop-role {
-  font-size: 11px;
-  opacity: 0.6;
+  font-size: 12px;
+  color: var(--ink-mute);
+  text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

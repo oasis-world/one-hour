@@ -83,6 +83,8 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
   const [multiline, setMultiline] = useState(false)
   const [mentionOpen, setMentionOpen] = useState(false)
   const [mentionIndex, setMentionIndex] = useState(0)
+  const [isComposing, setIsComposing] = useState(false)
+  const [frozenQuery, setFrozenQuery] = useState<string | null>(null)
   const coarse = isCoarsePointer()
   const mobileForm = useMobileFormFactor()
   const ime = useImeEnter()
@@ -92,7 +94,8 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
   const uploadInputRef = useRef<HTMLInputElement>(null)
 
   const getFilteredPresence = (query: string): PresenceMember[] => {
-    const list = (presence ?? []).filter((p) => p.userId !== selfId)
+    const companionId = companion?.id ?? null
+    const list = (presence ?? []).filter((p) => p.userId !== selfId && p.userId !== companionId)
     if (!query) return list.slice(0, 5)
     const q = query.toLowerCase()
     return list.filter((p) => {
@@ -115,9 +118,12 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
       }
     }
     // Also close if already completed a whisper target's name (exact @name + space)
-    // Check presence members for exact match
+    // Check presence members for exact match (companion excluded — it is already
+    // rendered as its own first candidate and must not appear twice).
     if (presence && presence.length > 0) {
+      const companionId = companion?.id ?? null
       for (const m of presence) {
+        if (m.userId === companionId) continue
         const tag = `@${m.displayName}`
         if (after === tag || after === tag + ' ' || after.startsWith(tag + ' ') || after.startsWith(tag + '\n')) {
           setMentionOpen(false)
@@ -129,7 +135,8 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
     const query = value.slice(lastAt + 1).trim().split(/\s/)[0] ?? ''
     const hasCompanion = Boolean(companion)
     const hasPresence = (() => {
-      const list = (presence ?? []).filter((p) => p.userId !== selfId)
+      const companionId = companion?.id ?? null
+      const list = (presence ?? []).filter((p) => p.userId !== selfId && p.userId !== companionId)
       if (!query) return list.length > 0
       const q = query.toLowerCase()
       return list.some((p) => (p.displayName ?? '').toLowerCase().includes(q) || (p.role ?? '').toLowerCase().includes(q))
@@ -139,23 +146,22 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
     setMentionIndex(0)
   }
 
+  // During IME composition the draft carries half-finished pinyin / kana
+  // fragments — filtering on them would make the @ list jitter and flicker.
+  // Freeze on the last committed query until composition ends.
+  const getMentionQuery = (value: string): string => {
+    const lastAt = value.lastIndexOf('@')
+    return lastAt === -1 ? '' : value.slice(lastAt + 1).trim().split(/\s/)[0] ?? ''
+  }
+  const liveQuery = getMentionQuery(draft)
+  const effectiveQuery = isComposing && frozenQuery != null ? frozenQuery : liveQuery
   const mentionCandidates: MentionCandidate[] = (() => {
-    const lastAt = draft.lastIndexOf('@')
-    const query = lastAt === -1 ? '' : draft.slice(lastAt + 1).trim().split(/\s/)[0] ?? ''
+    const query = effectiveQuery
     const filtered = getFilteredPresence(query)
     const out: MentionCandidate[] = []
     if (companion) {
-      // Filter companion by query too, but companion always stays if query empty or matches
-      const q = query.toLowerCase()
-      const cname = companion.name.toLowerCase()
-      const crole = (companion.role ?? '').toLowerCase()
-      const matchesCompanion = !q || cname.includes(q) || crole.includes(q)
-      if (matchesCompanion || !q) {
-        out.push({ kind: 'companion', id: companion.id, displayName: companion.name, role: companion.role, style: companion.style, seed: companion.seed, avatarUrl: companion.avatarUrl ?? null })
-      } else if (q) {
-        // Even if companion doesn't match, still show companion as first per spec (永远第一位不消失)
-        out.push({ kind: 'companion', id: companion.id, displayName: companion.name, role: companion.role, style: companion.style, seed: companion.seed, avatarUrl: companion.avatarUrl ?? null })
-      }
+      // Companion always stays first while the popup is open (matches or not).
+      out.push({ kind: 'companion', id: companion.id, displayName: companion.name, role: companion.role, style: companion.style, seed: companion.seed, avatarUrl: companion.avatarUrl ?? null })
     }
     for (const m of filtered) out.push({ kind: 'whisper', member: m })
     // If no companion and no presence, return empty to close
@@ -248,9 +254,10 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
     return () => setPopoverOpen(false)
   }, [plusOpen, emojiOpen, mentionOpen, onMenuOpenChange])
 
-  // Sync mention popover with draft
+  // Sync mention popover with draft — frozen while IME is composing so the
+  // half-finished pinyin never opens / closes / re-filters the @ list.
   // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
-  useEffect(() => { updateMentionState(draft) }, [draft, companion, presence, selfId])
+  useEffect(() => { if (!isComposing) updateMentionState(draft) }, [draft, companion, presence, selfId, isComposing])
 
   // External insert trigger (avatar / online list click)
   useEffect(() => {
@@ -579,6 +586,20 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
           placeholder={privateMode ? (COMPOSER_PRIVATE_PLACEHOLDER[lang] ?? COMPOSER_PLACEHOLDER[lang]) : COMPOSER_PLACEHOLDER[lang]}
           onChange={(e) => { setDraft(e.target.value) }}
           {...ime.imeProps}
+          onCompositionStart={(e) => {
+            ime.imeProps.onCompositionStart()
+            setFrozenQuery(getMentionQuery(draft))
+            setIsComposing(true)
+            void e
+          }}
+          onCompositionEnd={(e) => {
+            ime.imeProps.onCompositionEnd()
+            void e
+            // Same one-tick delay as useImeEnter: Safari fires the committing
+            // Enter keydown *after* compositionend, so the freeze must outlive
+            // it by one tick before the @ list resumes filtering.
+            window.setTimeout(() => setIsComposing(false), 0)
+          }}
           onKeyDown={(e) => {
             if (mentionOpen) {
               if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
