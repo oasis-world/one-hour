@@ -30,6 +30,8 @@ export interface ChatOutboxItem {
   attempts: number
   /** Downscaled image waiting for its storage upload. */
   imageBlob?: Blob
+  whisperTo?: string | null
+  whisperToName?: string | null
 }
 
 export const CHAT_OUTBOX_MAX_ATTEMPTS = 5

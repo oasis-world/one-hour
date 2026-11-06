@@ -40,7 +40,7 @@ interface Props {
   userTyping?: boolean
   selfProfile?: { nickname: string; style: string | null; seed: string | null; avatarUrl?: string | null } | null
   privateMode?: boolean
-  onEnterPrivateChat?: () => void
+  onEnterPrivateChat?: (member: PresenceMember) => void
 }
 
 interface OpenMenu {
@@ -308,6 +308,7 @@ export default function MessageList({
             isPrivate={isPrivateId?.(entry.id) ?? false}
             privateMode={privateMode}
             onEnterPrivateChat={onEnterPrivateChat}
+            selfId={selfId}
           />
         ))}
         {companionTyping && companion && (

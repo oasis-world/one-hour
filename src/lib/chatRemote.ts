@@ -83,6 +83,8 @@ export interface RoomHandle {
     imageBlob?: Blob
     expiresAt?: number
     farewell?: boolean
+    whisperTo?: string | null
+    whisperToName?: string | null
   }): Promise<{ ok: true } | { ok: false; error: 'network' | 'rejected' }>
   /** Author deletes one own message: dissolve here, purge the cloud row
    *  and, through the storage API (SQL deletes on storage.objects are
@@ -108,6 +110,8 @@ interface MessageRow {
   edited_at?: string | null
   expires_at?: string
   farewell?: boolean
+  whisper_to?: string | null
+  whisper_to_name?: string | null
 }
 
 interface ReactionRow {
@@ -431,6 +435,8 @@ export async function joinChatRoom(options: {
           ...(draft.expiresAt ? { expires_at: new Date(draft.expiresAt).toISOString() } : {}),
           ...(draft.farewell ? { farewell: true } : {}),
           ...(draft.authorRole?.trim() ? { author_role: draft.authorRole.trim() } : {}),
+          ...(draft.whisperTo ? { whisper_to: draft.whisperTo } : {}),
+          ...(draft.whisperToName ? { whisper_to_name: draft.whisperToName } : {}),
         }
         const optional: Record<string, unknown> = {
           avatar_style: draft.avatar?.style ?? null,
@@ -563,6 +569,8 @@ function rowToMessage(row: MessageRow): ChatMessage {
     farewell: row.farewell ?? false,
     imageUrl: row.image_url ?? null,
     editedAt: row.edited_at ?? null,
+    whisperTo: row.whisper_to ?? null,
+    whisperToName: row.whisper_to_name ?? null,
   }
 }
 
@@ -581,6 +589,6 @@ function isMissingColumnError(error: { message?: string; code?: string }): boole
 
 function missingOptionalMessageColumn(error: { message?: string }): string | null {
   const message = (error.message ?? '').toLowerCase()
-  return ['reply_to', 'avatar_style', 'avatar_seed', 'avatar_url', 'author_role', 'farewell', 'expires_at']
+  return ['reply_to', 'avatar_style', 'avatar_seed', 'avatar_url', 'author_role', 'farewell', 'expires_at', 'whisper_to', 'whisper_to_name']
     .find((column) => message.includes(column)) ?? null
 }

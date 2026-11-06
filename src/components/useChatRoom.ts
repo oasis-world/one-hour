@@ -76,7 +76,7 @@ export function useChatRoom(enabled: boolean) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, displayName, avatarKey, avatarUrl, profileDetails])
 
-  const send = useCallback((text: string, imageBlob?: Blob, replyTo?: MessageReply | null, options?: { expiresAt?: number; farewell?: boolean }) => {
+  const send = useCallback((text: string, imageBlob?: Blob, replyTo?: MessageReply | null, options?: { expiresAt?: number; farewell?: boolean; whisperTo?: string | null; whisperToName?: string | null }) => {
     apiRef.current?.send(text, imageBlob, replyTo, options)
   }, [])
   const retry = useCallback(() => apiRef.current?.retry(), [])

@@ -37,6 +37,8 @@ alter table public.chat_messages add column if not exists author_role text;
 alter table public.chat_messages add column if not exists reply_to jsonb;
 alter table public.chat_messages add column if not exists edited_at timestamptz;
 alter table public.chat_messages add column if not exists farewell boolean not null default false;
+alter table public.chat_messages add column if not exists whisper_to uuid references auth.users (id) on delete cascade;
+alter table public.chat_messages add column if not exists whisper_to_name text;
 
 -- Full replica identity so Realtime UPDATE/DELETE payloads carry every column
 -- (including edited_at) instead of just the primary key.
@@ -56,16 +58,26 @@ create index if not exists chat_messages_recent
 create index if not exists chat_messages_expiry
   on public.chat_messages (expires_at);
 
+create index if not exists chat_messages_whisper
+  on public.chat_messages (whisper_to);
+
 alter table public.chat_messages enable row level security;
 
--- Readable by every signed-in player (anonymous sign-ins included): the
--- room is public, that wider policy is the whole point.
+-- Public messages are readable by all signed-in players; whisper messages
+-- are only visible to their sender and recipient.
 drop policy if exists "chat is readable by signed-in players"
   on public.chat_messages;
 
 create policy "chat is readable by signed-in players"
   on public.chat_messages for select
-  using (auth.uid() is not null);
+  using (
+    auth.uid() is not null
+    and (
+      whisper_to is null
+      or whisper_to = auth.uid()
+      or user_id = auth.uid()
+    )
+  );
 
 -- Writes bind to the caller's JWT no matter what the payload claims.
 drop policy if exists "players may post as themselves"

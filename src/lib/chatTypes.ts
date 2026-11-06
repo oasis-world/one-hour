@@ -26,6 +26,9 @@ export interface ChatMessage {
   imageUrl?: string | null
   /** Set when the message text was edited after sending. */
   editedAt?: string | null
+  /** Whisper target — only sender and recipient can read. */
+  whisperTo?: string | null
+  whisperToName?: string | null
 }
 
 export interface MessageReply {
@@ -46,6 +49,8 @@ export interface ChatEntry extends ChatMessage {
   expiring?: boolean
   /** Companion greeting marker — renders the private-chat entry button. */
   isGreeting?: boolean
+  /** True when this is a whisper to another live user (cloud). */
+  isWhisper?: boolean
 }
 
 export interface PresenceMember {

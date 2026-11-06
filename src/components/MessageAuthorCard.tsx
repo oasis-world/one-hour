@@ -15,13 +15,15 @@ export default function MessageAuthorCard({
   className,
   expired = false,
   onPrivateChat,
-  isCompanion = false,
+  selfId,
+  isCompanion: _isCompanion = false,
 }: {
   member: PresenceMember
   className?: string
   expired?: boolean
-  onPrivateChat?: () => void
+  onPrivateChat?: (member: PresenceMember) => void
   isCompanion?: boolean
+  selfId?: string | null
 }) {
   const [now, setNow] = useState<number | null>(null)
   const [cloudProfile, setCloudProfile] = useState<CloudProfileSnapshot | null>(null)
@@ -69,10 +71,10 @@ export default function MessageAuthorCard({
           <span className="account-pop-countdown">{countdown(remaining)}</span>
         </div>
       </div>
-      {isCompanion && onPrivateChat && (
+      {onPrivateChat && member.userId !== selfId && (
         <div className="account-pop-actions">
-          <button type="button" className="account-pop-private-btn" onClick={() => onPrivateChat()}>
-            {t('进入私聊', 'Private chat')}
+          <button type="button" className="account-pop-private-btn" onClick={() => onPrivateChat(member)}>
+            {t('私聊', 'Private chat')}
           </button>
         </div>
       )}

@@ -38,8 +38,9 @@ interface Props {
   onCopy: (entry: ChatEntry) => void
   onJumpToReply: (id: string) => void
   isPrivate?: boolean
-  onEnterPrivateChat?: () => void
+  onEnterPrivateChat?: (member: PresenceMember) => void
   privateMode?: boolean
+  selfId?: string | null
 }
 
 /** Touch form factors (phones, tablets) get the long-press sheet. */
@@ -147,6 +148,7 @@ export default function MessageRow({
   isPrivate,
   onEnterPrivateChat,
   privateMode,
+  selfId,
 }: Props) {
   const imageSrc = entry.imageUrl ?? entry.localImage ?? null
   const messageMedia = findMessageMedia(entry.content)
@@ -202,7 +204,7 @@ export default function MessageRow({
   }
   const handleEnterPrivate = () => {
     setAuthorOpen(false)
-    onEnterPrivateChat?.()
+    onEnterPrivateChat?.(author)
     // Must focus synchronously inside the click gesture so mobile keyboards open.
     focusComposer()
     // Re-assert after React commits privateMode (placeholder/size change).
@@ -271,8 +273,8 @@ export default function MessageRow({
         entry.state ? `is-${entry.state}` : '',
         entry.expiring ? 'is-expiring' : '',
         menuOpen ? 'is-menu-open' : '',
-        isPrivate ? 'is-private' : '',
-        isMentioned ? 'is-mentioned' : '',
+        entry.isWhisper ? 'is-whisper' : isPrivate ? 'is-private' : '',
+        !entry.isWhisper && isMentioned ? 'is-mentioned' : '',
       ].join(' ')}
       onContextMenu={(e) => {
         e.preventDefault()
@@ -437,6 +439,7 @@ export default function MessageRow({
               expired={Boolean(entry.farewell)}
               onPrivateChat={handleEnterPrivate}
               isCompanion={Boolean(isPrivate && !mine)}
+              selfId={selfId}
             />
         </div>,
         portalRoot ?? document.body,

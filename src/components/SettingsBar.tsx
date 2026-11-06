@@ -18,6 +18,8 @@ export default function SettingsBar({
   suppressed = false,
   onToggleTheme,
   onChangeCountdownAnimation,
+  selfId,
+  onMemberPrivateClick,
 }: {
   members: PresenceMember[]
   theme: ThemeName
@@ -26,6 +28,8 @@ export default function SettingsBar({
   suppressed?: boolean
   onToggleTheme: () => void
   onChangeCountdownAnimation: (animation: CountdownAnimation) => void
+  selfId?: string | null
+  onMemberPrivateClick?: (member: PresenceMember) => void
 }) {
   const lang = useLang()
   const mobile = window.matchMedia?.('(pointer: coarse)').matches ?? false
@@ -198,6 +202,8 @@ export default function SettingsBar({
           members={members}
           placement="bottom"
           onClose={() => setListOpen(false)}
+          selfId={selfId}
+          onMemberClick={onMemberPrivateClick}
         />
       )}
     </div>

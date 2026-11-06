@@ -56,7 +56,7 @@ export interface ChatCallbacks {
 }
 
 export interface ChatApi {
-  send(content: string, imageBlob?: Blob, replyTo?: MessageReply | null, options?: { expiresAt?: number; farewell?: boolean }): void
+  send(content: string, imageBlob?: Blob, replyTo?: MessageReply | null, options?: { expiresAt?: number; farewell?: boolean; whisperTo?: string | null; whisperToName?: string | null }): void
   /** Retry every failed/pending message right now. */
   retry(): void
   /** Load and prepend the page older than the current oldest message. */
@@ -180,7 +180,7 @@ export function enterChat(
    * point the preview is released.
    */
   const mergeIntoEntry = (message: ChatMessage, existing?: ChatEntry): ChatEntry => {
-    const merged: ChatEntry = { ...message }
+    const merged: ChatEntry = { ...message, isWhisper: Boolean(message.whisperTo) }
     // Optimistic echo carried the author's look; a server row without it
     // (schema not migrated, older sender) keeps the local face.
     if (existing?.avatarStyle && !merged.avatarStyle) {
@@ -318,6 +318,8 @@ export function enterChat(
               imageBlob: item.imageBlob,
               expiresAt: item.expiresAt,
               farewell: item.farewell,
+              whisperTo: item.whisperTo ?? null,
+              whisperToName: item.whisperToName ?? null,
             })
           } catch {
             // One bad item must never wedge the queue (and the flush lock):
@@ -396,6 +398,9 @@ export function enterChat(
         at: item.at,
         expiresAt: item.expiresAt,
         farewell: item.farewell,
+        whisperTo: item.whisperTo ?? null,
+        whisperToName: item.whisperToName ?? null,
+        isWhisper: Boolean(item.whisperTo),
         state: 'pending',
       }
       if (item.imageBlob) {
@@ -536,6 +541,8 @@ export function enterChat(
         attempts: 0,
         expiresAt: options?.expiresAt,
         farewell: options?.farewell,
+        whisperTo: options?.whisperTo ?? null,
+        whisperToName: options?.whisperToName ?? null,
       }
       if (imageBlob) item.imageBlob = imageBlob
       const entry: ChatEntry = {
@@ -551,6 +558,9 @@ export function enterChat(
         at: item.at,
         expiresAt: options?.expiresAt,
         farewell: options?.farewell,
+        whisperTo: options?.whisperTo ?? null,
+        whisperToName: options?.whisperToName ?? null,
+        isWhisper: Boolean(options?.whisperTo),
         state: 'pending',
       }
       if (imageBlob) {

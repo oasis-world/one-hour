@@ -2655,6 +2655,51 @@ button {
   background: rgba(255, 122, 69, 0.09);
   border-left-color: rgba(255, 122, 69, 0.50);
 }
+.msg-row.is-whisper {
+  background: rgba(255, 122, 69, 0.10);
+  border-left: 2px solid #ff7a45;
+  border-radius: 0 10px 10px 0;
+}
+.app-shell.theme-warm .msg-row.is-whisper {
+  background: rgba(255, 122, 69, 0.09);
+  border-left-color: #ff7a45;
+}
+.online-pop-row.is-clickable {
+  border-radius: 8px;
+}
+.online-pop-row-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+.online-pop-row-btn:hover {
+  background: var(--row-hover);
+}
+.online-pop-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+.online-pop-role {
+  font-size: 11px;
+  opacity: 0.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (hover: none), (pointer: coarse) {
+  .online-pop-row-btn:hover {
+    background: transparent;
+  }
+}
 
 /* Companion avatar button to the right of + — pure avatar, no border */
 .composer-companion-btn {

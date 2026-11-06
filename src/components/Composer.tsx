@@ -9,7 +9,12 @@ import { PhotoIcon } from './userIcons'
 import EmojiPanel from './EmojiPanel'
 import AvatarBadge from './AvatarBadge'
 import type { CompanionProfile } from '../lib/companionProfile'
+import type { PresenceMember } from '../lib/chatTypes'
 import { getGameList } from '../games/registry'
+
+type MentionCandidate =
+  | { kind: 'companion'; id: string; displayName: string; role: string; style: string; seed: string; avatarUrl: string | null }
+  | { kind: 'whisper'; member: PresenceMember }
 
 interface Props {
   onSend: (text: string, replyTo?: MessageReply | null) => void
@@ -31,6 +36,11 @@ interface Props {
   onMentionCompanion?: () => void
   privateMode?: boolean
   onExitPrivateChat?: () => void
+  presence?: PresenceMember[]
+  selfId?: string | null
+  onWhisperSelect?: (member: PresenceMember) => void
+  pendingInsertName?: string | null
+  onConsumeInsert?: () => void
 }
 
 function isCoarsePointer(): boolean {
@@ -64,7 +74,7 @@ function useMobileFormFactor(): boolean {
  * or emoji button toggles its popover (a click outside closes it); there
  * is no hover-to-open.
  */
-export default function Composer({ onSend, replyTo, onClearReply, editing, onClearEditing, onEdit, onImagePicked, onImagesPicked, onMenuOpenChange, onStartGame, companion, onMentionCompanion, privateMode, onExitPrivateChat }: Props) {
+export default function Composer({ onSend, replyTo, onClearReply, editing, onClearEditing, onEdit, onImagePicked, onImagesPicked, onMenuOpenChange, onStartGame, companion, onMentionCompanion, privateMode, onExitPrivateChat, presence, selfId, onWhisperSelect, pendingInsertName, onConsumeInsert }: Props) {
   const lang = useLang()
   const [draft, setDraft] = useState(editing?.content ?? '')
   const [plusOpen, setPlusOpen] = useState(false)
@@ -81,22 +91,78 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
 
+  const getFilteredPresence = (query: string): PresenceMember[] => {
+    const list = (presence ?? []).filter((p) => p.userId !== selfId)
+    if (!query) return list.slice(0, 5)
+    const q = query.toLowerCase()
+    return list.filter((p) => {
+      const name = (p.displayName ?? '').toLowerCase()
+      const role = (p.role ?? '').toLowerCase()
+      return name.includes(q) || role.includes(q)
+    }).slice(0, 5)
+  }
+
   const updateMentionState = (value: string) => {
-    if (!companion) { setMentionOpen(false); return }
     const lastAt = value.lastIndexOf('@')
     if (lastAt === -1) { setMentionOpen(false); return }
     const after = value.slice(lastAt)
-    const tag = `@${companion.name}`
-    const tagWithSpace = `${tag} `
-    if (after === tag || after === tagWithSpace || after.startsWith(tagWithSpace) || after.startsWith(tag)) {
-      setMentionOpen(false)
-      return
+    // If already completed @name + space/newline, close — check companion tag
+    if (companion) {
+      const tag = `@${companion.name}`
+      if (after === tag || after === tag + ' ' || after.startsWith(tag + ' ') || after.startsWith(tag + '\n')) {
+        setMentionOpen(false)
+        return
+      }
     }
+    // Also close if already completed a whisper target's name (exact @name + space)
+    // Check presence members for exact match
+    if (presence && presence.length > 0) {
+      for (const m of presence) {
+        const tag = `@${m.displayName}`
+        if (after === tag || after === tag + ' ' || after.startsWith(tag + ' ') || after.startsWith(tag + '\n')) {
+          setMentionOpen(false)
+          return
+        }
+      }
+    }
+    // Need at least companion or at least one filtered presence to show
+    const query = value.slice(lastAt + 1).trim().split(/\s/)[0] ?? ''
+    const hasCompanion = Boolean(companion)
+    const hasPresence = (() => {
+      const list = (presence ?? []).filter((p) => p.userId !== selfId)
+      if (!query) return list.length > 0
+      const q = query.toLowerCase()
+      return list.some((p) => (p.displayName ?? '').toLowerCase().includes(q) || (p.role ?? '').toLowerCase().includes(q))
+    })()
+    if (!hasCompanion && !hasPresence) { setMentionOpen(false); return }
     setMentionOpen(true)
     setMentionIndex(0)
   }
 
-  const mentionCandidates = companion ? [companion] : []
+  const mentionCandidates: MentionCandidate[] = (() => {
+    const lastAt = draft.lastIndexOf('@')
+    const query = lastAt === -1 ? '' : draft.slice(lastAt + 1).trim().split(/\s/)[0] ?? ''
+    const filtered = getFilteredPresence(query)
+    const out: MentionCandidate[] = []
+    if (companion) {
+      // Filter companion by query too, but companion always stays if query empty or matches
+      const q = query.toLowerCase()
+      const cname = companion.name.toLowerCase()
+      const crole = (companion.role ?? '').toLowerCase()
+      const matchesCompanion = !q || cname.includes(q) || crole.includes(q)
+      if (matchesCompanion || !q) {
+        out.push({ kind: 'companion', id: companion.id, displayName: companion.name, role: companion.role, style: companion.style, seed: companion.seed, avatarUrl: companion.avatarUrl ?? null })
+      } else if (q) {
+        // Even if companion doesn't match, still show companion as first per spec (永远第一位不消失)
+        out.push({ kind: 'companion', id: companion.id, displayName: companion.name, role: companion.role, style: companion.style, seed: companion.seed, avatarUrl: companion.avatarUrl ?? null })
+      }
+    }
+    for (const m of filtered) out.push({ kind: 'whisper', member: m })
+    // If no companion and no presence, return empty to close
+    if (out.length === 0) return []
+    // Limit to 1 + 5 = 6 max
+    return out.slice(0, 6)
+  })()
   useLayoutEffect(() => {
     if (replyTo) inputRef.current?.focus()
   }, [replyTo])
@@ -184,7 +250,39 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
 
   // Sync mention popover with draft
   // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
-  useEffect(() => { updateMentionState(draft) }, [draft, companion])
+  useEffect(() => { updateMentionState(draft) }, [draft, companion, presence, selfId])
+
+  // External insert trigger (avatar / online list click)
+  useEffect(() => {
+    if (!pendingInsertName) return
+    const tag = `@${pendingInsertName} `
+    setDraft((prev) => {
+      const lastAt = prev.lastIndexOf('@')
+      let insertDraft: string
+      if (lastAt !== -1) {
+        const after = prev.slice(lastAt)
+        if (after.startsWith('@') && !after.includes(' ') && !after.includes('\n')) {
+          insertDraft = prev.slice(0, lastAt) + tag
+        } else {
+          insertDraft = prev.includes(`@${pendingInsertName}`) ? prev : (prev ? (prev.endsWith(' ') || prev.endsWith('\n') ? prev + tag : prev + ' ' + tag) : tag)
+        }
+      } else {
+        insertDraft = prev.includes(`@${pendingInsertName}`) ? prev : (prev ? (prev.endsWith(' ') || prev.endsWith('\n') ? prev + tag : prev + ' ' + tag) : tag)
+      }
+      requestAnimationFrame(() => {
+        const el = inputRef.current
+        if (el) {
+          el.focus()
+          try { el.selectionStart = el.selectionEnd = insertDraft.length } catch { /* noop */ }
+          requestAnimationFrame(() => {
+            try { el.selectionStart = el.selectionEnd = insertDraft.length } catch { /* noop */ }
+          })
+        }
+      })
+      return insertDraft
+    })
+    onConsumeInsert?.()
+  }, [pendingInsertName, onConsumeInsert])
 
   // Entering private mode should focus the field (mobile: keyboard pops).
   const prevPrivateRef = useRef(privateMode)
@@ -256,14 +354,20 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
     input.current?.click()
   }
 
-  const insertMention = (candidate?: CompanionProfile) => {
-    const target = candidate ?? (mentionCandidates[mentionIndex] ?? companion)
+  const insertMention = (candidate?: MentionCandidate) => {
+    const target = candidate ?? mentionCandidates[mentionIndex]
     if (!target) return
+    const displayName = target.kind === 'companion' ? target.displayName : target.member.displayName
     const lastAt = draft.lastIndexOf('@')
-    const tag = `@${target.name} `
+    const tag = `@${displayName} `
     const newDraft = lastAt === -1 ? tag : draft.slice(0, lastAt) + tag
     setDraft(newDraft)
     setMentionOpen(false)
+    if (target.kind === 'whisper') {
+      onWhisperSelect?.(target.member)
+    } else if (target.kind === 'companion') {
+      // companion mention handled by App's private routing via text contains
+    }
     requestAnimationFrame(() => {
       const el = inputRef.current
       if (el) {
@@ -432,27 +536,36 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
               )}
             </div>
           )}
-          {mentionOpen && companion && (
+          {mentionOpen && mentionCandidates.length > 0 && (
             <div className="popover mention-popover" role="listbox" aria-label={t('提及', 'Mention')}>
-              {mentionCandidates.map((c, idx) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={`mention-item${idx === mentionIndex ? ' is-selected' : ''}`}
-                  role="option"
-                  aria-selected={idx === mentionIndex}
-                  onMouseDown={keepFocus}
-                  onPointerDown={keepFocus}
-                  onMouseEnter={() => setMentionIndex(idx)}
-                  onClick={() => insertMention(c)}
-                >
-                  <AvatarBadge look={{ style: c.style, seed: c.seed, avatarUrl: c.avatarUrl ?? null }} size={28} />
-                  <span className="mention-item-main">
-                    <span className="mention-name">{c.name}</span>
-                    <span className="mention-role">{c.role}</span>
-                  </span>
-                </button>
-              ))}
+              {mentionCandidates.map((c, idx) => {
+                const isCompanion = c.kind === 'companion'
+                const name = isCompanion ? c.displayName : c.member.displayName
+                const role = isCompanion ? c.role : (c.member.role ?? '')
+                const avatarLook = isCompanion
+                  ? { style: c.style, seed: c.seed, avatarUrl: c.avatarUrl ?? null }
+                  : { style: c.member.avatarStyle ?? 'lorelei', seed: c.member.avatarSeed ?? '', avatarUrl: c.member.avatarUrl ?? null }
+                const key = isCompanion ? `companion-${c.id}` : `whisper-${c.member.userId}`
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`mention-item${idx === mentionIndex ? ' is-selected' : ''}`}
+                    role="option"
+                    aria-selected={idx === mentionIndex}
+                    onMouseDown={keepFocus}
+                    onPointerDown={keepFocus}
+                    onMouseEnter={() => setMentionIndex(idx)}
+                    onClick={() => insertMention(c)}
+                  >
+                    <AvatarBadge look={avatarLook as never} size={28} />
+                    <span className="mention-item-main">
+                      <span className="mention-name">{name}</span>
+                      <span className="mention-role">{role}</span>
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>

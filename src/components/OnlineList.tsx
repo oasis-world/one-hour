@@ -20,6 +20,8 @@ export default function OnlineList({
   ownerSelector,
   className = '',
   style,
+  onMemberClick,
+  selfId,
 }: {
   members: PresenceMember[]
   onClose: () => void
@@ -29,6 +31,8 @@ export default function OnlineList({
   ownerSelector?: string
   className?: string
   style?: React.CSSProperties
+  onMemberClick?: (member: PresenceMember) => void
+  selfId?: string | null
 }) {
   const popRef = useRef<HTMLDivElement>(null)
 
@@ -62,31 +66,57 @@ export default function OnlineList({
         <span>{`${title ?? t('在线', 'Online')} · ${members.length}`}</span>
       </header>
       <ul className="online-pop-list">
-        {members.map((member) => (
-          <li key={member.userId} className="online-pop-row">
-            {member.avatarUrl || (member.avatarStyle && member.avatarSeed) ? (
-              <AvatarBadge
-                look={{
-                  style: member.avatarStyle ?? 'lorelei',
-                  seed: member.avatarSeed ?? '',
-                  url: member.avatarUrl || null,
-                }}
-                size={28}
-                className="online-pop-face"
-              />
-            ) : (
-              <span
-                className="online-pop-avatar"
-                style={{ background: userAvatarTint(member.userId) }}
-              >
-                {member.displayName.slice(0, 1).toUpperCase()}
+        {members.map((member) => {
+          const isSelf = selfId && member.userId === selfId
+          const clickable = Boolean(onMemberClick) && !isSelf
+          const rowClass = `online-pop-row${clickable ? ' is-clickable' : ''}${isSelf ? ' is-self' : ''}`
+          const content = (
+            <>
+              {member.avatarUrl || (member.avatarStyle && member.avatarSeed) ? (
+                <AvatarBadge
+                  look={{
+                    style: member.avatarStyle ?? 'lorelei',
+                    seed: member.avatarSeed ?? '',
+                    url: member.avatarUrl || null,
+                  }}
+                  size={28}
+                  className="online-pop-face"
+                />
+              ) : (
+                <span
+                  className="online-pop-avatar"
+                  style={{ background: userAvatarTint(member.userId) }}
+                >
+                  {member.displayName.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <span className="online-pop-main">
+                <span className="online-pop-name" style={{ color: userNameColor(member.userId) }}>
+                  {member.displayName}
+                </span>
+                {member.role && <span className="online-pop-role">{member.role}</span>}
               </span>
-            )}
-            <span className="online-pop-name" style={{ color: userNameColor(member.userId) }}>
-              {member.displayName}
-            </span>
-          </li>
-        ))}
+            </>
+          )
+          return (
+            <li key={member.userId} className={rowClass}>
+              {clickable ? (
+                <button
+                  type="button"
+                  className="online-pop-row-btn"
+                  onClick={() => {
+                    onMemberClick?.(member)
+                    onClose()
+                  }}
+                >
+                  {content}
+                </button>
+              ) : (
+                content
+              )}
+            </li>
+          )
+        })}
         {members.length === 0 && (
           <li className="online-pop-empty">{emptyText ?? t('现在没有其他玩家在线', 'Nobody else is here')}</li>
         )}

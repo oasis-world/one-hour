@@ -314,6 +314,25 @@ export default function App() {
     }
   }, [])
   const exitPrivateChat = useCallback(() => setPrivateMode(false), [])
+  // Whisper: single-shot private to a live user via @mention selection
+  const [pendingWhisper, setPendingWhisper] = useState<import('./lib/chatTypes').PresenceMember | null>(null)
+  const [pendingInsertName, setPendingInsertName] = useState<string | null>(null)
+  const handleWhisperSelect = useCallback((member: import('./lib/chatTypes').PresenceMember) => {
+    setPendingWhisper(member)
+  }, [])
+  const handleMemberPrivateClick = useCallback((member: import('./lib/chatTypes').PresenceMember) => {
+    if (!member) return
+    // Don't whisper to self
+    if (member.userId === room.identity?.userId) return
+    // Check if it's companion synthetic member
+    if (companion && member.userId === companion.id) {
+      enterPrivateChat()
+      return
+    }
+    setPendingWhisper(member)
+    setPendingInsertName(member.displayName)
+  }, [room.identity, companion, enterPrivateChat])
+  const consumeInsert = useCallback(() => setPendingInsertName(null), [])
   const mudCardCreatingRef = useRef(false)
   // Reactions for local messages (companion chats + MUD card) — persisted in IndexedDB
   const [localReactionRows, setLocalReactionRows] = useState<RoomReactionRecord[]>([])
@@ -563,6 +582,37 @@ export default function App() {
   }
 
   const handleSend = (text: string, reply?: MessageReply | null) => {
+    // Whisper takes precedence: explicit pending target from @ selection
+    if (pendingWhisper && text.includes(`@${pendingWhisper.displayName}`)) {
+      room.send(text, undefined, reply, { whisperTo: pendingWhisper.userId, whisperToName: pendingWhisper.displayName })
+      recordMessageSent()
+      if (pendingWhisper.userId !== (room.identity?.userId ?? null)) {
+        recordInteraction(pendingWhisper.userId, pendingWhisper.displayName, room.identity?.userId ?? undefined)
+      }
+      setPendingWhisper(null)
+      setSentMessageSequence((sequence) => sequence + 1)
+      setReplyTo(null)
+      return
+    }
+    // Fallback: if text contains @<onlineMember> even without pendingWhisper, treat as whisper to that member
+    // This covers manual typing of @ without using the popup selection.
+    if (room.presence.length > 0) {
+      const lastAt = text.lastIndexOf('@')
+      if (lastAt !== -1) {
+        const after = text.slice(lastAt + 1).split(/\s/)[0]?.trim()
+        if (after) {
+          const hit = room.presence.find((m) => m.displayName === after && m.userId !== room.identity?.userId)
+          if (hit && text.includes(`@${hit.displayName}`)) {
+            room.send(text, undefined, reply, { whisperTo: hit.userId, whisperToName: hit.displayName })
+            recordMessageSent()
+            recordInteraction(hit.userId, hit.displayName, room.identity?.userId ?? undefined)
+            setSentMessageSequence((sequence) => sequence + 1)
+            setReplyTo(null)
+            return
+          }
+        }
+      }
+    }
     const isMention = companion ? containsCompanionMention(text, companion) : false
     const isIntent = isEnterPrivateChatIntent(text)
     const wantsPrivate = Boolean(companion && (privateMode || isMention || isIntent))
@@ -617,7 +667,9 @@ export default function App() {
   const handleImagePicked = async (file: File) => {
     try {
       const blob = await withTimeout(fileToChatImage(file), 60_000)
-      room.send('', blob, replyTo)
+      const whisperOpt = pendingWhisper ? { whisperTo: pendingWhisper.userId, whisperToName: pendingWhisper.displayName } : undefined
+      if (whisperOpt) setPendingWhisper(null)
+      room.send('', blob, replyTo, whisperOpt)
       recordMessageSent()
       setSentMessageSequence((sequence) => sequence + 1)
       setReplyTo(null)
@@ -647,7 +699,8 @@ export default function App() {
     for (const file of files.slice(0, 5)) {
       try {
         const blob = await withTimeout(fileToChatImage(file), 60_000)
-        room.send('', blob, replyForNext)
+        const whisperOpt = pendingWhisper ? { whisperTo: pendingWhisper.userId, whisperToName: pendingWhisper.displayName } : undefined
+        room.send('', blob, replyForNext, whisperOpt)
         recordMessageSent()
         setSentMessageSequence((sequence) => sequence + 1)
         if (replyForNext) {
@@ -661,6 +714,8 @@ export default function App() {
       }
     }
     const failed = heicFailed + otherFailed
+    // Whisper is single-shot — clear after batch
+    if (pendingWhisper && sent > 0) setPendingWhisper(null)
     if (failed === 0) return
     if (sent === 0 && otherFailed === 0) {
       showToast(t('iPhone 高效格式（HEIC）暂不支持，请改用 JPEG 或截图发送', 'HEIC photos are not supported — send a JPEG or screenshot instead'))
@@ -821,6 +876,8 @@ export default function App() {
         suppressed={composerMenuOpen}
         onToggleTheme={() => window.setOneHourTheme?.(theme === 'dark' ? 'warm' : 'dark')}
         onChangeCountdownAnimation={changeCountdownAnimation}
+        selfId={room.identity?.userId ?? null}
+        onMemberPrivateClick={handleMemberPrivateClick}
       />
 
       {/* Page-corner close: small, top-right of the screen. */}
@@ -915,7 +972,7 @@ export default function App() {
               selfProfile={profile ? { nickname: profile.nickname, style: profile.style ?? null, seed: profile.seed ?? null, avatarUrl: profile.avatarUrl ?? null } : null}
               onEdit={handleStartEdit}
               privateMode={privateMode}
-              onEnterPrivateChat={enterPrivateChat}
+              onEnterPrivateChat={handleMemberPrivateClick}
             />
 
             {room.identity ? (
@@ -934,6 +991,11 @@ export default function App() {
                 companion={companion}
                 privateMode={privateMode}
                 onExitPrivateChat={exitPrivateChat}
+                presence={displayPresence}
+                selfId={room.identity?.userId ?? null}
+                onWhisperSelect={handleWhisperSelect}
+                pendingInsertName={pendingInsertName}
+                onConsumeInsert={consumeInsert}
               />
             ) : (
               <div className="composer-dock">
