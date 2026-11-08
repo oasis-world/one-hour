@@ -1,5 +1,21 @@
 import type { DistrictId } from './worldTypes'
 
+// ── Tide Genesis crest (header) — wave dial + star, replaces hourglass.
+export function TideGenesisIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="1.5" opacity={0.95} />
+      <circle cx="12" cy="12" r="6.6" stroke="white" strokeWidth="0.8" opacity={0.4} />
+      {/* tide waves */}
+      <path d="M6 15.2c1.2 1 2.6 1.5 4 1.5 1.5 0 2.8-.5 4-1.5 1.2 1 2.6 1.5 4 1.5" stroke="white" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M6 12.4c1.2 1 2.6 1.5 4 1.5 1.5 0 2.8-.5 4-1.5 1.2 1 2.6 1.5 4 1.5" stroke="white" strokeWidth="1.2" strokeLinecap="round" opacity={0.75} />
+      {/* genesis star */}
+      <path d="M12 3.2l1.1 2.2h2.4l-1.9 1.5.7 2.3-2.3-1.6-2.3 1.6.7-2.3L8.5 5.4h2.4z" fill="white" opacity={0.95} />
+      <circle cx="12" cy="12" r="0.9" fill="white" />
+    </svg>
+  )
+}
+
 // ── World hourglass (header) — sand + frame + glow
 export function WorldHourglassIcon({ size = 16 }: { size?: number }) {
   return (

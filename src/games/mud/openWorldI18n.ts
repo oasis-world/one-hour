@@ -37,6 +37,11 @@ const T: Record<string, Record<Lang, string>> = {
   onlineNow: { zh: '在线', 'zh-TW': '在線', en: 'online', ja: 'オンライン', fr: 'en ligne', es: 'en línea', de: 'online', ko: '온라인', it: 'in linea', ar: 'متصل' },
   leaderboard: { zh: '修行榜', 'zh-TW': '修行榜', en: 'Cultivation rank', ja: '修行ランキング', fr: 'Classement', es: 'Clasificación', de: 'Rangliste', ko: '수련 순위', it: 'Classifica', ar: 'ترتيب التزكية' },
   noLogYet: { zh: '世界等待第一位使徒…', 'zh-TW': '世界等待第一位使徒…', en: 'The world awaits the first apostle…', ja: '世界は最初の使徒を待っています…', fr: 'Le monde attend le premier apôtre…', es: 'El mundo espera al primer apóstol…', de: 'Die Welt wartet auf den ersten Apostel…', ko: '세상은 첫 사도를 기다리고 있어요…', it: 'Il mondo attende il primo apostolo…', ar: 'العالم بانتظار أول رسول…' },
+  tabPuzzle: { zh: '🧩 谜', 'zh-TW': '🧩 謎', en: '🧩 Solve', ja: '🧩 解', fr: '🧩 Casse', es: '🧩 Acertijo', de: '🧩 Rätsel', ko: '🧩 퍼즐', it: '🧩 Enigma', ar: '🧩 لغز' },
+  tabMap: { zh: '🗺️ 图', 'zh-TW': '🗺️ 圖', en: '🗺️ Map', ja: '🗺️ 図', fr: '🗺️ Carte', es: '🗺️ Mapa', de: '🗺️ Karte', ko: '🗺️ 지도', it: '🗺️ Mappa', ar: '🗺️ خريطة' },
+  tabQuest: { zh: '✦ 任务', 'zh-TW': '✦ 任務', en: '✦ Quest', ja: '✦ 任務', fr: '✦ Quête', es: '✦ Misión', de: '✦ Aufgabe', ko: '✦ 퀘스트', it: '✦ Missione', ar: '✦ مهمة' },
+  tabGuide: { zh: '💬 问', 'zh-TW': '💬 問', en: '💬 Guide', ja: '💬 質', fr: '💬 Guide', es: '💬 Guía', de: '💬 Guide', ko: '💬 가이드', it: '💬 Guida', ar: '💬 مرشد' },
+  ownedGear: { zh: '已持有', 'zh-TW': '已持有', en: 'Owned', ja: '所持', fr: 'Possédées', es: 'Obtenidos', de: 'Im Besitz', ko: '보유', it: 'Posseduti', ar: 'مملوك' },
   loading: { zh: '正在链接当前世界进度…', 'zh-TW': '正在連結當前世界進度…', en: 'Linking current world progress…', ja: '現在の進捗を読み込んでいます…', fr: 'Connexion au progrès actuel…', es: 'Conectando al progreso actual…', de: 'Aktueller Fortschritt wird geladen…', ko: '현재 월드 진행도를 연결 중…', it: 'Collegamento ai progressi attuali…', ar: 'جاري الاتصال بالتقدم الحالي…' },
   offlineNote: { zh: '本地模式：进度保存在本机', 'zh-TW': '本地模式：進度保存在本機', en: 'Local mode: progress saved on this device', ja: 'ローカルモード：進捗はこの端末に保存', fr: 'Mode local : progression sur cet appareil', es: 'Modo local: progreso en este dispositivo', de: 'Lokalmodus: Fortschritt auf diesem Gerät', ko: '로컬 모드: 진행도는 이 기기에 저장', it: 'Modalità locale: progressi su questo dispositivo', ar: 'الوضع المحلي: التقدم محفوظ على هذا الجهاز' },
 }

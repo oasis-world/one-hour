@@ -1,9 +1,11 @@
-// Puzzle answering + AI task generation + Guide Q&A panels.
+// Puzzle answering + AI task generation + Guide Q&A panels (translated).
 import { useState } from 'react'
 import { useLang } from '../../lib/i18n'
 import { useImeEnter } from '../../lib/ime'
 import { tOpen } from './openWorldI18n'
 import { submitPuzzleAnswer, appendLog, requestGenerateTask, requestGuide } from './openWorldStore'
+import { puzzleTitle, puzzleRiddle, puzzleHint, langFamily } from './mudLocale'
+import { useTranslatedTexts } from './useTranslated'
 import type { OpenWorldSnapshot, PuzzleRow } from './openWorldTypes'
 import { roomNameOf, districtNameOf } from '../../lib/worldI18n'
 
@@ -16,31 +18,42 @@ export function PuzzleRowItem({ puzzle, snap, userId, solved, onSolved }: {
   const [showHint, setShowHint] = useState(false)
   const [busy, setBusy] = useState(false)
   const ime = useImeEnter()
-  const riddle = lang.startsWith('zh') ? puzzle.riddle : (puzzle.riddle_en ?? puzzle.riddle)
+  const baseTitle = puzzleTitle(puzzle, lang)
+  const baseRiddle = puzzleRiddle(puzzle, lang)
+  const baseHint = puzzleHint(puzzle, lang)
+  const source = langFamily(lang) === 'zh' ? lang : 'en'
+  const tr = useTranslatedTexts([
+    { id: 't', text: baseTitle, from: source },
+    { id: 'r', text: baseRiddle, from: source },
+    ...(baseHint ? [{ id: 'h', text: baseHint, from: source }] : []),
+  ], lang)
+  const title = tr.t ?? baseTitle
+  const riddle = tr.r ?? baseRiddle
+  const hint = baseHint ? (tr.h ?? baseHint) : null
   async function submit() {
     if (!answer.trim() || busy) return
     setBusy(true)
     const res = await submitPuzzleAnswer(snap, userId, puzzle.id, answer, lang)
     if (res.ok) {
       setMsg(`${tOpen(lang, 'correct')} +${res.xpGain}`); onSolved(res.xpGain)
-      await appendLog(userId, snap.myProfile?.display_name ?? '', puzzle.room_id, puzzle.title, `+${res.xpGain} XP`, lang, 'puzzle')
+      await appendLog(userId, snap.myProfile?.display_name ?? '', puzzle.room_id, title, `+${res.xpGain} XP`, lang, 'puzzle')
     } else setMsg(tOpen(lang, 'wrong'))
     setBusy(false)
   }
   return (
     <div className={`wmf-puzzle ${solved ? 'is-solved' : ''}`}>
-      <div className="wmf-puzzle-head"><strong>{puzzle.title}</strong><span className="wmf-puzzle-meta">{roomNameOf(puzzle.room_id, lang)} · {tOpen(lang, 'reward')} +{puzzle.reward_xp} XP</span></div>
+      <div className="wmf-puzzle-head"><strong>{title}</strong><span className="wmf-puzzle-meta">{roomNameOf(puzzle.room_id, lang)} · {tOpen(lang, 'reward')} +{puzzle.reward_xp} XP</span></div>
       <div className="wmf-puzzle-riddle">{riddle}</div>
       <div className="wmf-puzzle-actionsrow">
-        <button className="world-mud-footbtn" onClick={() => setShowHint((v) => !v)}>{tOpen(lang, 'hint')}</button>
+        {hint && <button className="world-mud-footbtn" onClick={() => setShowHint((v) => !v)}>{tOpen(lang, 'hint')}</button>}
         <span className="wmf-puzzle-solver">{puzzle.solver_count} {tOpen(lang, 'solved')}</span>
       </div>
-      {showHint && <div className="wmf-hint">{puzzle.hint}</div>}
+      {showHint && hint && <div className="wmf-hint">{hint}</div>}
       <div className="world-mud-inputrow">
         <input className="world-mud-input" value={answer} disabled={solved || busy} placeholder={tOpen(lang, 'answerPlaceholder')} maxLength={80} {...ime.imeProps}
           onChange={(e) => setAnswer(e.target.value)}
           onKeyDown={(e) => { if (ime.imeConsumesEnter(e)) return; if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submit() } }} />
-        <button className="world-mud-send" disabled={solved || busy || !answer.trim()} onClick={() => void submit()}>{tOpen(lang, 'submit')}</button>
+        <button className="world-mud-send" aria-label={tOpen(lang, 'submit')} title={tOpen(lang, 'submit')} disabled={solved || busy || !answer.trim()} onClick={() => void submit()}>→</button>
       </div>
       {msg && <div className="wmf-msg">{msg}</div>}
     </div>
@@ -77,16 +90,29 @@ export function TaskComposer({ snap, userId, roomId, onCreated }: {
         <input className="world-mud-input" value={prompt} placeholder={tOpen(lang, 'genTaskPlaceholder')} maxLength={200} disabled={busy} {...ime.imeProps}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => { if (ime.imeConsumesEnter(e)) return; if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void generate() } }} />
-        <button className="world-mud-send" disabled={busy || !prompt.trim()} onClick={() => void generate()}>{busy ? '…' : tOpen(lang, 'generate')}</button>
+        <button className="world-mud-send" aria-label={tOpen(lang, 'generate')} title={tOpen(lang, 'generate')} disabled={busy || !prompt.trim()} onClick={() => void generate()}>{busy ? '…' : '→'}</button>
       </div>
       {msg && <div className="wmf-msg">{msg}</div>}
-      {snap.tasks.length > 0 && (
-        <div className="wmf-tasklist">
-          {snap.tasks.slice(0, 3).map((t) => (
-            <div key={t.id} className="wmf-task"><b>{t.ai_title}</b><span>{districtNameOf(t.region_id, lang)} · {roomNameOf(t.room_id, lang)} · +{t.reward_xp} XP</span><div>{t.ai_desc}</div></div>
-          ))}
-        </div>
-      )}
+      <TaskList tasks={snap.tasks.slice(0, 3)} />
+    </div>
+  )
+}
+
+function TaskList({ tasks }: { tasks: OpenWorldSnapshot['tasks'] }) {
+  const lang = useLang()
+  const tr = useTranslatedTexts(
+    tasks.flatMap((t) => [
+      { id: `${t.id}-title`, text: t.ai_title, from: 'auto' },
+      { id: `${t.id}-desc`, text: t.ai_desc, from: 'auto' },
+    ]),
+    lang,
+  )
+  if (tasks.length === 0) return null
+  return (
+    <div className="wmf-tasklist">
+      {tasks.map((t) => (
+        <div key={t.id} className="wmf-task"><b>{tr[`${t.id}-title`] ?? t.ai_title}</b><span>{districtNameOf(t.region_id, lang)} · {roomNameOf(t.room_id, lang)} · +{t.reward_xp} XP</span><div>{tr[`${t.id}-desc`] ?? t.ai_desc}</div></div>
+      ))}
     </div>
   )
 }
@@ -112,7 +138,7 @@ export function GuidePanel({ snap, userId }: { snap: OpenWorldSnapshot; userId: 
         <input className="world-mud-input" value={q} placeholder={tOpen(lang, 'askPlaceholder')} maxLength={200} disabled={busy} {...ime.imeProps}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => { if (ime.imeConsumesEnter(e)) return; if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void ask() } }} />
-        <button className="world-mud-send" disabled={busy || !q.trim()} onClick={() => void ask()}>{busy ? '…' : tOpen(lang, 'ask')}</button>
+        <button className="world-mud-send" aria-label={tOpen(lang, 'ask')} title={tOpen(lang, 'ask')} disabled={busy || !q.trim()} onClick={() => void ask()}>{busy ? '…' : '→'}</button>
       </div>
       {answer && <div className="wmf-msg">{answer}</div>}
       {snap.myHelp.length > 0 && snap.myHelp.slice(0, 2).map((h) => (
