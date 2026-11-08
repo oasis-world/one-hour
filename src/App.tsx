@@ -12,7 +12,7 @@ import TopBar from './components/TopBar'
 import WelcomeModal from './components/WelcomeModal'
 import SummaryModal from './components/SummaryModal'
 import ChatTopAvatar from './components/ChatTopAvatar'
-import { ChatBubbleIcon, ThinXIcon } from './components/icons'
+import { BackgroundImageIcon, ChatBubbleIcon, PlusIcon } from './components/icons'
 import { useChatRoom } from './components/useChatRoom'
 import { useAccount } from './lib/useAccount'
 import { useUserProfile } from './lib/userProfile'
@@ -97,6 +97,9 @@ export default function App() {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   /** Composer popover open (plus/emoji) — mobile hides the gear meanwhile. */
   const [composerMenuOpen, setComposerMenuOpen] = useState(false)
+  /** Mobile top-right tool stack (background / music / gear / online) —
+      collapsed behind one toggle; ignored on desktop (toggle hidden). */
+  const [cornerOpen, setCornerOpen] = useState(false)
   /**
    * A blank click that just dismissed a composer popover must not also
    * fold the chat: the popover closes on pointerdown, before this click
@@ -841,6 +844,7 @@ export default function App() {
     'app-shell',
     theme === 'warm' ? 'theme-warm' : '',
     fold === 'open' || fold === 'folding' || fold === 'unfolding' ? 'is-chat-open' : '',
+    cornerOpen ? 'is-corner-expanded' : '',
   ].join(' ')
 
   return (
@@ -880,19 +884,19 @@ export default function App() {
         onMemberPrivateClick={handleMemberPrivateClick}
       />
 
-      {/* Page-corner close: small, top-right of the screen. */}
+      {/* Page-corner view-background: small, top-right of the screen. */}
       {chatMounted && (
         <button
           type="button"
           className={`chat-close${fold === 'folding' ? ' is-fading' : ''}`}
-          aria-label={t('收起聊天', 'Hide chat')}
-          title={t('收起聊天', 'Hide chat')}
+          aria-label={t('查看背景图片', 'View background photo')}
+          title={t('查看背景图片', 'View background photo')}
           onClick={(e) => {
             e.stopPropagation()
             closeChat()
           }}
         >
-          <ThinXIcon size={13} />
+          <BackgroundImageIcon size={16} />
         </button>
       )}
 
@@ -916,6 +920,24 @@ export default function App() {
             <span />
             <span />
           </span>
+        </button>
+      )}
+
+      {/* Mobile-only: one toggle for the whole top-right tool stack.
+          Plus morphs to X while the four buttons are expanded below it. */}
+      {chatMounted && (
+        <button
+          type="button"
+          className={`corner-toggle${cornerOpen ? ' is-open' : ''}`}
+          aria-label={cornerOpen ? (t('收起工具', 'Collapse tools')) : (t('展开工具', 'Expand tools'))}
+          title={cornerOpen ? (t('收起工具', 'Collapse tools')) : (t('展开工具', 'Expand tools'))}
+          aria-expanded={cornerOpen}
+          onClick={(e) => {
+            e.stopPropagation()
+            setCornerOpen((v) => !v)
+          }}
+        >
+          <PlusIcon size={16} />
         </button>
       )}
 

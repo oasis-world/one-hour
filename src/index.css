@@ -237,6 +237,9 @@ button {
   mask-composite: intersect;
   pointer-events: none;
   transition: none;
+  /* Breathing light on the gradient countdown ring, same 2.4s opacity
+     pulse as the chat-top avatar (is-critical below still speeds it up). */
+  animation: chat-top-avatar-breathe 2.4s ease-in-out infinite;
 }
 
 .top-avatar-btn.is-critical::before {
@@ -1368,9 +1371,9 @@ button {
 }
 
 .chat-close:hover {
-  color: var(--ink);
+  color: var(--accent);
   background: var(--surface-strong);
-  transform: rotate(90deg);
+  transform: scale(1.06);
 }
 
 .chat-close:active {
@@ -1412,6 +1415,12 @@ button {
 
 .music-toggle:active {
   transform: scale(0.92);
+}
+
+/* Mobile-only corner toggle for the top-right tool stack. Hidden on
+   desktop, where the four buttons stay in their own slots. */
+.corner-toggle {
+  display: none;
 }
 
 /* Equalizer bars inside the music toggle. */
@@ -2607,6 +2616,83 @@ button {
     top: calc(max(14px, env(safe-area-inset-top)) + 44px);
   }
 
+  /* Corner toggle: owns the top-right slot; the four tool buttons
+     reveal below it (one slot each) when expanded. */
+  .corner-toggle {
+    position: absolute;
+    top: max(14px, env(safe-area-inset-top));
+    right: max(16px, env(safe-area-inset-right));
+    z-index: 46;
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: var(--surface-raised);
+    color: var(--ink-soft);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    cursor: pointer;
+    box-shadow: 0 4px 14px var(--shadow);
+    transition:
+      transform 0.16s ease,
+      background 0.16s ease,
+      color 0.16s ease;
+  }
+
+  .corner-toggle:hover {
+    color: var(--accent);
+    background: var(--surface-strong);
+    transform: scale(1.06);
+  }
+
+  .corner-toggle:active {
+    transform: scale(0.92);
+  }
+
+  /* Plus morphs to X while the stack is expanded. */
+  .corner-toggle svg {
+    transition: transform 0.18s ease;
+  }
+
+  .corner-toggle.is-open {
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .corner-toggle.is-open svg {
+    transform: rotate(45deg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .corner-toggle svg {
+      transition: none;
+    }
+  }
+
+  /* Collapsed: only the toggle stays visible. */
+  .app-shell:not(.is-corner-expanded) .chat-close,
+  .app-shell:not(.is-corner-expanded) .music-toggle,
+  .app-shell:not(.is-corner-expanded) .settings-bar {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /* Expanded: the four buttons sit one slot below the toggle. */
+  .app-shell.is-corner-expanded .chat-close {
+    top: calc(max(14px, env(safe-area-inset-top)) + 44px);
+  }
+
+  .app-shell.is-corner-expanded .music-toggle {
+    top: calc(max(14px, env(safe-area-inset-top)) + 88px);
+  }
+
+  .app-shell.is-corner-expanded .settings-bar {
+    top: calc(max(14px, env(safe-area-inset-top)) + 132px);
+  }
+
 }
 
 /* Games submenu follows the settings menu row and disclosure styling. */
@@ -2780,22 +2866,38 @@ button {
 .mention-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mention-role { font-size: 11px; opacity: 0.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* Private-chat buttons: one shared pill style across every entry point
+   (companion greeting, composer exit bar, avatar popup) in both themes.
+   Core metrics/colors live in this single grouped rule so the buttons can
+   never drift apart again — only layout (margins / flex width) differs.
+   Colors are fixed to the warm accent palette (#c45c26 / #fff6e8) in both
+   themes, so dark matches warm exactly instead of following --accent. */
+.msg-greeting-private-btn,
+.composer-private-exit,
+.account-pop-private-btn {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #c45c26;
+  background: #c45c26;
+  color: #fff6e8;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: filter 0.14s ease, transform 0.12s ease;
+}
+.msg-greeting-private-btn:hover,
+.composer-private-exit:hover,
+.account-pop-private-btn:hover { filter: brightness(1.08); }
+.msg-greeting-private-btn:active,
+.composer-private-exit:active,
+.account-pop-private-btn:active { transform: scale(0.97); }
+
 /* Greeting private-chat entry button */
 .msg-greeting-private-btn {
   margin-top: 8px;
   align-self: flex-start;
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-size: 12.5px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: filter 0.14s ease, transform 0.12s ease;
 }
-.msg-greeting-private-btn:hover { filter: brightness(1.08); }
-.msg-greeting-private-btn:active { transform: scale(0.97); }
 
 /* Composer private-mode bar — sits at top-left of the input dock */
 .composer-private-bar {
@@ -2809,19 +2911,6 @@ button {
   margin-top: 10px !important;
   margin-bottom: 10px !important;
 }
-.composer-private-exit {
-  padding: 8px 18px;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  background: #e9977a;
-  color: #fff;
-  font-size: 13.5px;
-  font-weight: 800;
-  cursor: pointer;
-  transition: background 0.14s ease, filter 0.14s ease, transform 0.12s ease;
-}
-.composer-private-exit:hover { background: #e07f5f; filter: brightness(1.02); }
-.composer-private-exit:active { transform: scale(0.97); }
 
 /* Avatar popup private-chat action */
 .account-pop-actions {
@@ -2832,17 +2921,13 @@ button {
 }
 .account-pop-private-btn {
   flex: 1;
-  min-height: 36px;
-  border-radius: 10px;
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: filter 0.14s ease;
 }
-.account-pop-private-btn:hover { filter: brightness(1.07); }
+
+/* No divider above the private-chat action in avatar popups — only the
+   top border of the actions row is dropped, other popovers keep theirs. */
+.account-pop:has(.account-pop-private-btn) .account-pop-actions {
+  border-top: none;
+}
 
 /* Companion typing indicator */
 .msg-row.is-typing { opacity: 0.95; }

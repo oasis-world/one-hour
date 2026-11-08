@@ -78,6 +78,30 @@ export function CameraIcon({ size = 20 }: GlyphProps) {
   )
 }
 
+/** Background-image glyph: a framed landscape photo (sun + mountains). */
+export function BackgroundImageIcon({ size = 16 }: GlyphProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect x="2.6" y="3.4" width="14.8" height="13.2" rx="2.8" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="7.4" cy="7.2" r="1.7" stroke="currentColor" strokeWidth="1.4" />
+      <path
+        d="M3.6 14.6l4.5-4.4 3.2 3.2 2.3-2.3 2.8 3.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 export function UploadIcon({ size = 20 }: GlyphProps) {
   return (
     <svg
