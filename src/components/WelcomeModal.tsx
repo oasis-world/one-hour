@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type FocusEvent as ReactFocusEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useLang, t } from '../lib/i18n'
 import { resetStats } from '../lib/lifetimeStats'
 import { useImeEnter } from '../lib/ime'
@@ -60,6 +60,51 @@ export default function WelcomeModal({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  /** Pan the scrollable backdrop so the focused field rides above the keyboard. */
+  const ensureFieldVisible = (el: HTMLElement, instant = false) => {
+    try {
+      el.scrollIntoView({ block: 'center', behavior: instant ? 'auto' : 'smooth' })
+    } catch { /* noop */ }
+  }
+
+  const onFieldFocus = (e: ReactFocusEvent<HTMLInputElement>) => {
+    const el = e.currentTarget
+    // The keyboard animates in over ~300ms, so the first scroll (taken
+    // while the layout still spans the full screen) strands the lower
+    // field under the keys. Retry after it settles; the visualViewport
+    // effect below glues the field through the animation itself.
+    window.setTimeout(() => ensureFieldVisible(el), 300)
+    window.setTimeout(() => {
+      if (document.activeElement === el) ensureFieldVisible(el)
+    }, 650)
+  }
+
+  // Glue the focused field above the keyboard while the visual viewport
+  // resizes/scrolls through the keyboard animation. Instant scroll:
+  // smooth would fight the viewport motion and lag one frame behind.
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    try {
+      if (!window.matchMedia('(pointer: coarse)').matches) return
+    } catch { /* noop */ }
+    const onVv = () => {
+      const active = document.activeElement
+      if (
+        active instanceof HTMLElement &&
+        (active === nicknameRef.current || active === roleRef.current)
+      ) {
+        ensureFieldVisible(active, true)
+      }
+    }
+    vv.addEventListener('resize', onVv)
+    vv.addEventListener('scroll', onVv)
+    return () => {
+      vv.removeEventListener('resize', onVv)
+      vv.removeEventListener('scroll', onVv)
+    }
+  }, [])
 
   const reroll = () => {
     setDraft((prev) => randomProfile(prev, lang))
@@ -195,12 +240,7 @@ export default function WelcomeModal({
                   setDraft({ ...draft, nickname: e.target.value })
                   setError(null)
                 }}
-                onFocus={(e) => {
-                  const el = e.currentTarget
-                  window.setTimeout(() => {
-                    try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }) } catch { /* noop */ }
-                  }, 300)
-                }}
+                onFocus={onFieldFocus}
                 onKeyDown={onNickEnter}
                 {...ime.imeProps}
               />
@@ -241,12 +281,7 @@ export default function WelcomeModal({
                   setDraft({ ...draft, role: e.target.value })
                   setError(null)
                 }}
-                onFocus={(e) => {
-                  const el = e.currentTarget
-                  window.setTimeout(() => {
-                    try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }) } catch { /* noop */ }
-                  }, 300)
-                }}
+                onFocus={onFieldFocus}
                 onKeyDown={onRoleEnter}
                 {...ime.imeProps}
               />
