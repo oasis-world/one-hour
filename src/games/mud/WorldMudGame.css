@@ -141,5 +141,46 @@
 .app-shell:not(.theme-warm) .world-mud-map-note { background: color-mix(in srgb, var(--wm-gold) 8%, #252220 92%); border-color: #3a332e; color: #a99e96; }
 :root[data-theme="dark"] .world-mud-footbtn,
 .app-shell:not(.theme-warm) .world-mud-footbtn { border-color: #3a332e; color: #a99e96; }
-:root[data-theme="dark"] .world-mud-footbtn.is-on,
-.app-shell:not(.theme-warm) .world-mud-footbtn.is-on { background: color-mix(in srgb, var(--wm-gold) 16%, #2a2724 84%); border-color: color-mix(in srgb, var(--wm-gold) 28%, #3a332e 72%); color: #f3efe7; }
+/* ── Open world (Tide Genesis) extras ── */
+.wmf-snap{border:1px solid color-mix(in srgb,var(--wm-border) 70%,transparent);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:7px;background:color-mix(in srgb,var(--wm-gold) 6%,transparent)}
+.wmf-snap-head{display:flex;align-items:center;gap:7px;font-size:12px}
+.wmf-snap-icon{width:26px;height:26px;display:grid;place-items:center;border-radius:7px;background:linear-gradient(135deg,var(--wm-gold),#e8c99a);color:#fff}
+.wmf-snap-phase{margin-left:auto;color:var(--wm-mute);font-size:11px}
+.wmf-snap-online{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800}
+.wmf-progress{height:7px;border-radius:999px;background:color-mix(in srgb,var(--wm-border) 70%,transparent);overflow:hidden}
+.wmf-progress i{display:block;height:100%;background:linear-gradient(90deg,var(--wm-gold),#e8c99a);border-radius:999px;transition:width .4s}
+.wmf-snap-line{font-size:12px;color:var(--wm-ink)}
+.wmf-chronicle{border-top:1px dashed color-mix(in srgb,var(--wm-border) 60%,transparent);padding-top:6px}
+.wmf-chronicle-head{font-size:11px;font-weight:800;color:var(--wm-mute);margin-bottom:4px}
+.wmf-logline{display:flex;gap:6px;font-size:12px;color:var(--wm-ink);padding:2px 0}
+.wmf-logline b{flex-shrink:0}.wmf-logline span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wmf-logres{margin-left:auto;color:var(--wm-mute);flex-shrink:0}
+.wmf-boardrow{display:flex;flex-wrap:wrap;gap:4px}
+.wmf-boarditem{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid color-mix(in srgb,var(--wm-gold) 22%,transparent);background:color-mix(in srgb,var(--wm-gold) 8%,transparent)}
+.wmf-realm{border:1px solid color-mix(in srgb,var(--wm-border) 60%,transparent);border-radius:12px;padding:8px 10px;font-size:12px;display:flex;flex-direction:column;gap:5px}
+.wmf-xp{color:var(--wm-mute);font-size:11px}
+.wmf-equip{border:1px solid color-mix(in srgb,var(--wm-border) 60%,transparent);border-radius:12px;padding:8px 10px}
+.wmf-equip-title{font-size:11px;font-weight:800;color:var(--wm-mute);margin-bottom:5px}
+.wmf-equip-row{display:flex;flex-wrap:wrap;gap:5px}
+.wmf-item{font-size:11px;padding:4px 8px;border-radius:999px;border:1px solid color-mix(in srgb,var(--wm-border) 70%,transparent)}
+.wmf-item.rarity-rare{border-color:#5bb8d4}.wmf-item.rarity-epic{border-color:#7c5cff}.wmf-item.rarity-legendary{border-color:#e8c99a;background:color-mix(in srgb,var(--wm-gold) 12%,transparent);font-weight:800}
+.wmf-sec{font-size:12px;font-weight:800;color:var(--wm-ink);margin-top:2px}
+.wmf-puzzles{display:flex;flex-direction:column;gap:8px}
+.wmf-puzzle{border:1px solid color-mix(in srgb,var(--wm-border) 70%,transparent);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:7px;background:color-mix(in srgb,var(--card-bg,#fff) 96%,transparent)}
+.wmf-puzzle.is-solved{opacity:.75;border-color:#2ecc71}
+.wmf-puzzle-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.wmf-puzzle-meta{font-size:11px;color:var(--wm-mute)}
+.wmf-puzzle-riddle{font-size:13px;line-height:1.6;white-space:pre-wrap}
+.wmf-puzzle-actionsrow{display:flex;align-items:center;gap:8px}
+.wmf-puzzle-solver{margin-left:auto;font-size:11px;color:var(--wm-mute)}
+.wmf-hint{font-size:12px;color:var(--wm-mute);font-style:italic;background:color-mix(in srgb,var(--wm-gold) 8%,transparent);border-radius:8px;padding:6px 8px}
+.wmf-msg{font-size:12px;color:var(--wm-ink);background:color-mix(in srgb,var(--wm-gold) 10%,transparent);border-radius:8px;padding:6px 8px}
+.wmf-panel{border:1px solid color-mix(in srgb,var(--wm-border) 70%,transparent);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:7px}
+.wmf-panel-title{font-size:12px;font-weight:800}
+.wmf-tasklist,.wmf-tasklist-lab{display:flex;flex-direction:column;gap:5px}
+.wmf-task{font-size:12px;border-radius:8px;padding:6px 8px;background:color-mix(in srgb,var(--wm-gold) 6%,transparent)}
+.wmf-task b{display:block}.wmf-task span{font-size:11px;color:var(--wm-mute)}
+.wmf-qa{font-size:12px;display:flex;flex-direction:column;gap:2px;border-top:1px dashed color-mix(in srgb,var(--wm-border) 60%,transparent);padding-top:5px}
+@media (hover:none),(pointer:coarse){.wmf-puzzle,.wmf-panel{border-color:color-mix(in srgb,var(--wm-border) 70%,transparent)}}
+:root[data-theme="dark"] .wmf-snap,:root[data-theme="dark"] .wmf-realm,:root[data-theme="dark"] .wmf-equip,:root[data-theme="dark"] .wmf-puzzle,:root[data-theme="dark"] .wmf-panel,:root[data-theme="dark"] .wmf-task{background:#252220;border-color:#3a332e;color:#f0ebe3}
+.app-shell:not(.theme-warm) .wmf-snap,.app-shell:not(.theme-warm) .wmf-realm,.app-shell:not(.theme-warm) .wmf-equip,.app-shell:not(.theme-warm) .wmf-puzzle,.app-shell:not(.theme-warm) .wmf-panel,.app-shell:not(.theme-warm) .wmf-task{background:#252220;border-color:#3a332e;color:#f0ebe3}

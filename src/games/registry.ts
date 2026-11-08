@@ -34,8 +34,8 @@ export const GAMES: GameDefinition[] = [
   },
   {
     id: 'mud',
-    name: '文字冒险',
-    nameEn: 'MUD Adventure',
+    name: '潮汐启元',
+    nameEn: 'Tide Genesis',
     icon: '🗺️',
     minPlayers: 2,
     maxPlayers: 6,

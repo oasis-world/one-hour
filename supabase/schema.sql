@@ -245,30 +245,304 @@ create policy "signed-in players may delete chess states" on public.chess_states
 grant select, insert, update, delete on public.chess_states to authenticated;
 revoke all on public.chess_states from anon;
 
--- Legacy per-instance MUD was removed; drop its table on existing deployments.
-drop table if exists public.mud_states cascade;
+-- Legacy single-row world state is fully retired. The open-world MUD
+-- now lives in normalized tables below (worlds/regions/rooms/puzzles/...).
+drop table if exists public.world_mud_state cascade;
 
--- ── World MUD — eternal shared realm (never purged) ────────────────────────
-create table if not exists public.world_mud_state (
-  world_id text primary key,
-  state jsonb not null check (jsonb_typeof(state) = 'object'),
+-- ── Open World MUD (Tide Genesis) ─────────────────────────────────────
+-- Shared persistent world: every new player joins the *current* progress
+-- (solved seals, chronicle, realm leaderboard) instead of starting over.
+-- Human players + AI co-build it: AI generates tasks/puzzles, humans solve
+-- and cultivate (XP / realm level / equipment), and the AI Guide answers
+-- questions with world context. All eternal tables below are NEVER purged
+-- by the hourly chat purge; only the 1-hour chat tables are swept.
+
+create table if not exists public.worlds (
+  id text primary key,
+  phase text not null default '启元期',
+  epoch int not null default 1,
+  solved_puzzles int not null default 0,
+  total_puzzles int not null default 12,
   updated_at timestamptz not null default now()
 );
-alter table public.world_mud_state enable row level security;
-drop policy if exists "world state readable by signed-in players" on public.world_mud_state;
-create policy "world state readable by signed-in players" on public.world_mud_state for select using (auth.uid() is not null);
-drop policy if exists "signed-in players may create world state" on public.world_mud_state;
-create policy "signed-in players may create world state" on public.world_mud_state for insert with check (auth.uid() is not null);
-drop policy if exists "signed-in players may update world state" on public.world_mud_state;
-create policy "signed-in players may update world state" on public.world_mud_state for update using (auth.uid() is not null) with check (auth.uid() is not null);
-grant select, insert, update on public.world_mud_state to authenticated;
-revoke all on public.world_mud_state from anon;
+
+create table if not exists public.regions (
+  id text primary key,
+  world_id text not null references public.worlds (id) on delete cascade,
+  display_order int not null default 0,
+  unlocked boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.rooms (
+  id text primary key,
+  region_id text not null references public.regions (id) on delete cascade,
+  world_id text not null default 'main',
+  name_zh text,
+  name_en text,
+  exits jsonb not null default '{}'::jsonb,
+  danger int not null default 0,
+  richness int not null default 1,
+  is_hidden boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+create index if not exists rooms_region_idx on public.rooms (region_id);
+
+create table if not exists public.items (
+  id text primary key,
+  name text not null,
+  name_en text,
+  icon text not null default '✦',
+  rarity text not null default 'common',
+  slot text not null default 'pouch',
+  description text,
+  stats jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.puzzles (
+  id text primary key,
+  room_id text not null references public.rooms (id) on delete cascade,
+  region_id text not null references public.regions (id) on delete cascade,
+  title text not null,
+  riddle text not null,
+  answer_hash text not null,
+  hint text,
+  reward_xp int not null default 20,
+  reward_item_id text references public.items (id) on delete set null,
+  status text not null default 'open',
+  created_by uuid references auth.users (id) on delete set null,
+  solver_count int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists puzzles_room_idx on public.puzzles (room_id);
+create index if not exists puzzles_region_idx on public.puzzles (region_id);
+
+create table if not exists public.player_tasks (
+  id uuid primary key default gen_random_uuid(),
+  room_id text not null references public.rooms (id) on delete cascade,
+  region_id text not null references public.regions (id) on delete cascade,
+  author_id uuid references auth.users (id) on delete cascade,
+  prompt text not null,
+  ai_title text not null,
+  ai_desc text not null,
+  reward_xp int not null default 15,
+  reward_item_id text references public.items (id) on delete set null,
+  status text not null default 'approved',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists player_tasks_room_idx on public.player_tasks (room_id);
+
+create table if not exists public.player_profiles (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  display_name text not null,
+  realm_level int not null default 1,
+  xp int not null default 0,
+  realm_title text not null default '潮汐使徒',
+  equipped jsonb not null default '{}'::jsonb,
+  total_solved int not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.player_progress (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  puzzle_id text not null references public.puzzles (id) on delete cascade,
+  solved_at timestamptz not null default now(),
+  attempts int not null default 0,
+  primary key (user_id, puzzle_id)
+);
+
+create table if not exists public.world_log (
+  id uuid primary key default gen_random_uuid(),
+  at timestamptz not null default now(),
+  user_id uuid references auth.users (id) on delete set null,
+  display_name text not null,
+  location_id text,
+  action text not null,
+  result text,
+  kind text not null default 'action',
+  lang text not null default 'zh',
+  created_at timestamptz not null default now()
+);
+create index if not exists world_log_at_idx on public.world_log (at desc);
+create index if not exists world_log_kind_idx on public.world_log (kind, at desc);
+
+create table if not exists public.world_events (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  description text not null,
+  icon text not null default '✦',
+  ends_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.player_help_qa (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users (id) on delete cascade,
+  question text not null,
+  ai_answer text not null,
+  at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+create index if not exists player_help_qa_user_idx on public.player_help_qa (user_id, at desc);
+
+-- RLS: readable by every signed-in player (shared world is public to the room).
+alter table public.worlds enable row level security;
+alter table public.regions enable row level security;
+alter table public.rooms enable row level security;
+alter table public.items enable row level security;
+alter table public.puzzles enable row level security;
+alter table public.player_tasks enable row level security;
+alter table public.player_profiles enable row level security;
+alter table public.player_progress enable row level security;
+alter table public.world_log enable row level security;
+alter table public.world_events enable row level security;
+alter table public.player_help_qa enable row level security;
+
+drop policy if exists "worlds readable by signed-in players" on public.worlds;
+create policy "worlds readable by signed-in players" on public.worlds for select using (auth.uid() is not null);
+drop policy if exists "signed-in players may update worlds" on public.worlds;
+create policy "signed-in players may update worlds" on public.worlds for update using (auth.uid() is not null) with check (auth.uid() is not null);
+drop policy if exists "signed-in players may create worlds" on public.worlds;
+create policy "signed-in players may create worlds" on public.worlds for insert with check (auth.uid() is not null);
+
+drop policy if exists "regions readable by signed-in players" on public.regions;
+create policy "regions readable by signed-in players" on public.regions for select using (auth.uid() is not null);
+drop policy if exists "signed-in players may create regions" on public.regions;
+create policy "signed-in players may create regions" on public.regions for insert with check (auth.uid() is not null);
+drop policy if exists "signed-in players may update regions" on public.regions;
+create policy "signed-in players may update regions" on public.regions for update using (auth.uid() is not null) with check (auth.uid() is not null);
+
+drop policy if exists "rooms readable by signed-in players" on public.rooms;
+create policy "rooms readable by signed-in players" on public.rooms for select using (auth.uid() is not null);
+drop policy if exists "signed-in players may create rooms" on public.rooms;
+create policy "signed-in players may create rooms" on public.rooms for insert with check (auth.uid() is not null);
+drop policy if exists "signed-in players may update rooms" on public.rooms;
+create policy "signed-in players may update rooms" on public.rooms for update using (auth.uid() is not null) with check (auth.uid() is not null);
+
+drop policy if exists "items readable by signed-in players" on public.items;
+create policy "items readable by signed-in players" on public.items for select using (auth.uid() is not null);
+drop policy if exists "signed-in players may create items" on public.items;
+create policy "signed-in players may create items" on public.items for insert with check (auth.uid() is not null);
+drop policy if exists "signed-in players may update items" on public.items;
+create policy "signed-in players may update items" on public.items for update using (auth.uid() is not null) with check (auth.uid() is not null);
+
+drop policy if exists "puzzles readable by signed-in players" on public.puzzles;
+create policy "puzzles readable by signed-in players" on public.puzzles for select using (auth.uid() is not null);
+drop policy if exists "signed-in players may create puzzles" on public.puzzles;
+create policy "signed-in players may create puzzles" on public.puzzles for insert with check (auth.uid() is not null);
+drop policy if exists "signed-in players may update puzzles" on public.puzzles;
+create policy "signed-in players may update puzzles" on public.puzzles for update using (auth.uid() is not null) with check (auth.uid() is not null);
+
+drop policy if exists "player tasks readable by signed-in players" on public.player_tasks;
+create policy "player tasks readable by signed-in players" on public.player_tasks for select using (auth.uid() is not null);
+drop policy if exists "signed-in players may create tasks" on public.player_tasks;
+create policy "signed-in players may create tasks" on public.player_tasks for insert with check (auth.uid() is not null);
+drop policy if exists "task authors may update tasks" on public.player_tasks;
+create policy "task authors may update tasks" on public.player_tasks for update using (auth.uid() = author_id) with check (auth.uid() = author_id);
+drop policy if exists "signed-in players may approve tasks" on public.player_tasks;
+create policy "signed-in players may approve tasks" on public.player_tasks for update using (auth.uid() is not null) with check (auth.uid() is not null);
+
+drop policy if exists "player profiles readable by signed-in players" on public.player_profiles;
+create policy "player profiles readable by signed-in players" on public.player_profiles for select using (auth.uid() is not null);
+drop policy if exists "players may insert own cultivation profile" on public.player_profiles;
+create policy "players may insert own cultivation profile" on public.player_profiles for insert with check (auth.uid() = user_id);
+drop policy if exists "players may update own cultivation profile" on public.player_profiles;
+create policy "players may update own cultivation profile" on public.player_profiles for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "progress readable by signed-in players" on public.player_progress;
+create policy "progress readable by signed-in players" on public.player_progress for select using (auth.uid() is not null);
+drop policy if exists "players may record own progress" on public.player_progress;
+create policy "players may record own progress" on public.player_progress for insert with check (auth.uid() = user_id);
+drop policy if exists "players may update own progress" on public.player_progress;
+create policy "players may update own progress" on public.player_progress for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "world log readable by signed-in players" on public.world_log;
+create policy "world log readable by signed-in players" on public.world_log for select using (auth.uid() is not null);
+drop policy if exists "signed-in players may append world log" on public.world_log;
+create policy "signed-in players may append world log" on public.world_log for insert with check (auth.uid() is not null);
+
+drop policy if exists "world events readable by signed-in players" on public.world_events;
+create policy "world events readable by signed-in players" on public.world_events for select using (auth.uid() is not null);
+drop policy if exists "signed-in players may create world events" on public.world_events;
+create policy "signed-in players may create world events" on public.world_events for insert with check (auth.uid() is not null);
+drop policy if exists "signed-in players may update world events" on public.world_events;
+create policy "signed-in players may update world events" on public.world_events for update using (auth.uid() is not null) with check (auth.uid() is not null);
+
+drop policy if exists "help qa readable by owner" on public.player_help_qa;
+create policy "help qa readable by owner" on public.player_help_qa for select using (auth.uid() is not null);
+drop policy if exists "players may ask help" on public.player_help_qa;
+create policy "players may ask help" on public.player_help_qa for insert with check (auth.uid() = user_id);
+drop policy if exists "players may update own help" on public.player_help_qa;
+create policy "players may update own help" on public.player_help_qa for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+grant select, insert, update on public.worlds to authenticated;
+grant select, insert, update on public.regions to authenticated;
+grant select, insert, update on public.rooms to authenticated;
+grant select, insert, update on public.items to authenticated;
+grant select, insert, update on public.puzzles to authenticated;
+grant select, insert, update on public.player_tasks to authenticated;
+grant select, insert, update on public.player_profiles to authenticated;
+grant select, insert, update on public.player_progress to authenticated;
+grant select, insert on public.world_log to authenticated;
+grant select, insert, update on public.world_events to authenticated;
+grant select, insert, update on public.player_help_qa to authenticated;
+revoke all on public.worlds, public.regions, public.rooms, public.items, public.puzzles, public.player_tasks, public.player_profiles, public.player_progress, public.world_log, public.world_events, public.player_help_qa from anon;
 
 do $$
 begin
-  alter publication supabase_realtime add table public.world_mud_state;
+  alter publication supabase_realtime add table public.worlds;
 exception when duplicate_object then null;
 end $$;
+do $$
+begin
+  alter publication supabase_realtime add table public.world_log;
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter publication supabase_realtime add table public.player_profiles;
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter publication supabase_realtime add table public.player_tasks;
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter publication supabase_realtime add table public.puzzles;
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter publication supabase_realtime add table public.world_events;
+exception when duplicate_object then null;
+end $$;
+
+-- Seed: the shared world exists even before any player acts, so a new
+-- player always lands on the *current* progress, not a blank slate.
+insert into public.worlds (id, phase, epoch, total_puzzles) values ('main', '启元期', 1, 12) on conflict (id) do nothing;
+insert into public.regions (id, world_id, display_order, unlocked) values
+  ('plaza', 'main', 0, true), ('tavern', 'main', 1, true), ('forest', 'main', 2, true),
+  ('city', 'main', 3, true), ('ruin', 'main', 4, true), ('lab', 'main', 5, true),
+  ('ocean', 'main', 6, true), ('academy', 'main', 7, true)
+on conflict (id) do nothing;
+insert into public.items (id, name, name_en, icon, rarity, slot, description, stats) values
+  ('item-tide-blade', '汐刃', 'Tide Blade', '🗡️', 'rare', 'weapon', '引汐成刃，xian 汐力 +15', '{"attack":15}'::jsonb),
+  ('item-dawn-amulet', '破晓护符', 'Dawn Amulet', '🛡️', 'rare', 'amulet', '护符微光，防御 +12', '{"defense":12}'::jsonb),
+  ('item-star-compass', '星引罗盘', 'Star Compass', '🧭', 'epic', 'compass', '指引封印方位，探索 +10', '{"explore":10}'::jsonb),
+  ('item-tide-pouch', '潮痕囊', 'Tide Pouch', '🎒', 'common', 'pouch', '收纳潮汐碎片', '{"capacity":20}'::jsonb),
+  ('item-abyss-lantern', '渊灯', 'Abyss Lantern', '🔦', 'epic', 'compass', '照亮深渊裂隙', '{"light":15}'::jsonb),
+  ('item-gold-key', '金钥', 'Golden Key', '🔑', 'legendary', 'pouch', '打开禁书库的钥匙', '{"key":1}'::jsonb),
+  ('item-moon-vial', '月光药剂', 'Moonlight Vial', '🧪', 'common', 'pouch', '恢复汐力', '{"heal":20}'::jsonb),
+  ('item-tide-core', '汐核', 'Tide Core', '💠', 'legendary', 'amulet', '启元期核心碎片', '{"core":1}'::jsonb)
+on conflict (id) do nothing;
+insert into public.world_events (title, description, icon) values
+  ('潮汐初醒', '八域封印松动，潮汐使徒们踏入世界共同开凿封印。', '🌊')
+on conflict do nothing;
 
 -- ── Chat image bucket ───────────────────────────────────────────────────────
 
