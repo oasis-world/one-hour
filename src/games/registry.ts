@@ -2,7 +2,7 @@ import type { GameDefinition } from './types'
 import GomokuGame from './gomoku/GomokuGame'
 import XiangqiGame from './xiangqi/XiangqiGame'
 import ChessGame from './chess/ChessGame'
-import MudGame from './mud/MudGame'
+import WorldMudGame from './mud/WorldMudGame'
 
 export const GAMES: GameDefinition[] = [
   {
@@ -39,7 +39,7 @@ export const GAMES: GameDefinition[] = [
     icon: '🗺️',
     minPlayers: 2,
     maxPlayers: 6,
-    Component: MudGame,
+    Component: WorldMudGame,
   },
 ]
 

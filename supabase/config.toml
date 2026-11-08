@@ -10,8 +10,5 @@ verify_jwt = false
 # Same as companion-chat: gateway must not block preflight / anonymous JWT
 verify_jwt = false
 
-[functions.mud-generate]
-verify_jwt = false
-
 [functions.purge-chat-images]
 verify_jwt = false

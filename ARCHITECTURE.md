@@ -25,7 +25,7 @@ src/
 supabase/
   schema.sql           # 唯一真实结构源，改表必须同步
   config.toml
-  functions/           # companion-chat / world-mud-narrate / mud-generate /
+  functions/           # companion-chat / world-mud-narrate /
                        #   game-ai-move / purge-chat-images
 ```
 
@@ -103,14 +103,14 @@ i18n：`i18n.ts/translations.ts`，中英日法西德韩意阿拉伯等 10 种�
 | 游戏 | 结构 |
 |---|---|
 | 五子棋/象棋/国际象棋逻辑 | `logic.ts`（纯规则）+ `ai.ts`（本地 AI）+ `cloudState/cloudHints`（云同步/提示）+ `Game.tsx`；象棋 AI 另有 `ai/worker/search/evaluate/openingBook`（异步 worker 搜索+评估+开局库），国际象棋多 `ChessTutorPanel` 辅导面板。`AiControls/AiThinkingTimer/AiSourceIcon` + `aiModePreference` + `cloudAi.ts` 统一三种 AI 模式（自己/本地 AI/云 AI，经 `game-ai-move` 云函数），`GameCardMenu` 提供卡片菜单。 |
-| MUD | `MudGame.tsx` 为路由：`world/main/<12位` 的 id → `WorldMudGame`（永恒世界），否则遗留 `LegacyMudGame`（仅本地 blueprint 房间步进，标注「旧版存档」）。 |
+| MUD（世界） | `registry.ts` 的 `mud` 直接渲染 `WorldMudGame`（永恒沙漏世界）。 |
 | WorldMUD（永恒沙漏世界） | 单行 `world_mud_state(world_id='main')` **永不 purge**，Realtime 订阅他人动作；`worldState.ts` 本地 localStorage 365 天兜底 + 种子、玩家化身 1 小时（`joinedAt+1h` 过期剔除）、日志保留最后 80 条、`stats.totalActions/totalPlayersEver`；`worldTypes.ts` 建世界（plaza/ruin/lab/forest/ocean/city/tavern/academy 区）；叙事经 `world-mud-narrate` 云函数（见下）。 |
 
 ## 五、AI 伴侣系统
 
 - **画像/存储/上下文**：`companionProfile`（每人一个助手名+角色）、`companionStore`（1 对 1 消息在 IDB `companion_messages`，同样 1 小时过期+prune）、`companionContext`（拼系统提示词，含用户画像）、`companionGame`（意图建局）、`mention.ts`（@ 检测）。
 - **链路**：点 Composer 中头像或 @ 助手 → `companionChat.ts` 调 Edge `companion-chat` → 失败用全语言本地回退模板；问候语 natively 带 MUD 邀请文案（「永恒沙漏」）。
-- **`worldMudNarrate.ts` / `mudGeneration.ts`**：客户端薄封装，失败静默回退模板（502/未部署/无 key 不刷屏）。
+- **`worldMudNarrate.ts`**：客户端薄封装，失败静默回退模板（502/未部署/无 key 不刷屏）。
 
 ## 六、云函数（`supabase/functions/`）
 
@@ -120,7 +120,6 @@ i18n：`i18n.ts/translations.ts`，中英日法西德韩意阿拉伯等 10 种�
 |---|---|---|
 | `companion-chat` | `systemPrompt/history/userText/companionName/userName/isGreeting` | 强制 JSON `{reply, game}`；加固提示禁泄露 reasoning；问候强制 `@userName` 开头；含新闻关键词走 Tavily 搜索注入（无 key 时提示 cutoff 透明）；上游 45s 超时、2048 tokens；空回复/纯文本时关键词推断 game 兜底。 |
 | `world-mud-narrate` | `actionText/locationId/districtId/roomName/player/lang/recentLog/globalEvent` | JSON `{narrative(≤800), choices(≤4，snake_case action), broadcast(≤60), hint}`；**严格单语言规则**（英文时禁中文字符）；20s 超时；无 key/失败时 zh/ja/en 模板回退。 |
-| `mud-generate` | `blueprint/party/lang` | 返回 `sceneText + choices`；客户端校验 ≥2 选项、截断 label/action 24 字符、scene 600 字符。 |
 | `game-ai-move` | 走法请求 | 云 AI 落子（桌游云模式）。 |
 | `purge-chat-images` | 空体 | service_role 扫 `chat-images` 桶孤儿照片（需 Vault 两密钥，见 schema）。 |
 
@@ -131,7 +130,7 @@ i18n：`i18n.ts/translations.ts`，中英日法西德韩意阿拉伯等 10 种�
 | `chat_messages` | `expires_at` 默认 `now()+1h`；`check(内容>0 OR 图不为空)`、正文≤1000；`replica identity full`；索引 `created_at desc` + `expires_at`；RLS：登录可读、仅本人写删改。 |
 | `chat_reactions` | PK `(message_id,user_id,emoji)`，级联删；登录可读、仅本人增删；进 Realtime 发布。 |
 | `profiles` | 匿名 `expires_at=+1h`、登录 `NULL`；删画像触发器清其过期消息。 |
-| `gomoku/xiangqi/chess/mud_states` | `state jsonb` 快照，`expires_at +1h` 滚动续命。 |
+| `gomoku/xiangqi/chess_states` | `state jsonb` 快照，`expires_at +1h` 滚动续命。 |
 | `world_mud_state` | 永恒单行，无过期、无 delete 策略，仅登录读写。 |
 | `chat-images` 桶 | 公共读、本文件夹（uid 首段）读写。 |
 | 函数/定时 | `purge_expired_chat_messages()`（见上）+ `pg_cron: * * * * *`；`purge-chat-images` 每 5 分钟经 vault 密钥调 Edge（无 pg_net/密钥时静默跳过）。 |

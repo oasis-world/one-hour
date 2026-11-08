@@ -15,7 +15,6 @@ import { deleteGomokuState } from '../games/gomoku/cloudState'
 import { deleteXiangqiState } from '../games/xiangqi/cloudState'
 import AvatarBadge from './AvatarBadge'
 import { deleteChessState } from '../games/chess/cloudState'
-import { deleteMudState } from '../games/mud/cloudState'
 
 interface Props {
   entries: ChatEntry[]
@@ -198,7 +197,6 @@ export default function MessageList({
     if (gameRef?.type === 'gomoku') void deleteGomokuState(gameRef.instanceId)
     if (gameRef?.type === 'xiangqi') void deleteXiangqiState(gameRef.instanceId)
     if (gameRef?.type === 'chess') void deleteChessState(gameRef.instanceId)
-    if (gameRef?.type === 'mud') void deleteMudState(gameRef.instanceId)
     onRemove(entry.id)
   }
 

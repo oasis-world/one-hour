@@ -245,25 +245,8 @@ create policy "signed-in players may delete chess states" on public.chess_states
 grant select, insert, update, delete on public.chess_states to authenticated;
 revoke all on public.chess_states from anon;
 
--- ── MUD game state ─────────────────────────────────────────────────────
-create table if not exists public.mud_states (
-  instance_id text primary key,
-  state jsonb not null check (jsonb_typeof(state) = 'object'),
-  updated_at timestamptz not null default now(),
-  expires_at timestamptz not null default (now() + interval '1 hour')
-);
-create index if not exists mud_states_expiry on public.mud_states (expires_at);
-alter table public.mud_states enable row level security;
-drop policy if exists "mud states are readable by signed-in players" on public.mud_states;
-create policy "mud states are readable by signed-in players" on public.mud_states for select using (auth.uid() is not null);
-drop policy if exists "signed-in players may create mud states" on public.mud_states;
-create policy "signed-in players may create mud states" on public.mud_states for insert with check (auth.uid() is not null);
-drop policy if exists "signed-in players may update mud states" on public.mud_states;
-create policy "signed-in players may update mud states" on public.mud_states for update using (auth.uid() is not null) with check (auth.uid() is not null);
-drop policy if exists "signed-in players may delete mud states" on public.mud_states;
-create policy "signed-in players may delete mud states" on public.mud_states for delete using (auth.uid() is not null);
-grant select, insert, update, delete on public.mud_states to authenticated;
-revoke all on public.mud_states from anon;
+-- Legacy per-instance MUD was removed; drop its table on existing deployments.
+drop table if exists public.mud_states cascade;
 
 -- ── World MUD — eternal shared realm (never purged) ────────────────────────
 create table if not exists public.world_mud_state (
@@ -371,7 +354,6 @@ begin
   delete from public.gomoku_states where expires_at <= now();
   delete from public.xiangqi_states where expires_at <= now();
   delete from public.chess_states where expires_at <= now();
-  delete from public.mud_states where expires_at <= now();
   -- Purge expired anonymous profiles (and their now-orphaned messages were
   -- already removed above). Signed-in profiles have expires_at IS NULL and
   -- are never touched here.
@@ -393,11 +375,6 @@ begin
   where not exists (
     select 1 from public.chat_messages cm
     where cm.content like '%' || cs.instance_id || '%'
-  );
-  delete from public.mud_states ms
-  where not exists (
-    select 1 from public.chat_messages cm
-    where cm.content like '%' || ms.instance_id || '%'
   );
 end;
 $$;
