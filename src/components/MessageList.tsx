@@ -13,8 +13,10 @@ import { useChatScroll } from './useChatScroll'
 import { parseGameRef } from '../games/types'
 import { deleteGomokuState } from '../games/gomoku/cloudState'
 import { deleteXiangqiState } from '../games/xiangqi/cloudState'
-import AvatarBadge from './AvatarBadge'
 import { deleteChessState } from '../games/chess/cloudState'
+import AvatarBadge from './AvatarBadge'
+import { parsePollRef } from '../lib/pollTypes'
+import { deletePoll } from '../lib/pollRemote'
 
 interface Props {
   entries: ChatEntry[]
@@ -197,6 +199,8 @@ export default function MessageList({
     if (gameRef?.type === 'gomoku') void deleteGomokuState(gameRef.instanceId)
     if (gameRef?.type === 'xiangqi') void deleteXiangqiState(gameRef.instanceId)
     if (gameRef?.type === 'chess') void deleteChessState(gameRef.instanceId)
+    const pollRef = parsePollRef(entry.content)
+    if (pollRef) void deletePoll(pollRef.pollId)
     onRemove(entry.id)
   }
 

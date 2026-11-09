@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import BackgroundStage from './components/BackgroundStage'
 import Composer from './components/Composer'
 import ImageViewer from './components/ImageViewer'
+import CreatePollModal from './components/CreatePollModal'
 import MessageList from './components/MessageList'
 // EXPERIMENT: profile page disabled.
 // import ProfilePage from './components/ProfilePage'
@@ -50,6 +51,8 @@ import { createCompanionGame, gameTitle } from './lib/companionGame'
 import { isMudInviteIntent } from './lib/mudRecreate'
 import { isEnterPrivateChatIntent } from './lib/privateChatIntent'
 import { applyRoomReactionChange, recordEmojiUse, summarizeRoomReactions, type RoomReactionRecord } from './lib/chatReactions'
+import { createPoll } from './lib/pollRemote'
+import { buildPollContent, durationMinutes, newPollId, type PollDraft } from './lib/pollTypes'
 import { clearLocalReactions, loadLocalReactions, pruneLocalReactions, removeLocalReaction, removeLocalReactionsForMessage, saveLocalReaction } from './lib/localReactions'
 
 /**
@@ -94,6 +97,7 @@ export default function App() {
   // EXPERIMENT: profile page disabled.
   // const [profileOpen, setProfileOpen] = useState(false)
   const [welcomeOpen, setWelcomeOpen] = useState(false)
+  const [pollOpen, setPollOpen] = useState(false)
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   /** Composer popover open (plus/emoji) — mobile hides the gear meanwhile. */
   const [composerMenuOpen, setComposerMenuOpen] = useState(false)
@@ -662,6 +666,33 @@ export default function App() {
     setReplyTo(null)
   }
 
+  /** Create a poll: persist its ballot row first, then post the card message. */
+  const handleSendPoll = async (draft: PollDraft): Promise<boolean> => {
+    if (!room.identity) return false
+    const pollId = newPollId()
+    const expiresAt = Date.now() + durationMinutes(draft.durationId) * 60_000
+    const created = await createPoll({
+      pollId,
+      userId: room.identity.userId,
+      question: draft.question,
+      options: draft.options,
+      multiple: draft.multiple,
+      expiresAt,
+    })
+    if (!created.ok) {
+      showToast(
+        created.error === 'offline'
+          ? t('离线，投票需要网络连接', 'Offline — polls need a connection')
+          : t('投票发布失败，请重试', 'Could not publish the poll — try again'),
+      )
+      return false
+    }
+    room.send(buildPollContent(draft.question, pollId), undefined, replyTo, { expiresAt })
+    recordMessageSent()
+    setSentMessageSequence((sequence) => sequence + 1)
+    setReplyTo(null)
+    return true
+  }
   const handleEditMessage = (id: string, text: string) => {
     room.edit(id, text)
     setEditingMessage(null)
@@ -1010,6 +1041,7 @@ export default function App() {
                 onImagesPicked={handleImagesPicked}
                 onMenuOpenChange={handleMenuOpenChange}
                 onStartGame={handleStartGame}
+                onStartPoll={() => setPollOpen(true)}
                 companion={companion}
                 privateMode={privateMode}
                 onExitPrivateChat={exitPrivateChat}
@@ -1104,6 +1136,9 @@ export default function App() {
           onClose={profile ? () => setWelcomeOpen(false) : undefined}
         />
       ) : null}
+      {pollOpen && !pendingSummary && profile && room.identity && (
+        <CreatePollModal onClose={() => setPollOpen(false)} onSend={handleSendPoll} />
+      )}
       {toast && <div className="app-toast">{toast}</div>}
     </div>
   )

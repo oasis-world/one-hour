@@ -1,4 +1,5 @@
 /** Hand-rolled SVG glyphs — no icon dependency, inherits currentColor. */
+import { useId } from 'react'
 
 interface GlyphProps {
   size?: number
@@ -252,20 +253,41 @@ export function ChevronDownIcon({ size = 14 }: GlyphProps) {
   )
 }
 
-/** Logo mark — orange-red tile with a white Roman numeral I. */
-export function HourglassIcon({ size = 13 }: GlyphProps) {
+/** Logo mark — a gradient countdown ring: conic sweep with a clock hand. */
+export function HourglassIcon({ size = 13, progress = 1 }: GlyphProps & { progress?: number }) {
+  const gid = `hg${useId().replace(/:/g, '')}`
+  const p = Math.min(1, Math.max(0, progress))
+  const C = 2 * Math.PI * 7.5
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 14 14"
+      viewBox="0 0 20 20"
       aria-hidden="true"
       focusable="false"
     >
-      <rect width="14" height="14" rx="3" fill="#e85d3a" />
-      <rect x="4" y="3" width="6" height="2" rx="0.5" fill="#ffffff" />
-      <rect x="6" y="3" width="2" height="8" fill="#ffffff" />
-      <rect x="4" y="9" width="6" height="2" rx="0.5" fill="#ffffff" />
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="20" y2="20" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#f6c453" />
+          <stop offset="0.35" stopColor="#ff7a59" />
+          <stop offset="0.65" stopColor="#a855f7" />
+          <stop offset="1" stopColor="#3b82f6" />
+        </linearGradient>
+      </defs>
+      <circle cx="10" cy="10" r="7.5" fill="none" strokeWidth="2.2" style={{ stroke: 'var(--line)' }} />
+      <circle
+        cx="10"
+        cy="10"
+        r="7.5"
+        fill="none"
+        stroke={`url(#${gid})`}
+        strokeWidth="2.8"
+        strokeLinecap="round"
+        strokeDasharray={`${C * p} ${C}`}
+        transform="rotate(-90 10 10)"
+      />
+      <circle cx="10" cy="10" r="1.1" fill="currentColor" />
+      <path d="M10 10V5.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   )
 }
@@ -384,6 +406,16 @@ export function ReactIcon({ size = 20 }: GlyphProps) {
         strokeWidth="1.5"
         strokeLinecap="round"
       />
+    </svg>
+  )
+}
+
+export function VoteIcon({ size = 17 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false">
+      <path d="M3 16.6h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M6.3 16.2v-4.6M10 16.2V6.4M13.7 16.2v-6.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="15.6" cy="3.8" r="0.9" fill="currentColor" />
     </svg>
   )
 }

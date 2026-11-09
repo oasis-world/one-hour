@@ -154,6 +154,101 @@ exception
   when duplicate_object then null;
 end $$;
 
+-- ── Polls: one live vote per card message (1-hour lifecycle) ─────────
+--
+-- A poll lives as a chat message whose content carries __POLL__:<poll_id>.
+-- The polls row is the question/options ballot; poll_votes is the ballot
+-- box (one row per pick, so multi-pick polls hold several rows per
+-- voter). Both expire with the card message: the purge sweeps expired
+-- rows plus rows whose card has vanished (same orphan rule as games).
+
+create table if not exists public.polls (
+  poll_id uuid primary key,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  question text not null check (char_length(question) between 1 and 120),
+  options jsonb not null check (jsonb_typeof(options) = 'array'),
+  multiple boolean not null default false,
+  closed_at timestamptz, -- creator closed the ballot early
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default (now() + interval '1 hour')
+);
+
+create index if not exists polls_expiry on public.polls (expires_at);
+alter table public.polls enable row level security;
+
+drop policy if exists "polls are readable by signed-in players"
+  on public.polls;
+create policy "polls are readable by signed-in players"
+  on public.polls for select
+  using (auth.uid() is not null);
+
+drop policy if exists "players may create their own polls"
+  on public.polls;
+create policy "players may create their own polls"
+  on public.polls for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "poll owners may close their own polls"
+  on public.polls;
+create policy "poll owners may close their own polls"
+  on public.polls for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "poll owners may delete their own polls"
+  on public.polls;
+create policy "poll owners may delete their own polls"
+  on public.polls for delete
+  using (auth.uid() = user_id);
+
+create table if not exists public.poll_votes (
+  poll_id uuid not null references public.polls (poll_id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  option_index int not null check (option_index >= 0 and option_index < 8),
+  display_name text, -- voter name snapshot (presence may have left)
+  created_at timestamptz not null default now(),
+  primary key (poll_id, user_id, option_index)
+);
+
+create index if not exists poll_votes_poll on public.poll_votes (poll_id);
+alter table public.poll_votes enable row level security;
+
+drop policy if exists "poll votes are readable by signed-in players"
+  on public.poll_votes;
+create policy "poll votes are readable by signed-in players"
+  on public.poll_votes for select
+  using (auth.uid() is not null);
+
+drop policy if exists "players may cast their own votes"
+  on public.poll_votes;
+create policy "players may cast their own votes"
+  on public.poll_votes for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "players may change their own votes"
+  on public.poll_votes;
+create policy "players may change their own votes"
+  on public.poll_votes for delete
+  using (auth.uid() = user_id);
+
+grant select, insert, update, delete on public.polls to authenticated;
+grant select, insert, delete on public.poll_votes to authenticated;
+revoke all on public.polls, public.poll_votes from anon;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.polls;
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.poll_votes;
+exception
+  when duplicate_object then null;
+end $$;
+
 -- ── Gomoku game state ──────────────────────────────────────────────────────
 -- Broadcasts keep an active board in sync; this row restores it after refresh.
 -- Saved state expires one hour after its most recent move or player change.
@@ -650,6 +745,14 @@ begin
     select 1 from public.chat_messages cm
     where cm.content like '%' || cs.instance_id || '%'
   );
+  -- Polls share the card message's one-hour life: expired rows go, and so
+  -- do orphans whose card vanished (author delete / edit). Votes cascade.
+  delete from public.polls p
+  where p.expires_at <= now()
+     or not exists (
+       select 1 from public.chat_messages cm
+       where cm.content like '%' || p.poll_id::text || '%'
+     );
 end;
 $$;
 

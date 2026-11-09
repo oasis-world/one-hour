@@ -4,7 +4,7 @@ import { COMPOSER_PLACEHOLDER, COMPOSER_PRIVATE_PLACEHOLDER, useLang, t } from '
 import { useImeEnter } from '../lib/ime'
 import { setPopoverOpen, suppressNextClick } from '../lib/popoverGuard'
 import { markFilePickerOpened } from '../lib/filePickerGuard'
-import { CameraIcon, ChessCrownIcon, ChevronRightIcon, EmojiIcon, GameIcon, GomokuIcon, MudIcon, PlusIcon, SendIcon, ThinXIcon, UploadIcon, XiangqiGeneralIcon } from './icons'
+import { CameraIcon, ChessCrownIcon, ChevronRightIcon, EmojiIcon, GameIcon, GomokuIcon, MudIcon, PlusIcon, SendIcon, ThinXIcon, UploadIcon, VoteIcon, XiangqiGeneralIcon } from './icons'
 import { PhotoIcon } from './userIcons'
 import EmojiPanel from './EmojiPanel'
 import AvatarBadge from './AvatarBadge'
@@ -30,6 +30,8 @@ interface Props {
   onImagesPicked: (files: File[]) => void
   /** Start a game message for the given game id. */
   onStartGame?: (gameId: string) => void
+  /** Open the create-poll window (plus menu → Poll). */
+  onStartPoll?: () => void
   /** Notifies the shell while a popover is up (mobile hides the gear). */
   onMenuOpenChange?: (open: boolean) => void
   companion?: CompanionProfile | null
@@ -74,7 +76,7 @@ function useMobileFormFactor(): boolean {
  * or emoji button toggles its popover (a click outside closes it); there
  * is no hover-to-open.
  */
-export default function Composer({ onSend, replyTo, onClearReply, editing, onClearEditing, onEdit, onImagePicked, onImagesPicked, onMenuOpenChange, onStartGame, companion, onMentionCompanion, privateMode, onExitPrivateChat, presence, selfId, onWhisperSelect, pendingInsertName, onConsumeInsert }: Props) {
+export default function Composer({ onSend, replyTo, onClearReply, editing, onClearEditing, onEdit, onImagePicked, onImagesPicked, onMenuOpenChange, onStartGame, onStartPoll, companion, onMentionCompanion, privateMode, onExitPrivateChat, presence, selfId, onWhisperSelect, pendingInsertName, onConsumeInsert }: Props) {
   const lang = useLang()
   const [draft, setDraft] = useState(editing?.content ?? '')
   const [plusOpen, setPlusOpen] = useState(false)
@@ -397,7 +399,7 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
         <div className="composer-reply-preview">
           <div className="composer-reply-copy">
             <strong>{t('回复给', 'Replying to')} {replyTo.displayName}</strong>
-            <span>{(replyTo.content || '').split('\n__GAME__:')[0].trim() || (replyTo.hasImage ? t('图片', 'Image') : '')}</span>
+            <span>{(replyTo.content || '').split('\n__GAME__:')[0].split('\n__POLL__:')[0].trim() || (replyTo.hasImage ? t('图片', 'Image') : '')}</span>
           </div>
           <button
             type="button"
@@ -498,6 +500,22 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
                 >
                   <UploadIcon size={17} />
                   {t('上传图片', 'Upload image')}
+                </button>
+              )}
+              {onStartPoll && (
+                <button
+                  type="button"
+                  className="plus-menu-item"
+                  role="menuitem"
+                  onMouseDown={keepFocus}
+                  onPointerDown={keepFocus}
+                  onClick={() => {
+                    setPlusOpen(false)
+                    onStartPoll()
+                  }}
+                >
+                  <VoteIcon size={17} />
+                  {t('投票', 'Poll')}
                 </button>
               )}
               {onStartGame && (

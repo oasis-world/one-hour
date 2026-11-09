@@ -16,18 +16,34 @@ export function TideGenesisIcon({ size = 22 }: { size?: number }) {
   )
 }
 
-// ── World hourglass (header) — sand + frame + glow
+// ── World countdown ring (header) — gradient depleting ring + clock hand
 export function WorldHourglassIcon({ size = 16 }: { size?: number }) {
+  const gid = 'world-countdown-ring'
+  const C = 2 * Math.PI * 7.5
   return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden>
-      <path d="M5 2.5h10M5 17.5h10" stroke="white" strokeWidth="1.4" strokeLinecap="round" opacity={0.95} />
-      <path d="M6.2 2.5l2.6 6.2a1.2 1.2 0 010 .6L6.2 15.5M13.8 2.5l-2.6 6.2a1.2 1.2 0 000 .6l2.6 6.2" stroke="white" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M7.1 6.2h5.8M8 13.8h4" stroke="white" strokeWidth="1.15" strokeLinecap="round" opacity={0.85} />
-      {/* sand */}
-      <path d="M8.4 7.2l1.6 3 1.6-3H8.4z" fill="white" opacity={0.92} />
-      <path d="M7 15.5h6l-1.2-1.6a2.2 2.2 0 00-3.6 0L7 15.5z" fill="white" opacity={0.92} />
-      {/* glow */}
-      <circle cx="10" cy="10" r="8.5" stroke="white" strokeWidth="0.7" opacity={0.18} />
+    <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden>
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="20" y2="20" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#f6c453" />
+          <stop offset="0.35" stopColor="#ff7a59" />
+          <stop offset="0.65" stopColor="#a855f7" />
+          <stop offset="1" stopColor="#3b82f6" />
+        </linearGradient>
+      </defs>
+      <circle cx="10" cy="10" r="7.5" fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="2.2" />
+      <circle
+        cx="10"
+        cy="10"
+        r="7.5"
+        fill="none"
+        stroke={`url(#${gid})`}
+        strokeWidth="2.8"
+        strokeLinecap="round"
+        strokeDasharray={`${C} ${C}`}
+        transform="rotate(-90 10 10)"
+      />
+      <circle cx="10" cy="10" r="1.1" fill="white" />
+      <path d="M10 10V5.4" stroke="white" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   )
 }

@@ -10,6 +10,8 @@ import { EMOJI_LIST } from '../lib/emoji'
 import MessageMediaEmbed from './MessageMediaEmbed'
 import GameMessage from '../games/GameMessage'
 import { parseGameRef } from '../games/types'
+import PollCard from './PollCard'
+import { parsePollRef } from '../lib/pollTypes'
 import { userAvatarTint, userNameColor } from '../lib/identity'
 import AvatarBadge from './AvatarBadge'
 import CountdownRing from './CountdownRing'
@@ -154,6 +156,7 @@ export default function MessageRow({
   const messageMedia = findMessageMedia(entry.content)
   const displayContent = stripRenderedMediaMarkup(entry.content)
   const gameRef = parseGameRef(entry.content)
+  const pollRef = parsePollRef(entry.content)
   const mentionNames = (onlineMembers ?? []).map((m) => m.displayName).filter(Boolean)
   const isMentioned = (() => {
     try {
@@ -356,13 +359,15 @@ export default function MessageRow({
           >
             <span className="msg-reply-name">{entry.replyTo.displayName}</span>
             <span className="msg-reply-content">
-              {(entry.replyTo.content || '').split('\n__GAME__:')[0].trim() || (entry.replyTo.hasImage ? t('图片', 'Image') : '')}
+              {(entry.replyTo.content || '').split('\n__GAME__:')[0].split('\n__POLL__:')[0].trim() || (entry.replyTo.hasImage ? t('图片', 'Image') : '')}
             </span>
           </button>
         )}
         <div className="msg-body">
           {gameRef ? (
             <GameMessage content={entry.content} hostUserId={entry.userId} onlineMembers={onlineMembers} />
+          ) : pollRef ? (
+            <PollCard pollId={pollRef.pollId} hostUserId={entry.userId} selfId={selfId ?? null} onlineMembers={onlineMembers} />
           ) : (
             renderMessageContent(displayContent, mentionNames, entry.isGreeting ? entry.displayName : undefined)
           )}
@@ -420,7 +425,7 @@ export default function MessageRow({
         {!entry.expiring && (
           <MsgHoverBar
             mine={mine || Boolean(isPrivate)}
-            isGame={Boolean(gameRef)}
+            isGame={Boolean(gameRef) || Boolean(pollRef)}
             onReact={(emoji) => onReact(entry.id, emoji)}
             onCopy={() => onCopy(entry)}
             onDelete={(anchor) => onOpenMenu(entry, anchor, false, true)}
