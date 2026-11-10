@@ -253,8 +253,20 @@ export function ChevronDownIcon({ size = 14 }: GlyphProps) {
   )
 }
 
-/** Logo mark — a gradient countdown ring: conic sweep with a clock hand. */
-export function HourglassIcon({ size = 13, progress = 1 }: GlyphProps & { progress?: number }) {
+/** Project logo mark — same glyph as public/favicon.svg (orange tile + white hourglass). */
+export function HourglassIcon({ size = 13 }: GlyphProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <rect width="32" height="32" rx="8" fill="#e85d3a" />
+      <rect x="10" y="6" width="12" height="4" rx="1" fill="#ffffff" />
+      <rect x="14" y="6" width="4" height="20" fill="#ffffff" />
+      <rect x="10" y="22" width="12" height="4" rx="1" fill="#ffffff" />
+    </svg>
+  )
+}
+
+/** Countdown ring — gradient sweep with a clock hand (poll timers). */
+export function CountdownRingIcon({ size = 13, progress = 1 }: GlyphProps & { progress?: number }) {
   const gid = `hg${useId().replace(/:/g, '')}`
   const p = Math.min(1, Math.max(0, progress))
   const C = 2 * Math.PI * 7.5

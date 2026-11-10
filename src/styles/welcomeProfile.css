@@ -224,12 +224,7 @@
 .welcome-card .welcome-avatar-tools {
   position: static;
   margin-top: 10px;
-}
-
-@media (max-width: 820px) {
-  .welcome-card .welcome-avatar-tools {
-    gap: 12px;
-  }
+  gap: 12px;
 }
 
 .welcome-reroll,

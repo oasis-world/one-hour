@@ -1,5 +1,5 @@
 import { t } from '../lib/i18n'
-import { HourglassIcon } from './icons'
+import { CountdownRingIcon } from './icons'
 
 interface Props {
   question: string
@@ -24,7 +24,7 @@ export default function PollModalPreview({ question, filledOptions, multiple, du
       </div>
       <span className="poll-modal-preview-meta">
         <span>{multiple ? t('多选', 'Multi') : t('单选', 'Single')} ·</span>
-        <HourglassIcon size={11} progress={1} />
+        <CountdownRingIcon size={11} progress={1} />
         <span>{durationText}</span>
       </span>
     </div>

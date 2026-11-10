@@ -18,7 +18,7 @@ import {
 } from '../lib/pollTypes'
 import PollOption from './PollOption'
 import { PollLoading, PollUnavailable } from './PollCardStates'
-import { HourglassIcon } from './icons'
+import { CountdownRingIcon } from './icons'
 import './PollCard.css'
 
 interface Props {
@@ -193,7 +193,7 @@ export default function PollCard({ pollId, hostUserId, selfId, onlineMembers }: 
         <span className="poll-time">
           {open ? (
             <>
-              <HourglassIcon size={13} progress={remainingFraction} />
+              <CountdownRingIcon size={13} progress={remainingFraction} />
               {formatPollRemaining(remaining)}
             </>
           ) : (
