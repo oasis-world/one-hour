@@ -18,7 +18,6 @@ import {
 } from '../lib/pollTypes'
 import PollOption from './PollOption'
 import { PollLoading, PollUnavailable } from './PollCardStates'
-import { CountdownRingIcon } from './icons'
 import './PollCard.css'
 
 interface Props {
@@ -87,11 +86,6 @@ export default function PollCard({ pollId, hostUserId, selfId, onlineMembers }: 
     const member = onlineMembers.find((m) => m.userId === selfId)
     return member?.displayName ?? t('我', 'You')
   }, [onlineMembers, selfId])
-  const presenceById = useMemo(
-    () => new Map(onlineMembers.map((m) => [m.userId, m])),
-    [onlineMembers],
-  )
-
   const pick = (index: number) => {
     if (!poll || !open || voting || !selfId) return
     const picked = myVotes.includes(index)
@@ -148,10 +142,6 @@ export default function PollCard({ pollId, hostUserId, selfId, onlineMembers }: 
 
   const lead = Math.max(...tallies.counts, 0)
   const remaining = pollRemainingMs(poll, now)
-  const createdMs = new Date(poll.createdAt).getTime()
-  const expiresMs = new Date(poll.expiresAt).getTime()
-  const totalMs = expiresMs - createdMs
-  const remainingFraction = totalMs > 0 ? Math.min(1, Math.max(0, remaining / totalMs)) : 0
   const mine = selfId != null && hostUserId === selfId
 
   return (
@@ -176,8 +166,6 @@ export default function PollCard({ pollId, hostUserId, selfId, onlineMembers }: 
               isLead={lead > 0 && count === lead}
               disabled={!open || voting || !selfId}
               multiple={poll.multiple}
-              voters={tallies.votersByOption.get(index) ?? []}
-              presenceById={presenceById}
               onPick={() => pick(index)}
             />
           )
@@ -191,14 +179,7 @@ export default function PollCard({ pollId, hostUserId, selfId, onlineMembers }: 
             : t('等待大家投票…', 'Waiting for votes…')}
         </span>
         <span className="poll-time">
-          {open ? (
-            <>
-              <CountdownRingIcon size={13} progress={remainingFraction} />
-              {formatPollRemaining(remaining)}
-            </>
-          ) : (
-            '🏁'
-          )}
+          {open ? formatPollRemaining(remaining) : '🏁'}
         </span>
         {open && mine && (
           <button type="button" className="poll-close-btn" disabled={voting} onClick={onClosePoll}>

@@ -11,7 +11,8 @@ import {
   type PollDurationId,
 } from '../lib/pollTypes'
 import { ThinXIcon, VoteIcon } from './icons'
-import PollModalPreview from './PollModalPreview'
+// Preview hidden for now (per request) — restore from git to re-enable.
+// import PollModalPreview from './PollModalPreview'
 import PollModalSeg from './PollModalSeg'
 import PollOptionsEditor from './PollOptionsEditor'
 import PollQuestionField from './PollQuestionField'
@@ -30,7 +31,6 @@ export default function CreatePollModal({ onSend, onClose }: Props) {
   const [multiple, setMultiple] = useState(false)
   const [durationId, setDurationId] = useState<PollDurationId>('1h')
   const [sending, setSending] = useState(false)
-  const [sendError, setSendError] = useState(false)
   const [focusReq, setFocusReq] = useState<{ idx: number; seq: number } | null>(null)
   const questionRef = useRef<HTMLInputElement>(null)
   const optionRefs = useRef<Array<HTMLInputElement | null>>([])
@@ -39,7 +39,6 @@ export default function CreatePollModal({ onSend, onClose }: Props) {
   const draftError = validatePollDraft(question, options)
   const canSend = !draftError && !sending
   const filledOptions = options.map((o) => o.trim()).filter(Boolean)
-  const durationMinutes = POLL_DURATIONS.find((d) => d.id === durationId)?.minutes ?? 60
 
   useEffect(() => {
     // Popover guard: a dismissal under this modal must not fold the chat.
@@ -94,19 +93,12 @@ export default function CreatePollModal({ onSend, onClose }: Props) {
   const submit = () => {
     if (!canSend) return
     setSending(true)
-    setSendError(false)
     void onSend({ question: question.trim(), options: filledOptions, multiple, durationId })
       .then((ok) => {
         if (ok) onClose()
-        else {
-          setSendError(true)
-          setSending(false)
-        }
+        else setSending(false)
       })
-      .catch(() => {
-        setSendError(true)
-        setSending(false)
-      })
+      .catch(() => setSending(false))
   }
 
   return (
@@ -119,7 +111,7 @@ export default function CreatePollModal({ onSend, onClose }: Props) {
     >
       <div className="poll-modal-card" role="dialog" aria-modal="true" aria-label={t('发起投票', 'New poll')}>
         <header className="poll-modal-head">
-          <span className="poll-modal-tile"><VoteIcon size={20} /></span>
+          <span className="poll-modal-tile"><VoteIcon size={22} /></span>
           <span className="poll-modal-titles">
             <strong>{t('发起投票', 'New poll')}</strong>
             <small>{t('全员可见 · 实时统计 · 1 小时后消散', 'Visible to all · live results · fades in 1 hour')}</small>
@@ -169,17 +161,16 @@ export default function CreatePollModal({ onSend, onClose }: Props) {
           value={durationId}
           onChange={setDurationId}
         />
+        {/* Preview hidden for now (per request). Restore to re-enable:
         <PollModalPreview
           question={question}
           filledOptions={filledOptions}
           multiple={multiple}
           durationText={`${durationMinutes}${t(' 分钟', ' min')}`}
         />
+        */}
 
         <footer className="poll-modal-foot">
-          <span className="poll-modal-hint" role="status">
-            {sendError ? t('发布失败，请重试', 'Publishing failed — try again') : draftError ? t(draftError.zh, draftError.en) : t('点击发送后，全员立刻可见', 'Everyone sees it the moment you send')}
-          </span>
           <button type="button" className="btn-ghost" disabled={sending} onClick={onClose}>
             {t('取消', 'Cancel')}
           </button>

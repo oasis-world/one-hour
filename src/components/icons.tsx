@@ -425,9 +425,13 @@ export function ReactIcon({ size = 20 }: GlyphProps) {
 export function VoteIcon({ size = 17 }: GlyphProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false">
-      <path d="M3 16.6h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M6.3 16.2v-4.6M10 16.2V6.4M13.7 16.2v-6.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <circle cx="15.6" cy="3.8" r="0.9" fill="currentColor" />
+      <path d="M3 17h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path
+        d="M6.5 16.6v-5.2M10 16.6V6.2M13.5 16.6v-7.4"
+        stroke="currentColor"
+        strokeWidth="2.6"
+        strokeLinecap="round"
+      />
     </svg>
   )
 }

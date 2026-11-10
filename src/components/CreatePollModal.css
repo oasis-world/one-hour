@@ -146,7 +146,7 @@
 }
 .poll-modal-preview-opt.is-empty { border-style: dashed; color: var(--ink-mute); font-weight: 500; }
 .poll-modal-preview-meta { display: flex; align-items: center; gap: 4px; margin-top: 9px; font-size: 11px; color: var(--ink-mute); }
-.poll-modal-foot { display: flex; align-items: center; gap: 10px; }
+.poll-modal-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
 .poll-modal-hint { flex: 1; min-width: 0; font-size: 12px; color: var(--ink-mute); line-height: 1.45; }
 .poll-modal-send { flex: none; min-height: 40px; padding: 0 20px; }
 @media (hover: none), (pointer: coarse) {
