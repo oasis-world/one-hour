@@ -41,18 +41,6 @@ const AVATAR_HINT: Record<string, string> = {
   ar: 'انقر على صورتي في مربع الإدخال للدردشة معي في أي وقت',
 }
 
-const MUD_HINT: Record<string, string> = {
-  zh: '这里有一个开放世界 MUD《潮汐启元》🌊：八域十二封印已在进行中，新人直接加入当前进度，解谜修行升级，还能在卡片里输入框让 AI 生成任务，AI 守门人随时解答。',
-  'zh-TW': '這裡有一個開放世界 MUD《潮汐啟元》🌊：八域十二封印已在進行中，新人直接加入當前進度，解謎修行升級，還能在卡片裡輸入框讓 AI 生成任務，AI 守門人隨時解答。',
-  en: 'There’s an open-world MUD — Tide Genesis 🌊: eight regions and twelve seals are already underway, newcomers land on current progress, solve puzzles to cultivate, and can type a prompt in the card to let AI generate tasks. The AI Guide answers anytime.',
-  ja: 'オープン・ワールドMUD『潮汐啓元』🌊があります。8領域12封印が進行中、新規参加者は現在の進捗へ。パズルでเติบโตし、カードに入力するとAIがタスクを生成、ガイドが随時答えます。',
-  fr: 'Un MUD ouvert vous attend — Genèse des Marées 🌊. Huit régions et douze sceaux sont déjà en cours, les nouveaux arrivent au progrès actuel, résolvez des énigmes pour progresser, et tapez dans la carte pour que l’IA génère une tâche. Le Guide répond à tout moment.',
-  es: 'Hay un MUD de mundo abierto — Génesis de la Marea 🌊. Ocho regiones y doce sellos ya están en curso, los nuevos llegan al progreso actual, resuelve acertijos para cultivarte y escribe en la tarjeta para que la IA genere una tarea. El Guía responde siempre.',
-  de: 'Es gibt ein offenes MUD — Gezeiten-Genesis 🌊. Acht Regionen und zwölf Siegel laufen bereits, neue Spieler landen im aktuellen Fortschritt, löse Rätsel zur Kultivierung und schreibe in die Karte, damit die KI eine Aufgabe erstellt. Die Guide antwortet jederzeit.',
-  ko: '오픈 월드 MUD ‘조수 기원’ 🌊이 있어요. 8개 영역 12개 봉인이 이미 진행 중이고 신규는 현재 진행도에 바로 착지합니다. 퍼즐로 수련하고 카드에 입력하면 AI가 퀘스트를 생성하고 가이드가随时答합니다。',
-  it: 'C’è un MUD a mondo aperto — Genesi della Marea 🌊. Otto regioni e dodici sigilli sono già in corso, i nuovi arrivano ai progressi attuali, risolvi enigmi per coltivarti e scrivi nella scheda per far generare un compito all’IA. La Guida risponde sempre.',
-  ar: 'هناك عالم مفتوح — تكوين المد 🌊. ثماني مناطق واثنا عشر ختماً قيد التنفيذ، الوافد الجديد يصل إلى التقدم الحالي، حل الألغاز لتتزكى، واكتب في البطاقة لتوليد مهمة بالذكاء الاصطناعي. المرشد يرد دائماً.',
-}
 
 export function buildCompanionSystemPrompt(user: UserProfile, companion: CompanionProfile): string {
   const lang = getLang()
@@ -69,11 +57,10 @@ export function buildCompanionSystemPrompt(user: UserProfile, companion: Compani
 export function buildGreetingPrompt(user: UserProfile, companion: CompanionProfile): string {
   const lang = getLang()
   const hint = AVATAR_HINT[lang] ?? AVATAR_HINT.en
-  const mudHint = MUD_HINT[lang] ?? MUD_HINT.en
   const isZh = lang === 'zh' || lang === 'zh-TW'
   const langName = ({ zh: '中文', 'zh-TW': '繁中', en: 'English', ja: '日本語', fr: 'Français', es: 'Español', de: 'Deutsch', ko: '한국어', it: 'Italiano', ar: 'العربية' } as Record<string, string>)[lang] ?? lang
   if (isZh) {
-    return `用${langName}和${user.nickname}打招呼，开头必须是“@${user.nickname} ”（含空格），然后自我介绍你是${companion.name}（${companion.role}），提一句一小时聊天室的倒计时/游戏特色。必须包含这句话并润色得温暖热情：“${hint}”。另外必须加上一句（保留角色名与1小时信息）：“${mudHint}”可轻微润色但必须保留“${user.nickname}”与“1小时”与“永恒沙漏/永恆沙漏”。3-5句话，温暖俏皮。`
+    return `用${langName}和${user.nickname}打招呼，开头必须是“@${user.nickname} ”（含空格），然后自我介绍你是${companion.name}（${companion.role}），提一句一小时聊天室的倒计时/游戏特色。必须包含这句话并润色得温暖热情：“${hint}”。3-5句话，温暖俏皮。`
   }
-  return `Greet ${user.nickname} in ${langName} (${lang}). Start exactly with "@${user.nickname} " then introduce yourself as ${companion.name} (${companion.role}), mention one-hour countdown/games. You MUST include warmly rephrased: "${hint}". Also add a sentence (keep role + 1 hour): "${mudHint}" — must keep "${user.nickname}" and "${MUD_HINT[lang]?.includes('1') ? '1 hour' : '1 hour'}" and hourglass name. 3-5 sentences, warm.`
+  return `Greet ${user.nickname} in ${langName} (${lang}). Start exactly with "@${user.nickname} " then introduce yourself as ${companion.name} (${companion.role}), mention one-hour countdown/games. You MUST include warmly rephrased: "${hint}". 3-5 sentences, warm.`
 }

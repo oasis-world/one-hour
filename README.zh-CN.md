@@ -49,7 +49,6 @@ npm run dev
    ```bash
    supabase functions deploy game-ai-move --project-ref <你的 Supabase project ref>
    supabase functions deploy companion-chat --project-ref <你的 Supabase project ref>
-   supabase functions deploy world-mud-narrate --project-ref <你的 Supabase project ref>
    supabase secrets set OPENCODE_API_KEY=oc_sk_你的密钥
    ```
 

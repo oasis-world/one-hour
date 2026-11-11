@@ -4,14 +4,13 @@ import { COMPOSER_PLACEHOLDER, COMPOSER_PRIVATE_PLACEHOLDER, useLang, t } from '
 import { useImeEnter } from '../lib/ime'
 import { setPopoverOpen, suppressNextClick } from '../lib/popoverGuard'
 import { markFilePickerOpened } from '../lib/filePickerGuard'
-import { CameraIcon, ChessCrownIcon, ChevronRightIcon, EmojiIcon, GameIcon, GomokuIcon, MudIcon, PlusIcon, SendIcon, ThinXIcon, UploadIcon, VoteIcon, XiangqiGeneralIcon } from './icons'
+import { CameraIcon, ChessCrownIcon, ChevronRightIcon, EmojiIcon, GameIcon, GomokuIcon, PlusIcon, SendIcon, ThinXIcon, UploadIcon, VoteIcon, XiangqiGeneralIcon } from './icons'
 import { PhotoIcon } from './userIcons'
 import EmojiPanel from './EmojiPanel'
 import AvatarBadge from './AvatarBadge'
 import type { CompanionProfile } from '../lib/companionProfile'
 import type { PresenceMember } from '../lib/chatTypes'
 import { getGameList } from '../games/registry'
-
 type MentionCandidate =
   | { kind: 'companion'; id: string; displayName: string; role: string; style: string; seed: string; avatarUrl: string | null }
   | { kind: 'whisper'; member: PresenceMember }
@@ -551,8 +550,7 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
                             onStartGame(game.id)
                           }}
                         >
-                          {game.id === 'gomoku' ? <GomokuIcon size={17} /> : game.id === 'xiangqi' ? <XiangqiGeneralIcon size={17} /> : game.id === 'chess' ? <ChessCrownIcon size={17} /> : game.id === 'mud' ? <MudIcon size={17} /> : game.icon}
-                          {t(game.name, game.nameEn)}
+                          {game.id === 'gomoku' ? <GomokuIcon size={17} /> : game.id === 'xiangqi' ? <XiangqiGeneralIcon size={17} /> : game.id === 'chess' ? <ChessCrownIcon size={17} /> : game.icon}                          {t(game.name, game.nameEn)}
                         </button>
                       ))}
                     </div>

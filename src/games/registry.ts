@@ -2,7 +2,6 @@ import type { GameDefinition } from './types'
 import GomokuGame from './gomoku/GomokuGame'
 import XiangqiGame from './xiangqi/XiangqiGame'
 import ChessGame from './chess/ChessGame'
-import WorldMudGame from './mud/WorldMudGame'
 
 export const GAMES: GameDefinition[] = [
   {
@@ -31,15 +30,6 @@ export const GAMES: GameDefinition[] = [
     minPlayers: 1,
     maxPlayers: 2,
     Component: ChessGame,
-  },
-  {
-    id: 'mud',
-    name: '潮汐启元',
-    nameEn: 'Tide Genesis',
-    icon: '🗺️',
-    minPlayers: 2,
-    maxPlayers: 6,
-    Component: WorldMudGame,
   },
 ]
 

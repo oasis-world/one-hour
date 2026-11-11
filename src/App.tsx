@@ -48,7 +48,6 @@ import type { CompanionMessage } from './lib/companionStore'
 import { requestCompanionGreeting, requestCompanionReply, toHistory } from './lib/companionChat'
 import { containsCompanionMention } from './lib/mention'
 import { createCompanionGame, gameTitle } from './lib/companionGame'
-import { isMudInviteIntent } from './lib/mudRecreate'
 import { isEnterPrivateChatIntent } from './lib/privateChatIntent'
 import { applyRoomReactionChange, recordEmojiUse, summarizeRoomReactions, type RoomReactionRecord } from './lib/chatReactions'
 import { createPoll } from './lib/pollRemote'
@@ -340,7 +339,6 @@ export default function App() {
     setPendingInsertName(member.displayName)
   }, [room.identity, companion, enterPrivateChat])
   const consumeInsert = useCallback(() => setPendingInsertName(null), [])
-  const mudCardCreatingRef = useRef(false)
   // Reactions for local messages (companion chats + MUD card) — persisted in IndexedDB
   const [localReactionRows, setLocalReactionRows] = useState<RoomReactionRecord[]>([])
   useEffect(() => subscribeCompanion(setCompanion), [])
@@ -381,72 +379,6 @@ export default function App() {
     const validIds = new Set(privateMessages.map((m) => m.id))
     void pruneLocalReactions(validIds).then(() => loadLocalReactions().then(setLocalReactionRows).catch(() => {})).catch(() => {})
   }, [privateMessages])
-  // World MUD private card — local only, but world progress is global via Supabase
-  const triggerWorldMudCard = useCallback(async (opts?: { force?: boolean; as?: 'user' | 'companion' }) => {
-    if (!companion || !profile) return
-    if (mudCardCreatingRef.current) return
-    if (!opts?.force && privateMessagesRef.current.some((m) => m.content.includes('__GAME__:mud:world'))) {
-      // Auto flows (greeting/@mud) keep de-dupe; manual “+ → MUD” passes force:true to allow repeats
-      setSentMessageSequence((s) => s + 1)
-      return
-    }
-    mudCardCreatingRef.current = true
-    const langNow = lang
-    const titleMap: Record<string, string> = {
-      zh: '永恒沙漏 · 世界 MUD', 'zh-TW': '永恆沙漏 · 世界 MUD', en: 'The Eternal Hourglass · World MUD',
-      ja: '永遠の砂時計 · ワールドMUD', fr: 'Le Sablier Éternel · MUD Mondial', es: 'El Reloj Eterno · MUD Mundial',
-      de: 'Die Ewige Sanduhr · Welt-MUD', ko: '영원한 모래시계 · 월드 MUD', it: 'La Clessidra Eterna · MUD Mondiale', ar: 'الساعة الرملية الأبدية · لعبة MUD العالمية',
-    }
-    const introMap: Record<string, string> = {
-      zh: `准备好了吗，${profile.nickname}（${profile.role ?? '旅人'}）？点开下方卡片，以你的身份进入这个永不落幕、由所有人共同书写的世界——自然语言即可行动，也可点击按钮或输入指令。`,
-      'zh-TW': `準備好了嗎，${profile.nickname}（${profile.role ?? '旅人'}）？點開下方卡片，以你的身份進入這個永不落幕的世界——自然語言即可行動。`,
-      en: `Ready, ${profile.nickname} (${profile.role ?? 'traveler'})? Tap the card below to enter as yourself — an eternal, co-written realm. Use natural language or buttons/commands.`,
-      ja: `準備はいい？${profile.nickname}（${profile.role ?? '旅人'}）。下のカードをタップして、あなたの分身として永遠の世界へ。自然な言葉で行動できます。`,
-      fr: `Prêt, ${profile.nickname} ? Appuyez sur la carte ci-dessous pour entrer — un monde éternel co-écrit. Langage naturel ou boutons.`,
-      es: `¿Listo, ${profile.nickname}? Toca la tarjeta para entrar — un mundo eterno co-escrito. Lenguaje natural o botones.`,
-      de: `Bereit, ${profile.nickname}? Tippe auf die Karte — eine ewige, gemeinsam geschriebene Welt. Natürliche Sprache oder Buttons.`,
-      ko: `준비됐나요, ${profile.nickname}? 아래 카드를 눌러 입장하세요 — 영원히 함께 쓰는 세계. 자연어로 행동하세요.`,
-      it: `Pronto, ${profile.nickname}? Tocca la scheda per entrare — un mondo eterno co-scritto. Linguaggio naturale o pulsanti.`,
-      ar: `مستعد يا ${profile.nickname}؟ اضغط البطاقة أدناه للدخول — عالم أبدي يُكتب معاً. لغة طبيعية أو أزرار.`,
-    }
-    const title = titleMap[langNow] ?? titleMap.en
-    // If user already has progress, show “welcome back” with current location instead of generic welcome
-    let intro = introMap[langNow] ?? introMap.en
-    try {
-      const uid = profile ? `${profile.nickname}|${profile.role ?? ''}` : null
-      const key = uid ? `one-hour:mud-progress:${uid}` : null
-      const raw = key ? localStorage.getItem(key) : null
-      if (raw) {
-        const p = JSON.parse(raw) as { locationId?: string; at?: number }
-        if (p?.locationId && (!p.at || Date.now() - p.at <= 60 * 60 * 1000) && p.locationId !== 'plaza_center') {
-          const backMap: Record<string, string> = {
-            zh: `欢迎回来，${profile.nickname}！你目前在 ${p.locationId}，点开下方卡片继续你的冒险——世界因你而变。`,
-            'zh-TW': `歡迎回來，${profile.nickname}！你目前在 ${p.locationId}，點開下方卡片繼續你的冒險。`,
-            en: `Welcome back, ${profile.nickname}! You’re at ${p.locationId} — tap the card below to continue your journey. The world has been waiting.`,
-            ja: `おかえり、${profile.nickname}！現在地は${p.locationId}だよ。下のカードをタップして冒険を続けよう。`,
-            fr: `Bon retour, ${profile.nickname} ! Vous êtes à ${p.locationId} — appuyez sur la carte pour continuer.`,
-            es: `¡Bienvenido de vuelta, ${profile.nickname}! Estás en ${p.locationId}. Toca la tarjeta para continuar.`,
-            de: `Willkommen zurück, ${profile.nickname}! Du bist in ${p.locationId}. Tippe auf die Karte, um weiterzuspielen.`,
-            ko: `다시 온 걸 환영해, ${profile.nickname}! 현재 위치는 ${p.locationId}야. 아래 카드를 눌러 모험을 이어가자.`,
-            it: `Bentornato, ${profile.nickname}! Sei a ${p.locationId}. Tocca la scheda per continuare.`,
-            ar: `مرحباً بعودتك، ${profile.nickname}! أنت في ${p.locationId}. اضغط البطاقة للمتابعة.`,
-          }
-          intro = backMap[langNow] ?? backMap.en
-        }
-      }
-    } catch { /* ignore */ }
-    const cardText = `🎮 ${title}\n__GAME__:mud:world`
-    const asCompanion = opts?.as === 'companion'
-    const privateIntro = asCompanion ? createCompanionReply(`${intro}\n${cardText}`) : createUserCompanionMessage(`${intro}\n${cardText}`)
-    try {
-      await saveCompanionMessage(privateIntro)
-      setPrivateMessages((prev) => (opts?.force ? [...prev, privateIntro] : (prev.some((m) => m.content.includes('__GAME__:mud:world')) ? prev : [...prev, privateIntro])))
-      setSentMessageSequence((s) => s + 1)
-    } finally {
-      // Release after a short debounce so rapid double-clicks don't flash duplicates
-      window.setTimeout(() => { mudCardCreatingRef.current = false }, 1500)
-    }
-  }, [companion, profile, lang])
 
   const greetedRef = useRef<string | null>(null)
   // Welcome choreography: background → chat reveal → then greet with typing.
@@ -482,21 +414,10 @@ export default function App() {
       setPrivateMessages((prev) => [...prev, msg])
       setSentMessageSequence((s) => s + 1)
       await new Promise<void>((r) => window.setTimeout(r, 300))
-      if (!getCompanionIfAlive() || !profile) return
-      setCompanionTyping(true)
-      setSentMessageSequence((s) => s + 1)
-      await new Promise<void>((r) => window.setTimeout(r, 900))
-      try {
-        await triggerWorldMudCard({ as: 'companion' })
-      } finally {
-        setCompanionTyping(false)
-      }
+      setCompanionTyping(false)
     })()
     return () => { setCompanionTyping(false); setUserTyping(false) }
-  }, [profile, companion, privateMessages.length, hasRevealed, triggerWorldMudCard])
-
-  // MUD auto-invite is wired after displayPresence is defined (see below)
-
+  }, [profile, companion, privateMessages.length, hasRevealed])
   const handleSummaryComplete = () => {
     if (currentUserId) expireUserMessages(currentUserId)
     expireAnonymousProfile(currentUserId)
@@ -550,21 +471,6 @@ export default function App() {
 
   const sendPrivateAndReply = async (text: string) => {
     if (!companion) return
-    if (isMudInviteIntent(text)) {
-      const userMsg = createUserCompanionMessage(text)
-      await saveCompanionMessage(userMsg)
-      setPrivateMessages((prev) => [...prev, userMsg])
-      setSentMessageSequence((s) => s + 1)
-      setReplyTo(null)
-      setCompanionTyping(true)
-      await new Promise<void>((r) => window.setTimeout(r, 700))
-      try {
-        await triggerWorldMudCard({ as: 'companion', force: true })
-      } finally {
-        setCompanionTyping(false)
-      }
-      return
-    }
     const userMsg = createUserCompanionMessage(text)
     await saveCompanionMessage(userMsg)
     setPrivateMessages((prev) => [...prev, userMsg])
@@ -638,20 +544,6 @@ export default function App() {
   }
 
   const handleStartGame = (gameId: string) => {
-    if (gameId === 'mud') {
-      if (!profile) return
-      setUserTyping(true)
-      setSentMessageSequence((s) => s + 1)
-      void (async () => {
-        await new Promise<void>((r) => window.setTimeout(r, 800))
-        try {
-          await triggerWorldMudCard({ force: true })
-        } finally {
-          setUserTyping(false)
-        }
-      })()
-      return
-    }
     const instanceId = (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2))
     const game = getGameById(gameId)
     const title = game ? t(game.name, game.nameEn) : gameId
@@ -825,9 +717,6 @@ export default function App() {
     if (room.presence.some((p) => p.userId === companion.id)) return room.presence
     return [...room.presence, companionMember]
   }, [room.presence, companion])
-
-  // MUD auto-invite disabled: no longer auto-send MUD messages/cards.
-  // Manual invite is now triggered only when user @ companion asks for MUD.
 
   // The backdrop follows the newest photo in the log; the viewer browses
   // every live photo, oldest → newest.

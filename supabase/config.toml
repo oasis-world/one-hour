@@ -6,9 +6,5 @@ verify_jwt = false
 # Same as game-ai-move: OPTIONS has no JWT, POST validates via SUPABASE_URL/ANON_KEY
 verify_jwt = false
 
-[functions.world-mud-narrate]
-# Same as companion-chat: gateway must not block preflight / anonymous JWT
-verify_jwt = false
-
 [functions.purge-chat-images]
 verify_jwt = false
