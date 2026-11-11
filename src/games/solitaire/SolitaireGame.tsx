@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { GameComponentProps } from '../types'
 import { t, useLang } from '../../lib/i18n'
 import CardArt from './CardArt'
@@ -39,6 +39,7 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
   const stockRef = useRef<HTMLButtonElement>(null)
   const wasteRef = useRef<HTMLDivElement>(null)
   const flightFinishedRef = useRef(false)
+  const pendingCardPositionsRef = useRef<Map<string, DOMRect> | null>(null)
 
   useEffect(() => {
     try { localStorage.setItem(keyFor(instanceId), JSON.stringify(state)) } catch { /* Local storage may be unavailable. */ }
@@ -51,6 +52,15 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
   const commit = (next: SolitaireState) => {
     if (next !== state) { setState(next); setSelection(null) }
   }
+  const commitMove = (next: SolitaireState) => {
+    if (next === state) return
+    const positions = new Map<string, DOMRect>()
+    shellRef.current?.querySelectorAll<HTMLElement>('[data-card-id]').forEach((element) => {
+      if (element.dataset.cardId) positions.set(element.dataset.cardId, element.getBoundingClientRect())
+    })
+    pendingCardPositionsRef.current = positions
+    commit(next)
+  }
   const selectWaste = () => {
     if (!state.waste.length) return
     const source: Source = { zone: 'waste', index: 0 }
@@ -60,15 +70,15 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
     if (selection) {
       const next = moveToTableau(state, selection.source, column, selection.startIndex)
       if (next !== state) {
-        commit(next)
+        commitMove(next)
         return
       }
     }
     if (cardIndex !== undefined && state.tableau[column][cardIndex]?.faceUp) setSelection({ source: { zone: 'tableau', index: column }, startIndex: cardIndex })
-    else if (!state.tableau[column].length && selection) commit(moveToTableau(state, selection.source, column, selection.startIndex))
+    else if (!state.tableau[column].length && selection) commitMove(moveToTableau(state, selection.source, column, selection.startIndex))
   }
   const chooseFoundation = (index: number) => {
-    if (selection) commit(moveToFoundation(state, selection.source, index))
+    if (selection) commitMove(moveToFoundation(state, selection.source, index))
     else if (state.foundations[index].length) setSelection({ source: { zone: 'foundation', index } })
   }
   const doubleToFoundation = (source: Source) => {
@@ -77,7 +87,7 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
     const index = state.foundations.findIndex((pile) => pile.length
       ? pile.at(-1)!.suit === card.suit && pile.at(-1)!.rank + 1 === card.rank
       : card.rank === 1)
-    if (index >= 0) commit(moveToFoundation(state, source, index))
+    if (index >= 0) commitMove(moveToFoundation(state, source, index))
   }
   const restart = () => { setState(newGame(1)); setSelection(null); setSeconds(0) }
   const handleStock = () => {
@@ -117,6 +127,27 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
     return () => window.clearTimeout(timer)
   }, [flight, finishFlight])
 
+  useLayoutEffect(() => {
+    const previous = pendingCardPositionsRef.current
+    if (!previous) return
+    pendingCardPositionsRef.current = null
+    const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 500
+    if (!duration) return
+    shellRef.current?.querySelectorAll<HTMLElement>('[data-card-id]').forEach((element) => {
+      const cardId = element.dataset.cardId
+      const from = cardId ? previous.get(cardId) : undefined
+      if (!from) return
+      const to = element.getBoundingClientRect()
+      const dx = from.left - to.left
+      const dy = from.top - to.top
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return
+      element.animate(
+        [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
+        { duration, easing: 'cubic-bezier(.2,.75,.25,1)' },
+      )
+    })
+  }, [state])
+
   return <section ref={shellRef} className="solitaire-card" aria-label={t('空当接龙纸牌游戏', 'Klondike Solitaire')}>
     <header className="sol-header">
       <div className="sol-title-lockup"><span className="sol-mark"><SolitaireIcon size={31} /></span><span><strong>{t('纸牌接龙', 'Solitaire')}</strong><small>{t('经典 · 克朗代克', 'CLASSIC · KLONDIKE')}</small></span></div>
@@ -141,7 +172,7 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
         {state.waste.slice(-3).map((card, index, visible) => {
           const realIndex = state.waste.length - visible.length + index
           const top = realIndex === state.waste.length - 1
-          return <button key={card.id} type="button" className={`sol-pile sol-waste-card${top ? ' is-top' : ''}${selection?.source.zone === 'waste' && top ? ' is-selected' : ''}`} style={{ left: `${index * 15}%` }} onClick={top ? selectWaste : undefined} onDoubleClick={top ? () => doubleToFoundation({ zone: 'waste', index: 0 }) : undefined} aria-label={cardName(card)} disabled={!top}>
+          return <button key={card.id} data-card-id={card.id} type="button" className={`sol-pile sol-waste-card${top ? ' is-top' : ''}${selection?.source.zone === 'waste' && top ? ' is-selected' : ''}`} style={{ left: `${index * 15}%` }} onClick={top ? selectWaste : undefined} onDoubleClick={top ? () => doubleToFoundation({ zone: 'waste', index: 0 }) : undefined} aria-label={cardName(card)} disabled={!top}>
             <span className="sol-waste-flip-inner">
               <span className="sol-card-back-face"><CardArt back /></span>
               <span className="sol-card-front-face"><CardArt card={card} /></span>
@@ -150,7 +181,7 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
         })}
       </div>
       <div className="sol-foundations" aria-label={t('基础牌堆', 'Foundations')}>
-        {state.foundations.map((pile, index) => <button key={index} type="button" className={`sol-pile sol-foundation${selection?.source.zone === 'foundation' && selection.source.index === index ? ' is-selected' : ''}`} onClick={() => chooseFoundation(index)} aria-label={pile.at(-1) ? `${t('基础牌堆', 'Foundation')} ${cardName(pile.at(-1)!)}` : t('空基础牌堆', 'Empty foundation')}>
+        {state.foundations.map((pile, index) => <button key={index} data-card-id={pile.at(-1)?.id} type="button" className={`sol-pile sol-foundation${selection?.source.zone === 'foundation' && selection.source.index === index ? ' is-selected' : ''}`} onClick={() => chooseFoundation(index)} aria-label={pile.at(-1) ? `${t('基础牌堆', 'Foundation')} ${cardName(pile.at(-1)!)}` : t('空基础牌堆', 'Empty foundation')}>
           {pile.length ? <CardArt card={pile.at(-1)} /> : <span><SuitMark suit={SUITS[index]} size={27} /></span>}
         </button>)}
       </div>
@@ -161,7 +192,7 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
           const isSelected = selection?.source.zone === 'tableau' && selection.source.index === column && index >= (selection.startIndex ?? -1)
           const top = index === pile.length - 1
           const offset = pile.slice(0, index).reduce((total, previous) => total + (previous.faceUp ? 19 : 12), 0)
-          return <button key={card.id} type="button" className={`sol-pile sol-tableau-card${card.faceUp ? ' is-face-up' : ' is-face-down'}${isSelected ? ' is-selected' : ''}`} style={{ top: `${offset}px`, zIndex: index + 1 }} onClick={(event) => { event.stopPropagation(); if (card.faceUp) chooseTableau(column, index) }} onDoubleClick={index === pile.length - 1 ? () => doubleToFoundation({ zone: 'tableau', index: column }) : undefined} aria-label={card.faceUp ? cardName(card) : t('盖着的牌', 'Face-down card')} disabled={!card.faceUp}>
+          return <button key={card.id} data-card-id={card.id} type="button" className={`sol-pile sol-tableau-card${card.faceUp ? ' is-face-up' : ' is-face-down'}${isSelected ? ' is-selected' : ''}`} style={{ top: `${offset}px`, zIndex: index + 1 }} onClick={(event) => { event.stopPropagation(); if (card.faceUp) chooseTableau(column, index) }} onDoubleClick={index === pile.length - 1 ? () => doubleToFoundation({ zone: 'tableau', index: column }) : undefined} aria-label={card.faceUp ? cardName(card) : t('盖着的牌', 'Face-down card')} disabled={!card.faceUp}>
             <span className="sol-card-flip-inner">
               <span className="sol-card-back-face"><CardArt back /></span>
               <span className="sol-card-front-face"><CardArt card={card} /></span>
