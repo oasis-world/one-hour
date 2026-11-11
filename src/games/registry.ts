@@ -3,8 +3,10 @@ import GomokuGame from './gomoku/GomokuGame'
 import XiangqiGame from './xiangqi/XiangqiGame'
 import ChessGame from './chess/ChessGame'
 import SolitaireGame from './solitaire/SolitaireGame'
+import SudokuGame from './sudoku/SudokuGame'
 import { GomokuIcon, XiangqiGeneralIcon, ChessCrownIcon } from '../components/icons'
 import SolitaireIcon from './solitaire/SolitaireIcon'
+import SudokuIcon from './sudoku/SudokuIcon'
 
 export const GAMES: GameDefinition[] = [
   {
@@ -54,6 +56,18 @@ export const GAMES: GameDefinition[] = [
     minPlayers: 1,
     maxPlayers: 1,
     Component: SolitaireGame,
+  },
+  {
+    id: 'sudoku',
+    name: '数独',
+    nameEn: 'Sudoku',
+    icon: '▦',
+    Icon: SudokuIcon,
+    tagline: '专注逻辑，享受解题',
+    taglineEn: 'A little logic, a lot of focus',
+    minPlayers: 1,
+    maxPlayers: 1,
+    Component: SudokuGame,
   },
 ]
 
