@@ -475,6 +475,7 @@ export function ChessCrownIcon({ size = 17 }: GlyphProps) {
   </svg>
 }
 
+
 export function ChevronRightIcon({ size = 16 }: GlyphProps) {
   return (
     <svg

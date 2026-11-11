@@ -5,6 +5,7 @@ import BackgroundStage from './components/BackgroundStage'
 import Composer from './components/Composer'
 import ImageViewer from './components/ImageViewer'
 import CreatePollModal from './components/CreatePollModal'
+import GamePickerModal from './components/GamePickerModal'
 import MessageList from './components/MessageList'
 // EXPERIMENT: profile page disabled.
 // import ProfilePage from './components/ProfilePage'
@@ -97,6 +98,7 @@ export default function App() {
   // const [profileOpen, setProfileOpen] = useState(false)
   const [welcomeOpen, setWelcomeOpen] = useState(false)
   const [pollOpen, setPollOpen] = useState(false)
+  const [gamePickerOpen, setGamePickerOpen] = useState(false)
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   /** Composer popover open (plus/emoji) — mobile hides the gear meanwhile. */
   const [composerMenuOpen, setComposerMenuOpen] = useState(false)
@@ -931,6 +933,7 @@ export default function App() {
                 onMenuOpenChange={handleMenuOpenChange}
                 onStartGame={handleStartGame}
                 onStartPoll={() => setPollOpen(true)}
+                onOpenGames={() => setGamePickerOpen(true)}
                 companion={companion}
                 privateMode={privateMode}
                 onExitPrivateChat={exitPrivateChat}
@@ -1027,6 +1030,9 @@ export default function App() {
       ) : null}
       {pollOpen && !pendingSummary && profile && room.identity && (
         <CreatePollModal onClose={() => setPollOpen(false)} onSend={handleSendPoll} />
+      )}
+      {gamePickerOpen && !pendingSummary && profile && room.identity && (
+        <GamePickerModal onSelect={handleStartGame} onClose={() => setGamePickerOpen(false)} />
       )}
       {toast && <div className="app-toast">{toast}</div>}
     </div>

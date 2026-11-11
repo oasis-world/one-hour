@@ -2,8 +2,60 @@ import type { Lang } from './i18n'
 
 export type TranslationDict = Partial<Record<Lang, Record<string, string>>>
 
+const SOLITAIRE_TRANSLATIONS: Record<Exclude<Lang, 'zh' | 'en'>, Record<string, string>> = {
+  'zh-TW': {
+    'Klondike Solitaire': '克朗代克接龍', Solitaire: '接龍', 'CLASSIC · KLONDIKE': '經典 · 克朗代克', SCORE: '分數', TIME: '時間',
+    'Undo last move': '撤銷上一步', 'New deal': '新牌局', 'Draw cards': '抽牌', 'Recycle stock': '重新翻開牌堆',
+    'Waste pile': '棄牌堆', Foundations: '基礎牌堆', Foundation: '基礎牌堆', 'Empty foundation': '空的基礎牌堆',
+    Tableau: '桌面牌列', 'Face-down card': '蓋牌', 'Beautiful! You won!': '太棒了！你贏了！',
+  },
+  ja: {
+    'Klondike Solitaire': 'クロンダイク・ソリティア', Solitaire: 'ソリティア', 'CLASSIC · KLONDIKE': 'クラシック · クロンダイク', SCORE: 'スコア', TIME: '時間',
+    'Undo last move': '直前の手を取り消す', 'New deal': '新しいゲーム', 'Draw cards': '山札から引く', 'Recycle stock': '捨て札を山札に戻す',
+    'Waste pile': '捨て札', Foundations: '組札', Foundation: '組札', 'Empty foundation': '空の組札',
+    Tableau: '場札の列', 'Face-down card': '裏向きのカード', 'Beautiful! You won!': 'お見事！クリアです！',
+  },
+  fr: {
+    'Klondike Solitaire': 'Solitaire Klondike', Solitaire: 'Solitaire', 'CLASSIC · KLONDIKE': 'CLASSIQUE · KLONDIKE', SCORE: 'SCORE', TIME: 'TEMPS',
+    'Undo last move': 'Annuler le dernier coup', 'New deal': 'Nouvelle donne', 'Draw cards': 'Piocher', 'Recycle stock': 'Reprendre la défausse',
+    'Waste pile': 'Défausse', Foundations: 'Fondations', Foundation: 'Fondation', 'Empty foundation': 'Fondation vide',
+    Tableau: 'Colonnes du tableau', 'Face-down card': 'Carte face cachée', 'Beautiful! You won!': 'Bravo ! Vous avez gagné !',
+  },
+  es: {
+    'Klondike Solitaire': 'Solitario Klondike', Solitaire: 'Solitario', 'CLASSIC · KLONDIKE': 'CLÁSICO · KLONDIKE', SCORE: 'PUNTOS', TIME: 'TIEMPO',
+    'Undo last move': 'Deshacer último movimiento', 'New deal': 'Nueva partida', 'Draw cards': 'Robar cartas', 'Recycle stock': 'Volver a poner el descarte',
+    'Waste pile': 'Descarte', Foundations: 'Fundaciones', Foundation: 'Fundación', 'Empty foundation': 'Fundación vacía',
+    Tableau: 'Columnas del tablero', 'Face-down card': 'Carta boca abajo', 'Beautiful! You won!': '¡Genial! ¡Has ganado!',
+  },
+  de: {
+    'Klondike Solitaire': 'Klondike-Solitär', Solitaire: 'Solitär', 'CLASSIC · KLONDIKE': 'KLASSISCH · KLONDIKE', SCORE: 'PUNKTE', TIME: 'ZEIT',
+    'Undo last move': 'Letzten Zug rückgängig', 'New deal': 'Neues Spiel', 'Draw cards': 'Karten ziehen', 'Recycle stock': 'Ablagestapel zurücklegen',
+    'Waste pile': 'Ablagestapel', Foundations: 'Zielstapel', Foundation: 'Zielstapel', 'Empty foundation': 'Leerer Zielstapel',
+    Tableau: 'Spieltableau', 'Face-down card': 'Verdeckte Karte', 'Beautiful! You won!': 'Wunderbar! Du hast gewonnen!',
+  },
+  ko: {
+    'Klondike Solitaire': '클론다이크 솔리테어', Solitaire: '솔리테어', 'CLASSIC · KLONDIKE': '클래식 · 클론다이크', SCORE: '점수', TIME: '시간',
+    'Undo last move': '이전 수 되돌리기', 'New deal': '새 게임', 'Draw cards': '카드 뽑기', 'Recycle stock': '버린 카드 다시 가져오기',
+    'Waste pile': '버린 카드 더미', Foundations: '기초 더미', Foundation: '기초 더미', 'Empty foundation': '빈 기초 더미',
+    Tableau: '카드 열', 'Face-down card': '뒤집힌 카드', 'Beautiful! You won!': '멋져요! 승리했습니다!',
+  },
+  it: {
+    'Klondike Solitaire': 'Solitario Klondike', Solitaire: 'Solitario', 'CLASSIC · KLONDIKE': 'CLASSICO · KLONDIKE', SCORE: 'PUNTEGGIO', TIME: 'TEMPO',
+    'Undo last move': 'Annulla ultima mossa', 'New deal': 'Nuova partita', 'Draw cards': 'Pesca carte', 'Recycle stock': 'Rimetti gli scarti nel mazzo',
+    'Waste pile': 'Mazzo degli scarti', Foundations: 'Pile di base', Foundation: 'Pila di base', 'Empty foundation': 'Pila di base vuota',
+    Tableau: 'Colonne del tavolo', 'Face-down card': 'Carta coperta', 'Beautiful! You won!': 'Fantastico! Hai vinto!',
+  },
+  ar: {
+    'Klondike Solitaire': 'سوليتير كلوندايك', Solitaire: 'سوليتير', 'CLASSIC · KLONDIKE': 'كلاسيكي · كلوندايك', SCORE: 'النقاط', TIME: 'الوقت',
+    'Undo last move': 'التراجع عن الحركة الأخيرة', 'New deal': 'لعبة جديدة', 'Draw cards': 'اسحب أوراقًا', 'Recycle stock': 'إعادة الأوراق المرتجعة إلى الرزمة',
+    'Waste pile': 'كومة الأوراق المرتجعة', Foundations: 'أكوام الأساس', Foundation: 'كومة الأساس', 'Empty foundation': 'كومة أساس فارغة',
+    Tableau: 'أعمدة اللعب', 'Face-down card': 'ورقة مقلوبة', 'Beautiful! You won!': 'أحسنت! لقد فزت!',
+  },
+}
+
 export const TRANSLATIONS: TranslationDict = {
   'zh-TW': {
+    ...SOLITAIRE_TRANSLATIONS['zh-TW'],
     'AI opponent mode': 'AI 對戰模式', 'Cloud': '雲端', 'Local': '本機', 'AI is thinking': 'AI 正在思考',
     'King': '王', 'Queen': '后', 'Rook': '城堡', 'Bishop': '主教', 'Knight': '騎士', 'Pawn': '兵',
     'Games': '遊戲', 'Gomoku': '五子棋', 'Chinese Chess': '中國象棋', 'Chess': '國際象棋', 'MUD Adventure': '文字冒險', 'Chess board': '國際象棋棋盤', 'White pieces': '白方棋子', 'Black pieces': '黑方棋子', 'White side': '白方', 'Black side': '黑方', 'Spectators': '觀戰玩家', 'No spectators currently': '暫無觀戰玩家', 'Edit Message': '編輯訊息',
@@ -184,6 +236,7 @@ export const TRANSLATIONS: TranslationDict = {
     'Could not publish the poll — try again': '投票發布失敗，請重試',
   },
   ja: {
+    ...SOLITAIRE_TRANSLATIONS.ja,
     'AI opponent mode': 'AI対戦モード', 'Cloud': 'クラウド', 'Local': 'ローカル', 'AI is thinking': 'AIが考えています',
     'King': 'キング', 'Queen': 'クイーン', 'Rook': 'ルーク', 'Bishop': 'ビショップ', 'Knight': 'ナイト', 'Pawn': 'ポーン',
     'Games': 'ゲーム', 'Gomoku': '五目並べ', 'Chinese Chess': '中国象棋', 'Chess': 'チェス', 'MUD Adventure': 'テキスト冒険', 'Chess board': 'チェス盤', 'White pieces': '白の駒', 'Black pieces': '黒の駒', 'White side': '白', 'Black side': '黒', 'Spectators': '観戦者', 'No spectators currently': '現在、観戦者はいません', 'Edit Message': 'メッセージを編集',
@@ -338,6 +391,7 @@ export const TRANSLATIONS: TranslationDict = {
     'Activities': 'アクティビティ', 'Travel & Places': '旅行と場所', 'Objects': '物', 'Symbols': '記号', 'Flags': '旗',
   },
   fr: {
+    ...SOLITAIRE_TRANSLATIONS.fr,
     'AI opponent mode': 'Mode de jeu contre l’IA', 'Cloud': 'En ligne', 'Local': 'Local', 'AI is thinking': 'L’IA réfléchit',
     'King': 'roi', 'Queen': 'reine', 'Rook': 'tour', 'Bishop': 'fou', 'Knight': 'cavalier', 'Pawn': 'pion',
     'Games': 'Jeux', 'Gomoku': 'Gomoku', 'Chinese Chess': 'Échecs chinois', 'Chess': 'Échecs', 'MUD Adventure': 'Aventure textuelle', 'Chess board': 'Échiquier', 'White pieces': 'Pièces blanches', 'Black pieces': 'Pièces noires', 'White side': 'Blanc', 'Black side': 'Noir', 'Spectators': 'Spectateurs', 'No spectators currently': 'Aucun spectateur pour le moment', 'Edit Message': 'Modifier le message',
@@ -493,6 +547,7 @@ export const TRANSLATIONS: TranslationDict = {
     'Activities': 'Activités', 'Travel & Places': 'Voyages et lieux', 'Objects': 'Objets', 'Symbols': 'Symboles', 'Flags': 'Drapeaux',
   },
   es: {
+    ...SOLITAIRE_TRANSLATIONS.es,
     'AI opponent mode': 'Modo de juego contra IA', 'Cloud': 'Nube', 'Local': 'Local', 'AI is thinking': 'La IA está pensando',
     'King': 'rey', 'Queen': 'reina', 'Rook': 'torre', 'Bishop': 'alfil', 'Knight': 'caballo', 'Pawn': 'peón',
     'Games': 'Juegos', 'Gomoku': 'Gomoku', 'Chinese Chess': 'Ajedrez chino', 'Chess': 'Ajedrez', 'MUD Adventure': 'Aventura de texto', 'Chess board': 'Tablero de ajedrez', 'White pieces': 'Piezas blancas', 'Black pieces': 'Piezas negras', 'White side': 'Blancas', 'Black side': 'Negras', 'Spectators': 'Espectadores', 'No spectators currently': 'No hay espectadores por ahora', 'Edit Message': 'Editar mensaje',
@@ -648,6 +703,7 @@ export const TRANSLATIONS: TranslationDict = {
     'Activities': 'Actividades', 'Travel & Places': 'Viajes y lugares', 'Objects': 'Objetos', 'Symbols': 'Símbolos', 'Flags': 'Banderas',
   },
   de: {
+    ...SOLITAIRE_TRANSLATIONS.de,
     'AI opponent mode': 'KI-Spielmodus', 'Cloud': 'Cloud', 'Local': 'Lokal', 'AI is thinking': 'KI denkt nach',
     'King': 'König', 'Queen': 'Dame', 'Rook': 'Turm', 'Bishop': 'Läufer', 'Knight': 'Springer', 'Pawn': 'Bauer',
     'Games': 'Spiele', 'Gomoku': 'Gomoku', 'Chinese Chess': 'Chinesisches Schach', 'Chess': 'Schach', 'MUD Adventure': 'Textabenteuer', 'Chess board': 'Schachbrett', 'White pieces': 'Weiße Figuren', 'Black pieces': 'Schwarze Figuren', 'White side': 'Weiß', 'Black side': 'Schwarz', 'Spectators': 'Zuschauer', 'No spectators currently': 'Zurzeit keine Zuschauer', 'Edit Message': 'Nachricht bearbeiten',
@@ -803,6 +859,7 @@ export const TRANSLATIONS: TranslationDict = {
     'Activities': 'Aktivitäten', 'Travel & Places': 'Reisen & Orte', 'Objects': 'Objekte', 'Symbols': 'Symbole', 'Flags': 'Flaggen',
   },
   ko: {
+    ...SOLITAIRE_TRANSLATIONS.ko,
     'AI opponent mode': 'AI 대전 모드', 'Cloud': '클라우드', 'Local': '로컬', 'AI is thinking': 'AI가 생각 중입니다',
     'King': '킹', 'Queen': '퀸', 'Rook': '룩', 'Bishop': '비숍', 'Knight': '나이트', 'Pawn': '폰',
     'Games': '게임', 'Gomoku': '오목', 'Chinese Chess': '중국 장기', 'Chess': '체스', 'MUD Adventure': '텍스트 어드벤처', 'Chess board': '체스판', 'White pieces': '백 기물', 'Black pieces': '흑 기물', 'White side': '백', 'Black side': '흑', 'Spectators': '관전자', 'No spectators currently': '현재 관전자가 없습니다', 'Edit Message': '메시지 수정',
@@ -958,6 +1015,7 @@ export const TRANSLATIONS: TranslationDict = {
     'Activities': '활동', 'Travel & Places': '여행 및 장소', 'Objects': '사물', 'Symbols': '기호', 'Flags': '깃발',
   },
   it: {
+    ...SOLITAIRE_TRANSLATIONS.it,
     'AI opponent mode': 'Modalità di gioco contro IA', 'Cloud': 'Cloud', 'Local': 'Locale', 'AI is thinking': 'L’IA sta pensando',
     'King': 're', 'Queen': 'regina', 'Rook': 'torre', 'Bishop': 'alfiere', 'Knight': 'cavallo', 'Pawn': 'pedone',
     'Games': 'Giochi', 'Gomoku': 'Gomoku', 'Chinese Chess': 'Scacchi cinesi', 'Chess': 'Scacchi', 'MUD Adventure': 'Avventura testuale', 'Chess board': 'Scacchiera', 'White pieces': 'Pezzi bianchi', 'Black pieces': 'Pezzi neri', 'White side': 'Bianco', 'Black side': 'Nero', 'Spectators': 'Spettatori', 'No spectators currently': 'Nessuno spettatore al momento', 'Edit Message': 'Modifica messaggio',
@@ -1113,6 +1171,7 @@ export const TRANSLATIONS: TranslationDict = {
     'Activities': 'Attività', 'Travel & Places': 'Viaggi e luoghi', 'Objects': 'Oggetti', 'Symbols': 'Simboli', 'Flags': 'Bandiere',
   },
   ar: {
+    ...SOLITAIRE_TRANSLATIONS.ar,
     'AI opponent mode': 'وضع اللعب ضد الذكاء الاصطناعي', 'Cloud': 'سحابي', 'Local': 'محلي', 'AI is thinking': 'الذكاء الاصطناعي يفكر',
     'King': 'الملك', 'Queen': 'الملكة', 'Rook': 'القلعة', 'Bishop': 'الفيل', 'Knight': 'الحصان', 'Pawn': 'الجندي',
     'Games': 'الألعاب', 'Gomoku': 'غوموكو', 'Chinese Chess': 'شطرنج صيني', 'Chess': 'الشطرنج', 'MUD Adventure': 'مغامرة نصية', 'Chess board': 'رقعة الشطرنج', 'White pieces': 'القطع البيضاء', 'Black pieces': 'القطع السوداء', 'White side': 'الأبيض', 'Black side': 'الأسود', 'Spectators': 'المتفرجون', 'No spectators currently': 'لا يوجد متفرجون حاليًا', 'Edit Message': 'تعديل الرسالة',

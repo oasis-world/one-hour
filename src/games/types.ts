@@ -13,6 +13,11 @@ export interface GameDefinition {
   nameEn: string
   /** Compact icon (emoji or short text) for the games menu. */
   icon: string
+  /** Optional large icon component for the game picker modal. */
+  Icon?: ComponentType<{ size?: number }>
+  /** Optional short tagline shown under the name in the picker. */
+  tagline?: string
+  taglineEn?: string
   minPlayers: number
   maxPlayers: number
   Component: ComponentType<GameComponentProps>

@@ -29,6 +29,8 @@ interface Props {
   onImagesPicked: (files: File[]) => void
   /** Start a game message for the given game id. */
   onStartGame?: (gameId: string) => void
+  /** Open the game picker modal (plus menu → Games). */
+  onOpenGames?: () => void
   /** Open the create-poll window (plus menu → Poll). */
   onStartPoll?: () => void
   /** Notifies the shell while a popover is up (mobile hides the gear). */
@@ -75,7 +77,7 @@ function useMobileFormFactor(): boolean {
  * or emoji button toggles its popover (a click outside closes it); there
  * is no hover-to-open.
  */
-export default function Composer({ onSend, replyTo, onClearReply, editing, onClearEditing, onEdit, onImagePicked, onImagesPicked, onMenuOpenChange, onStartGame, onStartPoll, companion, onMentionCompanion, privateMode, onExitPrivateChat, presence, selfId, onWhisperSelect, pendingInsertName, onConsumeInsert }: Props) {
+export default function Composer({ onSend, replyTo, onClearReply, editing, onClearEditing, onEdit, onImagePicked, onImagesPicked, onMenuOpenChange, onStartGame, onOpenGames, onStartPoll, companion, onMentionCompanion, privateMode, onExitPrivateChat, presence, selfId, onWhisperSelect, pendingInsertName, onConsumeInsert }: Props) {
   const lang = useLang()
   const [draft, setDraft] = useState(editing?.content ?? '')
   const [plusOpen, setPlusOpen] = useState(false)
@@ -517,7 +519,28 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
                   {t('投票', 'Poll')}
                 </button>
               )}
-              {onStartGame && (
+              {onStartGame && onOpenGames && (
+                <button
+                  type="button"
+                  className="plus-menu-item plus-games-row"
+                  role="menuitem"
+                  aria-expanded={false}
+                  onMouseDown={keepFocus}
+                  onPointerDown={keepFocus}
+                  onClick={() => {
+                    setPlusOpen(false)
+                    setGamesOpen(false)
+                    onOpenGames()
+                  }}
+                >
+                  <GameIcon size={17} />
+                  {t('游戏', 'Games')}
+                  <span className="plus-menu-chevron">
+                    <ChevronRightIcon size={14} />
+                  </span>
+                </button>
+              )}
+              {onStartGame && !onOpenGames && (
                 <div className="plus-menu-group">
                   <button
                     type="button"
