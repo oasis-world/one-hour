@@ -33,6 +33,7 @@
 .sol-pile:focus-visible { outline:2px solid #f5d87f; outline-offset:2px; z-index:20 }
 .sol-pile.is-selected { outline:2px solid #f2d27b; outline-offset:1px; transform:translateY(-3px); filter:drop-shadow(0 0 7px #f3d7839c) }
 .sol-card-art { display:block; width:100%; height:100%; border-radius:8px; filter:drop-shadow(0 2px 2px #07100d45) }
+.sol-card-rank { font-size:20px;transform:translate(1px,2px) }
 .sol-pile.sol-stock { grid-column:1; }
 .sol-stock small { position:absolute; right:-4px; bottom:-5px; display:grid; min-width:16px; height:16px; padding:0 3px; place-items:center; border:1px solid #c7b7796b; border-radius:20px; color:#f6e6b8; background:#173b35; font-size:8px; font-weight:800 }
 .sol-stock.is-empty { display:grid; place-items:center; border:1px dashed #e1d29a70; box-shadow:none }
@@ -81,7 +82,7 @@
 .app-shell.theme-warm .solitaire-card { --sol-ink:#fff7df; }
 @media (hover:hover) and (pointer:fine) { .sol-tools button:not(:disabled):hover { color:#fff1c5; filter:brightness(1.2); transform:translateY(-1px) } .sol-pile:not(:disabled):hover { filter:brightness(1.06) drop-shadow(0 3px 5px #07100d70) } }
 @media (hover:none),(pointer:coarse) { .sol-top-row,.sol-tableau { touch-action:pan-y; -webkit-overflow-scrolling:touch }.sol-pile:hover { filter:none }.sol-pile.is-selected:hover { filter:drop-shadow(0 0 7px #f3d7839c) } }
-@media (max-width:600px),(hover:none) and (pointer:coarse) { .sol-card-rank { font-size:24px;transform:translate(3px,6px) }.sol-card-corner-suit { transform:translateY(7px) }.sol-card-center-pip { transform:translate(6px,5px) scale(var(--sol-pip-mobile-scale));transform-box:fill-box;transform-origin:center } }
+@media (max-width:600px),(hover:none) and (pointer:coarse) { .sol-card-rank { font-size:24px;transform:translate(3px,6px) }.sol-card-center-pip { transform:translate(6px,5px) scale(var(--sol-pip-mobile-scale));transform-box:fill-box;transform-origin:center } }
 @media (max-width:820px) { .solitaire-card { max-width:none } }
 @media (max-width:400px) { .solitaire-card { padding:10px;border-radius:16px }.sol-top-row,.sol-tableau { gap:4px;padding-right:7px;padding-left:7px }.sol-score-controls { gap:10px }.sol-stats { gap:6px;padding:5px 7px }.sol-head-actions { gap:5px }.sol-head-actions button.sol-action-button { width:29px;height:27px }.sol-title-lockup strong { font-size:15px }.sol-title-lockup small { font-size:7px } }
 @media (prefers-reduced-motion:reduce) { .sol-pile,.sol-card-flip-inner,.sol-flight-card,.sol-flight-flip-inner,.sol-win-glow { animation:none;transition:none } }

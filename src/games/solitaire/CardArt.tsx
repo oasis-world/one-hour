@@ -36,10 +36,9 @@ export default function CardArt({ card, back = false }: { card?: Card; back?: bo
   const pips = card.rank === 1 ? [] : (pipRows[card.rank] ?? []).map(([x, y]) => ({ x, y, rotated: y > 49 }))
   return <svg className="sol-card-art" viewBox="0 0 70 98" aria-hidden="true">
     <rect x="1" y="1" width="68" height="96" rx="8" fill="#fffdf7" stroke="#d7d4c9" strokeWidth="1.5" />
-    <text className="sol-card-rank" x="7" y="15" fill={color} fontSize="12" fontWeight="800" fontFamily="Georgia,serif">{label}</text>
-    <SuitGlyph className="sol-card-corner-suit" suit={card.suit} x={13} y={23} size={9} color={color} />
+    <text className="sol-card-rank" x="7" y="15" fill={color} fontSize="20" fontWeight="800" fontFamily="Georgia,serif">{label}</text>
     <g transform="rotate(180 35 49)" fill={color} fontFamily="Georgia,serif" textAnchor="middle">
-      <text className="sol-card-rank" x="7" y="15" fontSize="12" fontWeight="800">{label}</text><SuitGlyph className="sol-card-corner-suit" suit={card.suit} x={13} y={23} size={9} color={color} />
+      <text className="sol-card-rank" x="7" y="15" fontSize="20" fontWeight="800">{label}</text>
     </g>
     {court ? <g>
       <rect x="17" y="23" width="36" height="52" rx="14" fill={card.rank === 11 ? '#e8d9b6' : card.rank === 12 ? '#e9c8c3' : '#e6d28f'} stroke={color} strokeWidth="1.4" />
