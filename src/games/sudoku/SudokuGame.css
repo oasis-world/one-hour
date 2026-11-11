@@ -19,9 +19,9 @@
 .sudoku-difficulties { display:flex; gap:4px; width:max-content; max-width:100%; margin:14px auto 12px; padding:3px; border:1px solid var(--sdk-line); border-radius:10px; background:#090e171f }
 .sudoku-difficulties button { min-width:60px; padding:6px 11px; border:0; border-radius:7px; color:var(--sdk-muted); background:transparent; font:inherit; font-size:11px; font-weight:600; line-height:1.2; cursor:pointer; transition:color .18s,background .18s,box-shadow .18s }
 .sudoku-difficulties button.is-active { color:#e7f3ff; background:linear-gradient(135deg,#719bd044,#8db8ff20); box-shadow:inset 0 0 0 1px #b0d4ff25 }
-.sudoku-board { position:relative; display:grid; grid-template-columns:repeat(9,minmax(0,1fr)); width:min(100%,430px); aspect-ratio:1; margin:0 auto; overflow:hidden; border:7px solid #38271b; border-radius:8px; background:#38271b; box-shadow:0 10px 26px #0005,inset 0 0 0 1px #ead3ac,inset 0 1px #ffffff35 }
+.sudoku-board { position:relative; display:grid; grid-template-columns:repeat(9,minmax(0,1fr)); grid-template-rows:repeat(9,minmax(0,1fr)); width:min(100%,430px); aspect-ratio:1; margin:0 auto; overflow:hidden; border:7px solid #38271b; border-radius:8px; background:#38271b; box-shadow:0 10px 26px #0005,inset 0 0 0 1px #ead3ac,inset 0 1px #ffffff35 }
 .sudoku-board:after { position:absolute; inset:2px; border:1px solid #f1d7ad42; border-radius:3px; content:""; pointer-events:none }
-.sudoku-cell { position:relative; display:grid; min-width:0; min-height:0; place-items:center; padding:0; border:0; border-right:1px solid #d2ccc1; border-bottom:1px solid #d2ccc1; color:#30271e; background:#f4ead7; font:500 clamp(16px,5.1vw,25px)/1 system-ui,sans-serif; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background .15s,color .15s,box-shadow .15s }
+.sudoku-cell { position:relative; display:grid; width:100%; height:100%; min-width:0; min-height:0; place-items:center; padding:0; border:0; border-right:1px solid #d2ccc1; border-bottom:1px solid #d2ccc1; color:#30271e; background:#f4ead7; font:500 clamp(16px,5.1vw,25px)/1 system-ui,sans-serif; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background .15s,color .15s,box-shadow .15s }
 .sudoku-cell:nth-child(9n) { border-right:0 }
 .sudoku-cell:nth-last-child(-n+9) { border-bottom:0 }
 .sudoku-cell.has-box-right { border-right:2px solid #b7b1a6 }
@@ -96,7 +96,34 @@
 @media (hover:hover) and (pointer:fine) { .sudoku-cell:not(.is-selected):hover { filter:brightness(1.07) } }
 @media (hover:none),(pointer:coarse) { .sudoku-numberpad button:hover,.sudoku-actions button:hover { background-color:transparent }.sudoku-board { touch-action:pan-y;-webkit-overflow-scrolling:touch } }
 @media (max-width:820px) { .sudoku-card { max-width:none } }
-@media (max-width:400px) { .sudoku-card { padding:12px; border-radius:18px }.sudoku-brand strong { font-size:16px }.sudoku-stats { gap:7px; padding:6px 8px }.sudoku-difficulties { margin:11px auto 9px }.sudoku-difficulties button { min-width:54px; padding:6px 8px }.sudoku-numberpad { gap:3px }.sudoku-numberpad button { height:34px; border-radius:7px }.sudoku-actions { gap:4px }.sudoku-actions button { gap:3px; padding:7px 3px; font-size:9px } }
+@media (max-width:520px) {
+  .sudoku-card { padding:12px; border-radius:18px }
+  .sudoku-brand { gap:8px }
+  .sudoku-brand strong { font-size:17px }
+  .sudoku-brand small { display:none }
+  .sudoku-stats { gap:7px; padding:7px 8px }
+  .sudoku-stats span { min-width:31px }
+  .sudoku-stats small { font-size:9px; letter-spacing:.08em }
+  .sudoku-stats b { font-size:13px }
+  .sudoku-difficulties { margin:11px auto 10px }
+  .sudoku-difficulties button { min-width:68px; min-height:32px; padding:5px 10px; font-size:13px }
+  .sudoku-board { border-width:6px; border-radius:7px }
+  .sudoku-cell { font-size:clamp(18px,6vw,25px) }
+  .sudoku-notes { font-size:clamp(8px,2.1vw,10px) }
+  .sudoku-progress { margin:10px auto 9px; font-size:10px; letter-spacing:.06em }
+  .sudoku-progress b { font-size:12px }
+  .sudoku-numberpad { grid-template-columns:repeat(10,minmax(0,1fr)); gap:6px; margin-bottom:12px }
+  .sudoku-numberpad button { grid-column:span 2; height:44px; border-radius:10px; font-size:19px }
+  .sudoku-numberpad button:nth-child(6) { grid-column:2 / span 2 }
+  .sudoku-numberpad button:nth-child(7) { grid-column:4 / span 2 }
+  .sudoku-numberpad button:nth-child(8) { grid-column:6 / span 2 }
+  .sudoku-numberpad button:nth-child(9) { grid-column:8 / span 2 }
+  .sudoku-actions { display:flex; gap:4px; width:min(100%,430px) }
+  .sudoku-actions button { display:flex; flex:1 1 0; min-height:44px; gap:0; padding:7px 2px; border-radius:9px; font-size:clamp(11px,3.4vw,14px); white-space:nowrap }
+  .sudoku-actions button span,.sudoku-actions button svg { display:none }
+  .sudoku-note-help { margin-top:9px; font-size:12px }
+  .sudoku-tip { margin-top:12px; font-size:12px; line-height:1.45 }
+}
 @keyframes sudoku-pop { from { opacity:.3; transform:scale(.55) } to { opacity:1; transform:scale(1) } }
 @keyframes sudoku-win-in { from { opacity:0; transform:translate(-50%,-44%) scale(.88) } to { opacity:1; transform:translate(-50%,-50%) scale(1) } }
 @keyframes sudoku-sparkle { 50% { transform:rotate(18deg) scale(1.14) } }

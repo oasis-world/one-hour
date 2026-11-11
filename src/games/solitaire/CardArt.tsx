@@ -1,9 +1,10 @@
 import { useId } from 'react'
+import type { CSSProperties } from 'react'
 import { isRed, rankLabel, type Card } from './model'
 import { SuitShape } from './SuitMark'
 
-function SuitGlyph({ suit, x, y, size, rotated = false, color }: { suit: Card['suit']; x: number; y: number; size: number; rotated?: boolean; color: string }) {
-  return <svg x={x - size / 2} y={y - size / 2} width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden="true">
+function SuitGlyph({ suit, x, y, size, rotated = false, color, className, style }: { suit: Card['suit']; x: number; y: number; size: number; rotated?: boolean; color: string; className?: string; style?: CSSProperties }) {
+  return <svg className={className} style={style} x={x - size / 2} y={y - size / 2} width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden="true">
     <g transform={rotated ? 'rotate(180 12 12)' : undefined}><SuitShape suit={suit} /></g>
   </svg>
 }
@@ -35,10 +36,10 @@ export default function CardArt({ card, back = false }: { card?: Card; back?: bo
   const pips = card.rank === 1 ? [] : (pipRows[card.rank] ?? []).map(([x, y]) => ({ x, y, rotated: y > 49 }))
   return <svg className="sol-card-art" viewBox="0 0 70 98" aria-hidden="true">
     <rect x="1" y="1" width="68" height="96" rx="8" fill="#fffdf7" stroke="#d7d4c9" strokeWidth="1.5" />
-    <text x="7" y="15" fill={color} fontSize="12" fontWeight="800" fontFamily="Georgia,serif">{label}</text>
-    <SuitGlyph suit={card.suit} x={13} y={23} size={9} color={color} />
+    <text className="sol-card-rank" x="7" y="15" fill={color} fontSize="12" fontWeight="800" fontFamily="Georgia,serif">{label}</text>
+    <SuitGlyph className="sol-card-corner-suit" suit={card.suit} x={13} y={23} size={9} color={color} />
     <g transform="rotate(180 35 49)" fill={color} fontFamily="Georgia,serif" textAnchor="middle">
-      <text x="7" y="15" fontSize="12" fontWeight="800">{label}</text><SuitGlyph suit={card.suit} x={13} y={23} size={9} color={color} />
+      <text className="sol-card-rank" x="7" y="15" fontSize="12" fontWeight="800">{label}</text><SuitGlyph className="sol-card-corner-suit" suit={card.suit} x={13} y={23} size={9} color={color} />
     </g>
     {court ? <g>
       <rect x="17" y="23" width="36" height="52" rx="14" fill={card.rank === 11 ? '#e8d9b6' : card.rank === 12 ? '#e9c8c3' : '#e6d28f'} stroke={color} strokeWidth="1.4" />
@@ -49,7 +50,10 @@ export default function CardArt({ card, back = false }: { card?: Card; back?: bo
       <SuitGlyph suit={card.suit} x={35} y={56} size={11} color="#fff8e4" />
       <path d="M22 28h26M22 70h26" stroke={color} strokeWidth="1" opacity=".6" />
     </g> : <g fill={color} textAnchor="middle" fontFamily="Georgia,serif">
-      {card.rank === 1 ? <SuitGlyph suit={card.suit} x={35} y={49} size={40} color={color} /> : pips.map((pip, index) => <SuitGlyph key={index} suit={card.suit} x={pip.x} y={pip.y} size={pipSize[card.rank] ?? 16} rotated={pip.rotated} color={color} />)}
+      {card.rank === 1 ? <SuitGlyph className="sol-card-center-pip" style={{ '--sol-pip-mobile-scale': (40 - 4) / 40 } as CSSProperties} suit={card.suit} x={35} y={49} size={40} color={color} /> : pips.map((pip, index) => {
+        const size = pipSize[card.rank] ?? 16
+        return <SuitGlyph className="sol-card-center-pip" style={{ '--sol-pip-mobile-scale': (size - 4) / size } as CSSProperties} key={index} suit={card.suit} x={pip.x} y={pip.y} size={size} rotated={pip.rotated} color={color} />
+      })}
     </g>}
   </svg>
 }
