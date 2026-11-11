@@ -2804,33 +2804,6 @@ button {
   }
 }
 
-/* Companion avatar button to the right of + — pure avatar, no border */
-.composer-companion-btn {
-  width: 26px;
-  height: 26px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-  overflow: hidden;
-  transition: transform 0.14s ease, opacity 0.14s ease;
-}
-.composer-companion-btn img {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  display: block;
-}
-.composer-companion-btn:hover {
-  transform: scale(1.08);
-  opacity: 0.9;
-}
-.composer-companion-btn:active { transform: scale(0.94); }
-
 .mention-popover {
   left: 0;
   min-width: 200px;
@@ -2892,12 +2865,6 @@ button {
 .msg-greeting-private-btn:active,
 .composer-private-exit:active,
 .account-pop-private-btn:active { transform: scale(0.97); }
-
-/* Greeting private-chat entry button */
-.msg-greeting-private-btn {
-  margin-top: 8px;
-  align-self: flex-start;
-}
 
 /* Composer private-mode bar — sits at top-left of the input dock */
 .composer-private-bar {

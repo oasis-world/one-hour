@@ -8,6 +8,7 @@ import { CameraIcon, ChessCrownIcon, ChevronRightIcon, EmojiIcon, GameIcon, Gomo
 import { PhotoIcon } from './userIcons'
 import EmojiPanel from './EmojiPanel'
 import AvatarBadge from './AvatarBadge'
+import ComposerGamesButton from './ComposerGamesButton'
 import type { CompanionProfile } from '../lib/companionProfile'
 import type { PresenceMember } from '../lib/chatTypes'
 import { getGameList } from '../games/registry'
@@ -36,7 +37,6 @@ interface Props {
   /** Notifies the shell while a popover is up (mobile hides the gear). */
   onMenuOpenChange?: (open: boolean) => void
   companion?: CompanionProfile | null
-  onMentionCompanion?: () => void
   privateMode?: boolean
   onExitPrivateChat?: () => void
   presence?: PresenceMember[]
@@ -77,7 +77,7 @@ function useMobileFormFactor(): boolean {
  * or emoji button toggles its popover (a click outside closes it); there
  * is no hover-to-open.
  */
-export default function Composer({ onSend, replyTo, onClearReply, editing, onClearEditing, onEdit, onImagePicked, onImagesPicked, onMenuOpenChange, onStartGame, onOpenGames, onStartPoll, companion, onMentionCompanion, privateMode, onExitPrivateChat, presence, selfId, onWhisperSelect, pendingInsertName, onConsumeInsert }: Props) {
+export default function Composer({ onSend, replyTo, onClearReply, editing, onClearEditing, onEdit, onImagePicked, onImagesPicked, onMenuOpenChange, onStartGame, onOpenGames, onStartPoll, companion, privateMode, onExitPrivateChat, presence, selfId, onWhisperSelect, pendingInsertName, onConsumeInsert }: Props) {
   const lang = useLang()
   const [draft, setDraft] = useState(editing?.content ?? '')
   const [plusOpen, setPlusOpen] = useState(false)
@@ -302,7 +302,7 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
       try {
         const el = inputRef.current
         if (el) el.setSelectionRange(el.value.length, el.value.length)
-      } catch {}
+      } catch { /* Some mobile webviews do not support selection ranges. */ }
     }
     prevPrivateRef.current = privateMode
   }, [privateMode])
@@ -434,33 +434,17 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
           >
             <PlusIcon />
           </button>
-          {companion && (
-            <button
-              type="button"
-              className="composer-companion-btn"
-              aria-label={t('提及伙伴', 'Mention companion')}
-              title={companion.name}
+          {onOpenGames && (
+            <ComposerGamesButton
               onClick={() => {
-                const tag = `@${companion.name} `
-                let next = draft
-                if (!draft.includes(tag)) {
-                  next = !draft ? tag : draft.startsWith('@') ? `${tag}${draft}` : `${tag}${draft}`
-                  setDraft(next)
-                }
-                onMentionCompanion?.()
-                const el = inputRef.current
-                if (el) {
-                  el.focus()
-                  // Cursor after the inserted tag; delay one frame so React has flushed the new value
-                  requestAnimationFrame(() => {
-                    try { el.setSelectionRange(next.length, next.length) } catch { /* ignore */ }
-                    requestAnimationFrame(() => { try { el.setSelectionRange(next.length, next.length) } catch { /* ignore */ } })
-                  })
-                }
+                setPlusOpen(false)
+                setEmojiOpen(false)
+                setGamesOpen(false)
+                setMentionOpen(false)
+                onMenuOpenChange?.(false)
+                onOpenGames()
               }}
-            >
-              <AvatarBadge look={{ style: companion.style, seed: companion.seed, avatarUrl: companion.avatarUrl ?? null }} size={24} />
-            </button>
+            />
           )}
 
           {plusOpen && (

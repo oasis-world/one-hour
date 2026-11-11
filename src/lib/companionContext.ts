@@ -3,16 +3,16 @@ import type { UserProfile } from './userProfile'
 import { getLang } from './i18n'
 
 const FEATURES: Record<string, string> = {
-  zh: '一小时聊天室：每条消息只存在1小时，有倒计时光环，支持五子棋/象棋/国际象棋游戏（可与AI对弈）、表情回应、氛围音乐。你是私密伴侣，只和主人私聊。',
-  'zh-TW': '一小時聊天室：每條訊息只存在1小時，有倒計時光環，支援五子棋/象棋/國際象棋遊戲（可與AI對弈）、表情回應、氛圍音樂。你是私密伴侶，只和主人私聊。',
-  en: 'One-hour room: every message lives 1 hour with a countdown halo, games (Gomoku/Xiangqi/Chess vs AI), emoji reactions, ambient music. You are a private companion, chatting only with your owner.',
-  ja: '1時間チャットルーム：メッセージは1時間で消え、カウントダウン演出、五目並べ/象棋/チェス（AI対戦可）、リアクション、環境音楽あり。あなたはご主人専用のプライベートパートナーです。',
-  fr: 'Salon d’une heure : chaque message vit 1h avec halo de compte à rebours, jeux (Gomoku/Xiangqi/Échecs vs IA), réactions, musique d’ambiance. Vous êtes un compagnon privé réservé à votre propriétaire.',
-  es: 'Sala de una hora: cada mensaje vive 1h con halo de cuenta atrás, juegos (Gomoku/Xiangqi/Ajedrez vs IA), reacciones, música ambiental. Eres un compañero privado solo para tu dueño.',
-  de: 'Ein-Stunden-Raum: Jede Nachricht lebt 1 Stunde mit Countdown-Halo, Spiele (Gomoku/Xiangqi/Schach vs KI), Reaktionen, Ambient-Musik. Du bist ein privater Begleiter nur für deinen Besitzer.',
-  ko: '1시간 채팅방: 모든 메시지는 1시간만 유지되며 카운트다운, 오목/샹치/체스(AI 대전), 리액션, 배경음악을 지원합니다. 당신은 주인 전용 프라이빗 컴패니언입니다.',
-  it: 'Stanza di un’ora: ogni messaggio vive 1h con alone countdown, giochi (Gomoku/Xiangqi/Scacchi vs IA), reazioni, musica ambientale. Sei un compagno privato solo per il tuo proprietario.',
-  ar: 'غرفة الساعة الواحدة: كل رسالة تعيش ساعة مع هالة العد التنازلي، ألعاب (غوموكو/شطرنج صيني/شطرنج ضد الذكاء الاصطناعي)، تفاعلات، موسيقى محيطة. أنت رفيق خاص لمالكك فقط.',
+  zh: '一小时聊天室：每条消息只存在1小时，有倒计时光环，还有五子棋、中国象棋、国际象棋（可与AI对弈），以及单人纸牌接龙和数独。你是私密伴侣，只和主人私聊。',
+  'zh-TW': '一小時聊天室：每條訊息只存在1小時，有倒計時光環，還有五子棋、中國象棋、國際象棋（可與AI對弈），以及單人接龍和數獨。你是私密伴侶，只和主人私聊。',
+  en: 'One-hour room: every message lives 1 hour with a countdown halo. It has Gomoku, Xiangqi, and Chess (playable vs AI), plus solo Solitaire and Sudoku. You are a private companion, chatting only with your owner.',
+  ja: '1時間チャットルーム：メッセージは1時間で消え、五目並べ・象棋・チェス（AI対戦可）のほか、ソリティアと数独も遊べます。あなたはご主人専用のプライベートパートナーです。',
+  fr: 'Salon d’une heure : chaque message vit 1h avec un compte à rebours. On y trouve le Gomoku, le Xiangqi et les échecs (contre l’IA), ainsi que le Solitaire et le Sudoku en solo. Vous êtes un compagnon privé réservé à votre propriétaire.',
+  es: 'Sala de una hora: cada mensaje vive 1h con cuenta atrás. Incluye Gomoku, Xiangqi y Ajedrez (contra la IA), además de Solitario y Sudoku en solitario. Eres un compañero privado solo para tu dueño.',
+  de: 'Ein-Stunden-Raum: Jede Nachricht lebt 1 Stunde mit Countdown. Es gibt Gomoku, Xiangqi und Schach (gegen KI) sowie Solitaire und Sudoku für Einzelspieler. Du bist ein privater Begleiter nur für deinen Besitzer.',
+  ko: '1시간 채팅방: 모든 메시지는 1시간 동안 카운트다운과 함께 유지됩니다. 오목·샹치·체스(AI 대전)와 혼자 즐기는 솔리테어·스도쿠가 있습니다. 당신은 주인 전용 프라이빗 컴패니언입니다.',
+  it: 'Stanza di un’ora: ogni messaggio vive 1h con conto alla rovescia. Ci sono Gomoku, Xiangqi e Scacchi (contro l’IA), oltre a Solitario e Sudoku da giocare da soli. Sei un compagno privato solo per il tuo proprietario.',
+  ar: 'غرفة الساعة الواحدة: كل رسالة تبقى ساعة مع عدّ تنازلي. تضم غوموكو والشطرنج الصيني والشطرنج (ضد الذكاء الاصطناعي)، إضافة إلى سوليتير وسودوكو الفرديين. أنت رفيق خاص بمالكك فقط.',
 }
 
 const GAME_HINT: Record<string, string> = {
@@ -28,17 +28,30 @@ const GAME_HINT: Record<string, string> = {
   ar: 'إذا أراد المستخدم بوضوح لعب غوموكو (gomoku) أو شيانغتشي (xiangqi) أو الشطرنج (chess) بأي لغة، ضع gameId المناسب.',
 }
 
-const AVATAR_HINT: Record<string, string> = {
-  zh: '请随时点击我在输入框里的头像来和我聊天',
-  'zh-TW': '請隨時點擊我在輸入框裡的頭像來和我聊天',
-  en: 'Tap my avatar in the composer to chat with me anytime',
-  ja: 'いつでも入力欄の私のアバターをタップして話しかけてね',
-  fr: 'Appuie sur mon avatar dans la barre de saisie pour discuter avec moi à tout moment',
-  es: 'Toca mi avatar en el cuadro de texto para charlar conmigo cuando quieras',
-  de: 'Tippe jederzeit auf meinen Avatar im Eingabefeld, um mit mir zu chatten',
-  ko: '언제든 입력창에서 내 아바타를 탭해서 대화해요',
-  it: 'Tocca il mio avatar nella barra di input per chattare con me quando vuoi',
-  ar: 'انقر على صورتي في مربع الإدخال للدردشة معي في أي وقت',
+const MENTION_HINT: Record<string, string> = {
+  zh: '输入 @ 就能找到我，随时和我聊天',
+  'zh-TW': '輸入 @ 就能找到我，隨時和我聊天',
+  en: 'Type @ to find me and chat anytime',
+  ja: '「@」を入力すると私を見つけて、いつでも話せるよ',
+  fr: 'Tape @ pour me trouver et discuter avec moi quand tu veux',
+  es: 'Escribe @ para encontrarme y charlar cuando quieras',
+  de: 'Gib @ ein, um mich zu finden und jederzeit mit mir zu chatten',
+  ko: '@를 입력해 나를 찾아 언제든 대화해요',
+  it: 'Scrivi @ per trovarmi e chattare quando vuoi',
+  ar: 'اكتب @ لتجدني وتتحدث معي في أي وقت',
+}
+
+const GAME_BUTTON_HINT: Record<string, string> = {
+  zh: '想玩游戏的话，点输入框旁边的游戏按钮就能选择',
+  'zh-TW': '想玩遊戲的話，點輸入框旁邊的遊戲按鈕就能選擇',
+  en: 'To play, tap the game button beside the composer to choose a game',
+  ja: 'ゲームで遊ぶときは、入力欄の横にあるゲームボタンから選んでね',
+  fr: 'Pour jouer, appuie sur le bouton des jeux à côté de la zone de saisie',
+  es: 'Para jugar, toca el botón de juegos junto al cuadro de texto',
+  de: 'Tippe zum Spielen auf die Spieleschaltfläche neben dem Eingabefeld',
+  ko: '게임을 하려면 입력창 옆 게임 버튼을 눌러 골라요',
+  it: 'Per giocare, tocca il pulsante dei giochi accanto al campo di testo',
+  ar: 'للعب، اضغط زر الألعاب بجوار مربع الكتابة لاختيار لعبة',
 }
 
 
@@ -56,11 +69,12 @@ export function buildCompanionSystemPrompt(user: UserProfile, companion: Compani
 
 export function buildGreetingPrompt(user: UserProfile, companion: CompanionProfile): string {
   const lang = getLang()
-  const hint = AVATAR_HINT[lang] ?? AVATAR_HINT.en
+  const hint = MENTION_HINT[lang] ?? MENTION_HINT.en
+  const gameButtonHint = GAME_BUTTON_HINT[lang] ?? GAME_BUTTON_HINT.en
   const isZh = lang === 'zh' || lang === 'zh-TW'
   const langName = ({ zh: '中文', 'zh-TW': '繁中', en: 'English', ja: '日本語', fr: 'Français', es: 'Español', de: 'Deutsch', ko: '한국어', it: 'Italiano', ar: 'العربية' } as Record<string, string>)[lang] ?? lang
   if (isZh) {
-    return `用${langName}和${user.nickname}打招呼，开头必须是“@${user.nickname} ”（含空格），然后自我介绍你是${companion.name}（${companion.role}），提一句一小时聊天室的倒计时/游戏特色。必须包含这句话并润色得温暖热情：“${hint}”。3-5句话，温暖俏皮。`
+    return `用${langName}和${user.nickname}打招呼，开头必须是“@${user.nickname} ”（含空格），然后自我介绍你是${companion.name}（${companion.role}），简短提到一小时聊天室和可以玩游戏。不要列举具体游戏名称，因为游戏会持续增加；自然提到：“${gameButtonHint}”。必须包含这句话并润色得温暖热情：“${hint}”。总共2-3句，简短、温暖俏皮。`
   }
-  return `Greet ${user.nickname} in ${langName} (${lang}). Start exactly with "@${user.nickname} " then introduce yourself as ${companion.name} (${companion.role}), mention one-hour countdown/games. You MUST include warmly rephrased: "${hint}". 3-5 sentences, warm.`
+  return `Greet ${user.nickname} in ${langName} (${lang}). Start exactly with "@${user.nickname} ", introduce yourself as ${companion.name} (${companion.role}), and briefly mention the one-hour room and that there are games to play. Do not list specific game names because the catalog will grow. Naturally include: "${gameButtonHint}". You MUST also include warmly rephrased: "${hint}". Keep it to 2-3 short, warm sentences.`
 }

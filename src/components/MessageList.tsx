@@ -42,6 +42,7 @@ interface Props {
   selfProfile?: { nickname: string; style: string | null; seed: string | null; avatarUrl?: string | null } | null
   privateMode?: boolean
   onEnterPrivateChat?: (member: PresenceMember) => void
+  onOpenGames?: () => void
 }
 
 interface OpenMenu {
@@ -83,6 +84,7 @@ export default function MessageList({
   selfProfile,
   privateMode,
   onEnterPrivateChat,
+  onOpenGames,
 }: Props) {
   useLang() // re-render on language flips
   const logRef = useRef<HTMLDivElement>(null)
@@ -310,6 +312,7 @@ export default function MessageList({
             isPrivate={isPrivateId?.(entry.id) ?? false}
             privateMode={privateMode}
             onEnterPrivateChat={onEnterPrivateChat}
+            onOpenGames={onOpenGames}
             selfId={selfId}
           />
         ))}

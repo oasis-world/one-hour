@@ -19,6 +19,7 @@ import { TravelerGlyph } from './icons'
 import MsgHoverBar from './MsgHoverBar'
 import MsgReactions from './MsgReactions'
 import MessageAuthorCard from './MessageAuthorCard'
+import CompanionGreetingActions from './CompanionGreetingActions'
 import { parseMentions } from '../lib/mention'
 
 interface Props {
@@ -41,6 +42,7 @@ interface Props {
   onJumpToReply: (id: string) => void
   isPrivate?: boolean
   onEnterPrivateChat?: (member: PresenceMember) => void
+  onOpenGames?: () => void
   privateMode?: boolean
   selfId?: string | null
 }
@@ -149,6 +151,7 @@ export default function MessageRow({
   onJumpToReply,
   isPrivate,
   onEnterPrivateChat,
+  onOpenGames,
   privateMode,
   selfId,
 }: Props) {
@@ -203,7 +206,7 @@ export default function MessageRow({
     try {
       const len = el.value.length
       el.setSelectionRange(len, len)
-    } catch {}
+    } catch { /* Some mobile webviews do not support selection ranges. */ }
   }
   const handleEnterPrivate = () => {
     setAuthorOpen(false)
@@ -418,9 +421,7 @@ export default function MessageRow({
           <MsgReactions reactions={reactions} onToggle={(emoji) => onReact(entry.id, emoji)} />
         )}
         {entry.isGreeting && isPrivate && !mine && !privateMode && onEnterPrivateChat && (
-          <button type="button" className="msg-greeting-private-btn" onClick={handleEnterPrivate}>
-            {t('进入私聊', 'Private chat')}
-          </button>
+          <CompanionGreetingActions onPrivateChat={handleEnterPrivate} onOpenGames={onOpenGames} />
         )}
         {!entry.expiring && (
           <MsgHoverBar

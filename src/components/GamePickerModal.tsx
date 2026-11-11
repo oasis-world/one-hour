@@ -66,7 +66,7 @@ export default function GamePickerModal({ onSelect, onClose }: Props) {
           <span className="game-picker-tile"><GameIcon size={36} /></span>
           <span className="game-picker-titles">
             <strong>{t('选择游戏', 'Choose a game')}</strong>
-            <small>{t('发起一局 · 与好友或 AI 对弈', 'Start a match · play with friends or AI')}</small>
+            <small>{t('挑一款喜欢的游戏开始玩', 'Pick a game and start playing')}</small>
           </span>
           <button
             type="button"

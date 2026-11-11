@@ -917,6 +917,7 @@ export default function App() {
               onEdit={handleStartEdit}
               privateMode={privateMode}
               onEnterPrivateChat={handleMemberPrivateClick}
+              onOpenGames={() => setGamePickerOpen(true)}
             />
 
             {room.identity ? (

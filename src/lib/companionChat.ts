@@ -53,16 +53,16 @@ export async function requestCompanionGreeting(companion: CompanionProfile): Pro
   }
   const lang = (await import('./i18n')).getLang()
   const base: Record<string, string> = {
-    zh: `嗨～我是${companion.name}，${companion.role}✨ 在这个一小时的世界里，每条消息都有倒计时，我们还能一起下棋玩游戏哦～ 想找我聊天，请随时点击我在输入框里的头像来和我聊天，期待你的消息！`,
-    'zh-TW': `嗨～我是${companion.name}，${companion.role}✨ 在這個一小時的世界裡，每條消息都有倒計時，我們還能一起下棋玩遊戲哦～ 想找我聊天，請隨時點擊我在輸入框裡的頭像來和我聊天，期待你的訊息！`,
-    en: `Hey! I'm ${companion.name}, ${companion.role} ✨ Every message here lives an hour — we can even play chess together. Tap my avatar in the composer to chat anytime! `,
-    ja: `やあ！私は${companion.name}（${companion.role}）だよ✨ この一時間の世界ではメッセージにカウントダウンがあって、一緒にチェスもできるんだ。いつでも入力欄の私のアバターをタップして話しかけてね！`,
-    fr: `Salut ! Je suis ${companion.name}, ${companion.role} ✨ Ici chaque message ne vit qu'une heure, on peut même jouer aux échecs ensemble. Appuie sur mon avatar pour discuter ! `,
-    es: `¡Hola! Soy ${companion.name}, ${companion.role} ✨ Aquí cada mensaje vive una hora y podemos jugar al ajedrez juntos. ¡Toca mi avatar para charlar! `,
-    de: `Hey! Ich bin ${companion.name}, ${companion.role} ✨ Jede Nachricht lebt hier eine Stunde, wir können sogar Schach spielen. Tippe auf meinen Avatar! `,
-    ko: `안녕! 나는 ${companion.name}, ${companion.role}야 ✨ 여기서는 모든 메시지가 한 시간만 살아있고 체스도 같이 둘 수 있어. 언제든 입력창에서 내 아바타를 탭해요! `,
-    it: `Ciao! Sono ${companion.name}, ${companion.role} ✨ Qui ogni messaggio vive un'ora e possiamo anche giocare a scacchi insieme. Tocca il mio avatar! `,
-    ar: `مرحباً! أنا ${companion.name}، ${companion.role} ✨ كل رسالة هنا تعيش ساعة واحدة، ويمكننا حتى لعب الشطرنج معاً. انقر على صورتي للدردشة! `,
+    zh: `嗨～我是${companion.name}，${companion.role}✨ 这里的消息一小时后就会消失。想玩游戏，点输入框旁的游戏按钮；想找我聊天，输入 @ 就能找到我～`,
+    'zh-TW': `嗨～我是${companion.name}，${companion.role}✨ 這裡的訊息一小時後就會消失。想玩遊戲，點輸入框旁的遊戲按鈕；想找我聊天，輸入 @ 就能找到我～`,
+    en: `Hey! I'm ${companion.name}, ${companion.role} ✨ Messages here disappear after an hour. Tap the game button beside the composer to pick a game, or type @ to find me and chat!`,
+    ja: `やあ！私は${companion.name}（${companion.role}）だよ✨ メッセージは一時間で消えるんだ。ゲームは入力欄の横のボタンから選んでね。おしゃべりするときは「@」を入力して私を見つけてね！`,
+    fr: `Salut ! Je suis ${companion.name}, ${companion.role} ✨ Les messages disparaissent au bout d'une heure. Appuie sur le bouton des jeux pour en choisir un, ou tape @ pour me trouver et discuter !`,
+    es: `¡Hola! Soy ${companion.name}, ${companion.role} ✨ Los mensajes desaparecen después de una hora. Toca el botón de juegos para elegir uno, o escribe @ para encontrarme y charlar.`,
+    de: `Hey! Ich bin ${companion.name}, ${companion.role} ✨ Nachrichten verschwinden nach einer Stunde. Wähle über die Spieleschaltfläche ein Spiel aus oder gib @ ein, um mich zum Chatten zu finden!`,
+    ko: `안녕! 나는 ${companion.name}, ${companion.role}야 ✨ 메시지는 한 시간 뒤 사라져. 게임 버튼을 눌러 게임을 고르고, 대화하고 싶을 땐 @를 입력해 나를 찾아줘!`,
+    it: `Ciao! Sono ${companion.name}, ${companion.role} ✨ I messaggi scompaiono dopo un'ora. Tocca il pulsante dei giochi per sceglierne uno, oppure scrivi @ per trovarmi e chattare!`,
+    ar: `مرحباً! أنا ${companion.name}، ${companion.role} ✨ تختفي الرسائل بعد ساعة. اضغط زر الألعاب لاختيار لعبة، أو اكتب @ لتجدني وتتحدث معي!`,
   }
   return `@${user.nickname} ${base[lang] ?? base.en}`
 }
