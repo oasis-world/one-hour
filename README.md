@@ -10,7 +10,7 @@ An ephemeral public chat room: **every message (text or photo) lives for exactly
 
 - 🖼️ **Image messages**: Desktop uploads via the `+` menu (multi-select up to 5, each becomes its own message); on touch devices `+` expands to "Take photo / Photo library", with the camera capturing directly. Photos are compressed in-browser (long edge 1440px, JPEG 0.82) with HEIC/HEIF auto-conversion; on weak/offline networks the image Blob travels with the text in the IndexedDB outbox and retries with backoff (per-file timeouts keep one stuck decode from blocking the rest). Tap any image to open the fullscreen viewer with swipe, pinch/double-tap zoom, pan, and vertical-fling dismiss. Images expire and are cleaned up with their message.
 
-- 🌄 **Dynamic backdrop**: The fullscreen backdrop prefers the newest image in chat (synchronized across all clients, including its countdown); with no chat image it fetches a random photo (official Unsplash API when `VITE_UNSPLASH_ACCESS_KEY` is set, otherwise the keyless picsum Unsplash-sourced feed). Either way each backdrop photo stays at most one hour, then crossfades to a new one; a new chat image takes over immediately. The backdrop blurs while chat is open; tapping the top-right X folds the whole chat column (input included) into the bottom-left corner and the backdrop goes fully clear; tapping anywhere (or the bottom-left hint) unfolds it again. While folded, a ring-only countdown in the bottom-right shows the remaining backdrop slot, and a globe button opens the source photo.
+- 🌄 **Dynamic backdrop**: The fullscreen backdrop prefers the newest image in chat (synchronized across all clients, including its countdown); with no chat image it requests Unsplash through a Supabase Edge Function (the Access Key stays server-side), then falls back to Picsum and a curated pool of six Unsplash CDN photos. Photos are preloaded as normal images, so display does not depend on cross-origin fetch permissions. Each photo stays at most one hour, then crossfades to a new one; a new chat image takes over immediately. The backdrop blurs while chat is open; tapping the top-right X folds the whole chat column (input included) into the bottom-left corner and the backdrop goes fully clear; tapping anywhere (or the bottom-left hint) unfolds it again. While folded, a ring-only countdown in the bottom-right shows the remaining backdrop slot, and a globe button opens the source photo.
 
 - 🟢 **Realtime sync**: Supabase Realtime (postgres_changes INSERT/UPDATE/DELETE + presence) keeps new messages, edits, reactions, disappearances, and the online list in sync, with catch-up on reconnect and tab return.
 
@@ -36,7 +36,9 @@ npm run dev
 4. (Optional, for the cron to call the Edge Function) Create Vault secrets in the SQL Editor: `project_url` and `purge_service_key` (service role key). The scheduling SQL in schema.sql skips when these are absent.
 5. Put the Project Settings → API URL and publishable (anon) key into `.env.local` (`VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`; legacy `VITE_SUPABASE_ANON_KEY` still works).
 
-> Without env vars the app still runs (single-machine mode): messages stay local and still vanish after one hour. The Unsplash Access Key is optional — without it the picsum Unsplash-sourced feed is used.
+> Without env vars the app still runs (single-machine mode): messages stay local and still vanish after one hour. The Unsplash Access Key is optional; configure it as the Supabase Edge Function secret `UNSPLASH_ACCESS_KEY` to enable the official API. Otherwise Picsum and the Unsplash CDN fallback pool are used.
+
+To enable the official Unsplash API, set the Supabase Edge Function secret `UNSPLASH_ACCESS_KEY` and deploy `unsplash-background`. Never place the Access Key in a `VITE_` variable.
 
 ## Directory structure
 

@@ -8,3 +8,7 @@ verify_jwt = false
 
 [functions.purge-chat-images]
 verify_jwt = false
+
+[functions.unsplash-background]
+# OPTIONS preflight has no user JWT; the function validates JWTs on POST itself.
+verify_jwt = false

@@ -78,7 +78,7 @@ supabase/
 `App.tsx` 是编排中枢：折叠四态 `open/folding/folded/unfolding`（点右上 X 折到左下角，背景全清晰；点任意处展开；折叠时右下角只剩 `BgSlotRing` 倒计时 + 地球按钮开来源图），splash 去除，`scheduleReveal` 2.5s 延迟展开（`revealActive` 防 visibility+focus 双触发播两次动画）。
 
 - **消息**：`MessageList/Row`（倒计时环多风格：classic/soft line/segments/breathing/halo/orbit，由 `settings` 切换；末 10 分钟琥珀、末 2 分钟红色脉冲）、`MessageMenu`（回复/编辑/删/复制）、`MsgHoverBar`（桌面悬停工具）、`MsgReactions`（点赞外表情反应，`chat_reactions` 表，快照完成前缓冲增量防乱序，失败回滚）、`ImageViewer`（手势滑动/双击捏合缩放/上抛关闭）。
-- **背景**：`BackgroundStage` 优先最新聊天图（全员同步，带其倒计时），无则 Unsplash 官方 API（有 `VITE_UNSPLASH_ACCESS_KEY` 时）否则 picsum 的 Unsplash 源；最长一小时交叉淡入新图；聊天开启时模糊。
+- **背景**：`BackgroundStage` 优先最新聊天图（全员同步，带其倒计时），优先通过已鉴权的 Supabase Edge Function 请求 Unsplash（密钥仅在服务端），再回退 Picsum 与 6 张 Unsplash CDN 图；用普通图片加载预检，避免依赖图源 CORS；最长一小时交叉淡入新图；聊天开启时模糊。
 - **输入与模态**：`Composer`（`+` 菜单多选最多 5 图、触屏走拍摄/相册、HEIC 自动转 JPEG 压缩长边 1440 0.82 质量、@ 伴侣、回复/编辑态）；`WelcomeModal`（首访选脸+昵称）、`SummaryModal`（画像过期后的统计小结 `lifetimeStats`，含 `PendingSummary` 持久化防重弹 + `resetStats`）。
 - **强制规则已落地**：所有 Enter 均接 `useImeEnter`（`isComposing` + `keyCode 229` + Safari 延迟一拍三信号）；弹窗点空白关闭接 `popoverGuard`（引用计数+关闭时间戳 ~450ms，`App` 内还用 `menuClosedAt` ref 同步守卫防 pointerdown→click 误触折叠）；移动端 `@media (hover:none)` 下列表 hover 背景透明 + `touch-action: pan-y`；清空按钮在输入框内右侧、点按 preventDefault 保焦；文件均≤200 行倾向、样式分段；**git 命令一律不主动执行**。
 
@@ -142,4 +142,3 @@ i18n：`i18n.ts/translations.ts`，中英日法西德韩意阿拉伯等 10 种�
 3. **新开游戏** → 照 `registry + types(GameDefinition) + cloudState/cloudHints + realtime.ts` 模板，别忘了在 schema 加 `*_states` 表、purge 清理、`instance_id` 关联卡消息的删除条件。
 4. **AI 链路** → 模型名硬编码在四个云函数顶部常量；key 只在 Edge 环境变量，绝不进前端；前端一律「失败本地回退」。
 5. **性能/兼容** → 新输入框必接 `useImeEnter`；新浮层必接 `popoverGuard`（450ms 时间戳）；移动端 hover 禁粘滞；文件保持 ≤200 行拆分。
-

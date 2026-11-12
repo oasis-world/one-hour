@@ -1,22 +1,28 @@
 /**
- * Random fullscreen backdrop feed. With VITE_UNSPLASH_ACCESS_KEY set, the
- * official Unsplash API picks the photo; without a key the keyless
- * picsum.photos feed stands in (its library is Unsplash-sourced), so the
- * backdrop works out of the box either way.
+ * Prefer a server-side Unsplash photo when Supabase and its Edge Function
+ * are configured. Fall back to Picsum, then a small stable Unsplash CDN pool.
  *
- * The photo is fetched (redirects followed) and displayed from a local
- * blob, and the *resolved* URL is kept as its source: picsum's
- * `?random=` URLs redirect to a different photo on every request, so
- * only the final URL truthfully identifies what is on screen.
+ * If Picsum is unavailable, try a small pool of stable Unsplash CDN photos.
  */
 
-const UNSPLASH_KEY = (import.meta.env.VITE_UNSPLASH_ACCESS_KEY ?? '').trim()
+import { isSupabaseConfigured } from './supabaseConfig'
+import { getSupabaseClient } from './supabaseClient'
+
+const FALLBACK_PHOTOS = [
+  'photo-1500530855697-b586d89ba3ee',
+  'photo-1470770841072-f978cf4d019e',
+  'photo-1501785888041-af3ef285b470',
+  'photo-1470252649378-9c29740c9fa8',
+  'photo-1441974231531-c6227db76b6e',
+  'photo-1464822759023-fed622ff2c3b',
+]
 
 export interface BackgroundPhoto {
-  /** Blob URL for display — stable, already fully loaded. */
+  /** Direct URL of a successfully preloaded image. */
   url: string
-  /** Resolved (redirect-followed) URL of the very image shown. */
+  /** Source URL of the image shown. */
   source: string | null
+  credit?: { name: string; url: string } | null
 }
 
 function isNarrowScreen(): boolean {
@@ -31,48 +37,93 @@ function isNarrowScreen(): boolean {
   }
 }
 
-async function pickFeedUrl(): Promise<string> {
+function fallbackUrl(photo: string, narrow: boolean): string {
+  const width = narrow ? 1080 : 1920
+  const height = narrow ? 1920 : 1080
+  return `https://images.unsplash.com/${photo}?auto=format&fit=crop&w=${width}&h=${height}&q=80`
+}
+
+function fallbackUrls(narrow: boolean): string[] {
+  return [...FALLBACK_PHOTOS]
+    .sort(() => Math.random() - .5)
+    .map((photo) => fallbackUrl(photo, narrow))
+}
+
+async function pickUnsplashPhoto(): Promise<BackgroundPhoto | null> {
+  if (!isSupabaseConfigured()) return null
   const narrow = isNarrowScreen()
-  if (UNSPLASH_KEY) {
-    try {
-      const orientation = narrow ? 'portrait' : 'landscape'
-      const res = await fetch(
-        `https://api.unsplash.com/photos/random?orientation=${orientation}&client_id=${encodeURIComponent(UNSPLASH_KEY)}`,
-      )
-      if (res.ok) {
-        const data = (await res.json()) as {
-          urls?: { raw?: string; regular?: string; full?: string }
-        }
-        const raw = data.urls?.raw
-        if (raw) {
-          const w = narrow ? 1080 : 1920
-          return `${raw}&w=${w}&q=80&fm=jpg`
-        }
-        if (data.urls?.regular) return data.urls.regular
-        if (data.urls?.full) return data.urls.full
-      }
-    } catch {
-      // Offline / rate-limited → fall through to the keyless feed.
+  try {
+    const client = await getSupabaseClient()
+    const token = await waitForSessionToken(client)
+    if (!token) return null
+    const { data, error } = await client.functions.invoke<{
+      imageUrl: string
+      sourceUrl: string
+      photographerName: string
+      photographerUrl: string
+    }>('unsplash-background', {
+      body: { orientation: narrow ? 'portrait' : 'landscape' },
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (error || !data?.imageUrl || !data.sourceUrl || !data.photographerName || !data.photographerUrl) return null
+    return {
+      url: data.imageUrl,
+      source: data.sourceUrl,
+      credit: { name: data.photographerName, url: data.photographerUrl },
     }
+  } catch {
+    // Missing deployment, auth, or network → fall through to Picsum.
   }
-  const seed = Math.random().toString(36).slice(2, 10)
-  return narrow
-    ? `https://picsum.photos/1080/1920?random=${seed}`
-    : `https://picsum.photos/1920/1080?random=${seed}`
+  return null
+}
+
+async function waitForSessionToken(client: Awaited<ReturnType<typeof getSupabaseClient>>): Promise<string | null> {
+  for (let attempt = 0; attempt < 7; attempt++) {
+    try {
+      const { data } = await client.auth.getSession()
+      if (data.session?.access_token) return data.session.access_token
+    } catch {
+      // Auth may still be restoring the local session.
+    }
+    if (attempt < 6) await new Promise((resolve) => window.setTimeout(resolve, 350))
+  }
+  return null
+}
+
+function loadDirectly(photo: BackgroundPhoto): Promise<BackgroundPhoto | null> {
+  return new Promise((resolve) => {
+    const image = new Image()
+    let settled = false
+    const finish = (photo: BackgroundPhoto | null) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timer)
+      image.onload = null
+      image.onerror = null
+      resolve(photo)
+    }
+    const timer = window.setTimeout(() => finish(null), 7000)
+    image.onload = () => finish(photo)
+    image.onerror = () => finish(null)
+    image.src = photo.url
+  })
 }
 
 export async function fetchRandomBackground(): Promise<BackgroundPhoto | null> {
-  const feedUrl = await pickFeedUrl()
-  try {
-    const res = await fetch(feedUrl)
-    if (!res.ok) return null
-    const blob = await res.blob()
-    if (!blob.type.startsWith('image/')) return null
-    // res.url is post-redirect — exactly the photo the blob contains.
-    return { url: URL.createObjectURL(blob), source: res.url }
-  } catch {
-    // CORS or offline: no truthful source link, and an unloaded image
-    // would risk a blank stage — skip this round.
-    return null
+  const narrow = isNarrowScreen()
+  const unsplashPhoto = await pickUnsplashPhoto()
+  const seed = Math.random().toString(36).slice(2, 10)
+  const width = narrow ? 1080 : 1920
+  const height = narrow ? 1920 : 1080
+  const picsumUrl = `https://picsum.photos/${width}/${height}?random=${seed}`
+  const candidates: BackgroundPhoto[] = [
+    ...(unsplashPhoto ? [unsplashPhoto] : []),
+    { url: picsumUrl, source: picsumUrl },
+    ...fallbackUrls(narrow).map((url) => ({ url, source: url })),
+  ]
+  for (const candidate of candidates) {
+    const photo = await loadDirectly(candidate)
+    if (photo) return photo
   }
+  return null
 }

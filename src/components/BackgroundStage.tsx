@@ -195,7 +195,7 @@ export default function BackgroundStage({
   const cornerLink = isChat ? null : (cloudPhoto?.source ?? null)
 
   return (
-    <div className="bg-stage" aria-hidden="true">
+    <div className="bg-stage">
       {edgeColors && (
         <div
           className="bg-edge"
