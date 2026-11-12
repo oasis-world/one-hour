@@ -122,21 +122,28 @@ export function moveToFoundation(state: SolitaireState, source: Source, foundati
   return commit(state, { stock: state.stock, waste: taken.waste, tableau: taken.tableau, foundations: taken.foundations, score, moves: state.moves }, won)
 }
 
+export function autoFoundationStep(state: SolitaireState, excludedCardId?: string): SolitaireState {
+  const sources: Source[] = [
+    ...(state.waste.length ? [{ zone: 'waste' as const, index: 0 }] : []),
+    ...state.tableau.map((_, index) => ({ zone: 'tableau' as const, index })),
+  ]
+  for (const source of sources) {
+    const card = topCard(state, source)
+    if (!card || card.id === excludedCardId) continue
+    const target = state.foundations.findIndex((pile) => pile.length
+      ? pile.at(-1)!.suit === card.suit && pile.at(-1)!.rank + 1 === card.rank
+      : card.rank === 1)
+    if (target >= 0) return moveToFoundation(state, source, target)
+  }
+  return state
+}
+
 export function autoFoundation(state: SolitaireState, excludedCardId?: string): SolitaireState {
   let next = state
-  let changed = true
-  while (changed && !next.won) {
-    changed = false
-    const sources: Source[] = [
-      ...(next.waste.length ? [{ zone: 'waste' as const, index: 0 }] : []),
-      ...next.tableau.map((_, index) => ({ zone: 'tableau' as const, index })),
-    ]
-    for (const source of sources) {
-      const card = topCard(next, source)
-      if (!card || card.id === excludedCardId) continue
-      const target = next.foundations.findIndex((pile) => pile.length ? pile.at(-1)!.suit === card.suit && pile.at(-1)!.rank + 1 === card.rank : card.rank === 1)
-      if (target >= 0) { next = moveToFoundation(next, source, target); changed = true; break }
-    }
+  while (!next.won) {
+    const step = autoFoundationStep(next, excludedCardId)
+    if (step === next) break
+    next = step
   }
   return next
 }

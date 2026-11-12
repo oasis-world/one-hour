@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { GameComponentProps } from '../types'
 import { t, useLang } from '../../lib/i18n'
 import CardArt from './CardArt'
-import { drawCards, moveToFoundation, moveToTableau, newGame, rankLabel, SUITS, topCard, undo, type Card, type SolitaireState, type Source } from './model'
+import { autoFoundation, autoFoundationStep, drawCards, moveToFoundation, moveToTableau, newGame, rankLabel, SUITS, topCard, undo, type Card, type SolitaireState, type Source } from './model'
 import SolitaireIcon from './SolitaireIcon'
 import SuitMark from './SuitMark'
 import './SolitaireGame.css'
@@ -35,10 +35,12 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
   const [selection, setSelection] = useState<Selection | null>(null)
   const [seconds, setSeconds] = useState(0)
   const [flight, setFlight] = useState<CardFlight | null>(null)
+  const [autoCompleting, setAutoCompleting] = useState(false)
   const shellRef = useRef<HTMLElement>(null)
   const stockRef = useRef<HTMLButtonElement>(null)
   const wasteRef = useRef<HTMLDivElement>(null)
   const flightFinishedRef = useRef(false)
+  const autoCompletingRef = useRef(false)
   const pendingCardPositionsRef = useRef<Map<string, DOMRect> | null>(null)
 
   useEffect(() => {
@@ -52,21 +54,55 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
   const commit = (next: SolitaireState) => {
     if (next !== state) { setState(next); setSelection(null) }
   }
-  const commitMove = (next: SolitaireState) => {
+  const commitMove = useCallback((next: SolitaireState) => {
     if (next === state) return
     const positions = new Map<string, DOMRect>()
     shellRef.current?.querySelectorAll<HTMLElement>('[data-card-id]').forEach((element) => {
       if (element.dataset.cardId) positions.set(element.dataset.cardId, element.getBoundingClientRect())
     })
     pendingCardPositionsRef.current = positions
-    commit(next)
-  }
+    setState(next)
+    setSelection(null)
+  }, [state])
+  useEffect(() => {
+    if (
+      autoCompletingRef.current || autoCompleting || flight || state.won || state.stock.length > 0 ||
+      state.tableau.some((pile) => pile.some((card) => !card.faceUp))
+    ) return
+    if (!autoFoundation(state).won) return
+    const timer = window.setTimeout(() => {
+      autoCompletingRef.current = true
+      setAutoCompleting(true)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [state, flight, autoCompleting])
+  useEffect(() => {
+    if (!autoCompleting) return
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const delay = reducedMotion ? 80 : 520
+    const timer = window.setTimeout(() => {
+      if (state.won) {
+        autoCompletingRef.current = false
+        setAutoCompleting(false)
+        return
+      }
+      const next = autoFoundationStep(state)
+      if (next === state) {
+        autoCompletingRef.current = false
+        setAutoCompleting(false)
+        return
+      }
+      commitMove(next)
+    }, delay)
+    return () => window.clearTimeout(timer)
+  }, [autoCompleting, state, commitMove])
   const selectWaste = () => {
-    if (!state.waste.length) return
+    if (autoCompleting || !state.waste.length) return
     const source: Source = { zone: 'waste', index: 0 }
     setSelection({ source })
   }
   const chooseTableau = (column: number, cardIndex?: number) => {
+    if (autoCompleting) return
     if (selection) {
       const next = moveToTableau(state, selection.source, column, selection.startIndex)
       if (next !== state) {
@@ -78,10 +114,12 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
     else if (!state.tableau[column].length && selection) commitMove(moveToTableau(state, selection.source, column, selection.startIndex))
   }
   const chooseFoundation = (index: number) => {
+    if (autoCompleting) return
     if (selection) commitMove(moveToFoundation(state, selection.source, index))
     else if (state.foundations[index].length) setSelection({ source: { zone: 'foundation', index } })
   }
   const doubleToFoundation = (source: Source) => {
+    if (autoCompleting) return
     const card = topCard(state, source)
     if (!card) return
     const index = state.foundations.findIndex((pile) => pile.length
@@ -89,8 +127,15 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
       : card.rank === 1)
     if (index >= 0) commitMove(moveToFoundation(state, source, index))
   }
-  const restart = () => { setState(newGame(1)); setSelection(null); setSeconds(0) }
+  const restart = () => {
+    autoCompletingRef.current = false
+    setAutoCompleting(false)
+    setState(newGame(1))
+    setSelection(null)
+    setSeconds(0)
+  }
   const handleStock = () => {
+    if (autoCompleting) return
     const next = drawCards(state)
     if (next === state) return
     if (!state.stock.length) { commit(next); return }
@@ -133,7 +178,7 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
     pendingCardPositionsRef.current = null
     const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 500
     if (!duration) return
-    shellRef.current?.querySelectorAll<HTMLElement>('[data-card-id]').forEach((element) => {
+    shellRef.current?.querySelectorAll<HTMLElement>('[data-card-id]').forEach((element, index) => {
       const cardId = element.dataset.cardId
       const from = cardId ? previous.get(cardId) : undefined
       if (!from) return
@@ -141,10 +186,22 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
       const dx = from.left - to.left
       const dy = from.top - to.top
       if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return
-      element.animate(
-        [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
+      const previousZIndex = element.style.zIndex
+      const raisedZIndex = String(1000 + index)
+      element.style.zIndex = raisedZIndex
+      const animation = element.animate(
+        [
+          { transform: `translate(${dx}px, ${dy}px) scale(.96)` },
+          { transform: `translate(${dx * .52}px, ${dy * .52}px) scale(1.08)`, offset: .55 },
+          { transform: 'translate(0, 0) scale(1)' },
+        ],
         { duration, easing: 'cubic-bezier(.2,.75,.25,1)' },
       )
+      const restoreZIndex = () => {
+        if (element.style.zIndex === raisedZIndex) element.style.zIndex = previousZIndex
+      }
+      animation.onfinish = restoreZIndex
+      animation.oncancel = restoreZIndex
     })
   }, [state])
 
@@ -153,7 +210,7 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
       <div className="sol-title-lockup"><span className="sol-mark"><SolitaireIcon size={31} /></span><span><strong>{t('纸牌接龙', 'Solitaire')}</strong><small>{t('经典 · 克朗代克', 'CLASSIC · KLONDIKE')}</small></span></div>
       <div className="sol-score-controls">
         <div className="sol-tools sol-head-actions">
-          <button type="button" className="sol-action-button sol-undo-button" onClick={() => { setState(undo(state)); setSelection(null) }} disabled={!state.past.length} aria-label={t('撤销上一步', 'Undo last move')} title={t('撤销上一步', 'Undo last move')}>
+          <button type="button" className="sol-action-button sol-undo-button" onClick={() => { setState(undo(state)); setSelection(null) }} disabled={!state.past.length || autoCompleting} aria-label={t('撤销上一步', 'Undo last move')} title={t('撤销上一步', 'Undo last move')}>
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.2 5.2 3.8 8.4l3.4 3.2M4.2 8.4h6a5 5 0 1 1-4.4 7.3" /></svg>
           </button>
           <button type="button" className="sol-action-button sol-new-deal" onClick={restart} aria-label={t('新牌局', 'New deal')} title={t('新牌局', 'New deal')}>
@@ -164,7 +221,7 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
       </div>
     </header>
     <div className="sol-top-row">
-      <button ref={stockRef} type="button" className={`sol-pile sol-stock${!state.stock.length ? ' is-empty' : ''}`} onClick={handleStock} disabled={Boolean(flight)} aria-label={state.stock.length ? t('抽牌', 'Draw cards') : t('重新翻开牌堆', 'Recycle stock')}>
+      <button ref={stockRef} type="button" className={`sol-pile sol-stock${!state.stock.length ? ' is-empty' : ''}`} onClick={handleStock} disabled={Boolean(flight) || autoCompleting} aria-label={state.stock.length ? t('抽牌', 'Draw cards') : t('重新翻开牌堆', 'Recycle stock')}>
         {state.stock.length ? <CardArt back /> : <span className="sol-recycle">↻</span>}
         <small>{state.stock.length || (state.waste.length ? '↻' : '—')}</small>
       </button>
@@ -172,7 +229,7 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
         {state.waste.slice(-3).map((card, index, visible) => {
           const realIndex = state.waste.length - visible.length + index
           const top = realIndex === state.waste.length - 1
-          return <button key={card.id} data-card-id={card.id} type="button" className={`sol-pile sol-waste-card${top ? ' is-top' : ''}${selection?.source.zone === 'waste' && top ? ' is-selected' : ''}`} style={{ left: `${index * 15}%` }} onClick={top ? selectWaste : undefined} onDoubleClick={top ? () => doubleToFoundation({ zone: 'waste', index: 0 }) : undefined} aria-label={cardName(card)} disabled={!top}>
+          return <button key={card.id} data-card-id={card.id} type="button" className={`sol-pile sol-waste-card${top ? ' is-top' : ''}${selection?.source.zone === 'waste' && top ? ' is-selected' : ''}`} style={{ left: `${index * 15}%` }} onClick={top ? selectWaste : undefined} onDoubleClick={top ? () => doubleToFoundation({ zone: 'waste', index: 0 }) : undefined} aria-label={cardName(card)} disabled={!top || autoCompleting}>
             <span className="sol-waste-flip-inner">
               <span className="sol-card-back-face"><CardArt back /></span>
               <span className="sol-card-front-face"><CardArt card={card} /></span>
@@ -181,7 +238,7 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
         })}
       </div>
       <div className="sol-foundations" aria-label={t('基础牌堆', 'Foundations')}>
-        {state.foundations.map((pile, index) => <button key={index} data-card-id={pile.at(-1)?.id} type="button" className={`sol-pile sol-foundation${selection?.source.zone === 'foundation' && selection.source.index === index ? ' is-selected' : ''}`} onClick={() => chooseFoundation(index)} aria-label={pile.at(-1) ? `${t('基础牌堆', 'Foundation')} ${cardName(pile.at(-1)!)}` : t('空基础牌堆', 'Empty foundation')}>
+        {state.foundations.map((pile, index) => <button key={index} data-card-id={pile.at(-1)?.id} type="button" className={`sol-pile sol-foundation${selection?.source.zone === 'foundation' && selection.source.index === index ? ' is-selected' : ''}`} onClick={() => chooseFoundation(index)} disabled={autoCompleting} aria-label={pile.at(-1) ? `${t('基础牌堆', 'Foundation')} ${cardName(pile.at(-1)!)}` : t('空基础牌堆', 'Empty foundation')}>
           {pile.length ? <CardArt card={pile.at(-1)} /> : <span><SuitMark suit={SUITS[index]} size={27} /></span>}
         </button>)}
       </div>
@@ -191,8 +248,8 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
         {pile.map((card, index) => {
           const isSelected = selection?.source.zone === 'tableau' && selection.source.index === column && index >= (selection.startIndex ?? -1)
           const top = index === pile.length - 1
-          const offset = pile.slice(0, index).reduce((total, previous) => total + (previous.faceUp ? 19 : 12), 0)
-          return <button key={card.id} data-card-id={card.id} type="button" className={`sol-pile sol-tableau-card${card.faceUp ? ' is-face-up' : ' is-face-down'}${isSelected ? ' is-selected' : ''}`} style={{ top: `${offset}px`, zIndex: index + 1 }} onClick={(event) => { event.stopPropagation(); if (card.faceUp) chooseTableau(column, index) }} onDoubleClick={index === pile.length - 1 ? () => doubleToFoundation({ zone: 'tableau', index: column }) : undefined} aria-label={card.faceUp ? cardName(card) : t('盖着的牌', 'Face-down card')} disabled={!card.faceUp}>
+          const offset = pile.slice(0, index).reduce((total, previous) => total + (previous.faceUp ? 21 : 14), 0)
+          return <button key={card.id} data-card-id={card.id} type="button" className={`sol-pile sol-tableau-card${card.faceUp ? ' is-face-up' : ' is-face-down'}${isSelected ? ' is-selected' : ''}`} style={{ top: `${offset}px`, zIndex: index + 1 }} onClick={(event) => { event.stopPropagation(); if (card.faceUp) chooseTableau(column, index) }} onDoubleClick={index === pile.length - 1 ? () => doubleToFoundation({ zone: 'tableau', index: column }) : undefined} aria-label={card.faceUp ? cardName(card) : t('盖着的牌', 'Face-down card')} disabled={!card.faceUp || autoCompleting}>
             <span className="sol-card-flip-inner">
               <span className="sol-card-back-face"><CardArt back /></span>
               <span className="sol-card-front-face"><CardArt card={card} /></span>
@@ -214,7 +271,7 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
         <span className="sol-card-front-face"><CardArt card={flight.card} /></span>
       </span>
     </div>}
-    {state.won && <div className="sol-win-message" role="status">{t('漂亮！你完成了这局！', 'Beautiful! You won!')}</div>}
-    {state.won && <div className="sol-win-glow" aria-hidden="true">✦</div>}
+    {state.won && !autoCompleting && <div className="sol-win-message" role="status">{t('漂亮！你完成了这局！', 'Beautiful! You won!')}</div>}
+    {state.won && !autoCompleting && <div className="sol-win-glow" aria-hidden="true">✦</div>}
   </section>
 }
