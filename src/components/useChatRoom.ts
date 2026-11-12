@@ -77,7 +77,7 @@ export function useChatRoom(enabled: boolean) {
   }, [userId, displayName, avatarKey, avatarUrl, profileDetails])
 
   const send = useCallback((text: string, imageBlob?: Blob, replyTo?: MessageReply | null, options?: { expiresAt?: number; farewell?: boolean; whisperTo?: string | null; whisperToName?: string | null }) => {
-    apiRef.current?.send(text, imageBlob, replyTo, options)
+    return apiRef.current?.send(text, imageBlob, replyTo, options) ?? null
   }, [])
   const retry = useCallback(() => apiRef.current?.retry(), [])
   const remove = useCallback((id: string) => apiRef.current?.remove(id), [])

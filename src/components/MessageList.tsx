@@ -17,6 +17,7 @@ import { deleteChessState } from '../games/chess/cloudState'
 import AvatarBadge from './AvatarBadge'
 import { parsePollRef } from '../lib/pollTypes'
 import { deletePoll } from '../lib/pollRemote'
+import StarScore, { type StarReward } from './StarScore'
 
 interface Props {
   entries: ChatEntry[]
@@ -26,6 +27,9 @@ interface Props {
   layoutKey: boolean
   incomingMessageSequence: number
   sentMessageSequence: number
+  starScore: number
+  starRewards: StarReward[]
+  onStarRewardComplete: (reward: StarReward) => void
   reactions: RoomReactionState
   onImageClick: (src: string) => void
   onRetry: () => void
@@ -68,6 +72,9 @@ export default function MessageList({
   layoutKey,
   incomingMessageSequence,
   sentMessageSequence,
+  starScore,
+  starRewards,
+  onStarRewardComplete,
   reactions,
   onImageClick,
   onRetry,
@@ -250,6 +257,7 @@ export default function MessageList({
   return (
     <div className="chat-log-wrap">
       <div className="chat-list-backdrop" aria-hidden="true" />
+      <StarScore score={starScore} rewards={starRewards} onRewardComplete={onStarRewardComplete} />
       <div
         className="chat-log"
         ref={logRef}

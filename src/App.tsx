@@ -7,6 +7,7 @@ import ImageViewer from './components/ImageViewer'
 import CreatePollModal from './components/CreatePollModal'
 import GamePickerModal from './components/GamePickerModal'
 import MessageList from './components/MessageList'
+import type { StarReward } from './components/StarScore'
 // EXPERIMENT: profile page disabled.
 // import ProfilePage from './components/ProfilePage'
 import SettingsBar from './components/SettingsBar'
@@ -127,6 +128,13 @@ export default function App() {
   const [replyTo, setReplyTo] = useState<MessageReply | null>(null)
   const [editingMessage, setEditingMessage] = useState<ChatEntry | null>(null)
   const [sentMessageSequence, setSentMessageSequence] = useState(0)
+  const [starScore, setStarScore] = useState(() => {
+    try {
+      const stored = Number(localStorage.getItem('one-hour-star-score'))
+      return Number.isFinite(stored) && stored > 0 ? Math.floor(stored) : 0
+    } catch { return 0 }
+  })
+  const [starRewards, setStarRewards] = useState<StarReward[]>([])
   const toastTimer = useRef<number | null>(null)
   const bgReadyRef = useRef(false)
   const revealTimer = useRef<number | null>(null)
@@ -136,6 +144,18 @@ export default function App() {
       the second call would clobber the first mid-flight (its inner timer
       escapes cancellation) and the unfold animation plays twice. */
   const revealActive = useRef(false)
+  const rewardMessage = (id: string | null) => {
+    if (!id) return
+    setStarRewards((rewards) => [...rewards, { id, points: Math.floor(Math.random() * 5) + 1 }])
+  }
+  const completeStarReward = useCallback((reward: StarReward) => {
+    setStarScore((score) => score + reward.points)
+    setStarRewards((rewards) => rewards.filter((item) => item.id !== reward.id))
+  }, [])
+
+  useEffect(() => {
+    try { localStorage.setItem('one-hour-star-score', String(starScore)) } catch { /* Storage is optional. */ }
+  }, [starScore])
   const cancelRevealTimers = useCallback(() => {
     if (revealTimer.current) {
       window.clearTimeout(revealTimer.current)
@@ -462,7 +482,7 @@ export default function App() {
     if (!room.identity || !companion) return
     const instanceId = (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2))
     const title = gameTitle(gameId, t)
-    room.send(`🎮 ${title}\n__GAME__:${gameId}:${instanceId}`, undefined, null)
+    rewardMessage(room.send(`🎮 ${title}\n__GAME__:${gameId}:${instanceId}`, undefined, null))
     recordMessageSent()
     setSentMessageSequence((s) => s + 1)
     // Create game state with companion already joined; host is current user
@@ -499,7 +519,7 @@ export default function App() {
   const handleSend = (text: string, reply?: MessageReply | null) => {
     // Whisper takes precedence: explicit pending target from @ selection
     if (pendingWhisper && text.includes(`@${pendingWhisper.displayName}`)) {
-      room.send(text, undefined, reply, { whisperTo: pendingWhisper.userId, whisperToName: pendingWhisper.displayName })
+      rewardMessage(room.send(text, undefined, reply, { whisperTo: pendingWhisper.userId, whisperToName: pendingWhisper.displayName }))
       recordMessageSent()
       if (pendingWhisper.userId !== (room.identity?.userId ?? null)) {
         recordInteraction(pendingWhisper.userId, pendingWhisper.displayName, room.identity?.userId ?? undefined)
@@ -518,7 +538,7 @@ export default function App() {
         if (after) {
           const hit = room.presence.find((m) => m.displayName === after && m.userId !== room.identity?.userId)
           if (hit && text.includes(`@${hit.displayName}`)) {
-            room.send(text, undefined, reply, { whisperTo: hit.userId, whisperToName: hit.displayName })
+            rewardMessage(room.send(text, undefined, reply, { whisperTo: hit.userId, whisperToName: hit.displayName }))
             recordMessageSent()
             recordInteraction(hit.userId, hit.displayName, room.identity?.userId ?? undefined)
             setSentMessageSequence((sequence) => sequence + 1)
@@ -536,7 +556,7 @@ export default function App() {
       void sendPrivateAndReply(text)
       return
     }
-    room.send(text, undefined, reply)
+    rewardMessage(room.send(text, undefined, reply))
     recordMessageSent()
     if (reply?.userId && reply.userId !== (room.identity?.userId ?? null)) {
       recordInteraction(reply.userId, reply.displayName, room.identity?.userId ?? undefined)
@@ -549,7 +569,7 @@ export default function App() {
     const instanceId = (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2))
     const game = getGameById(gameId)
     const title = game ? t(game.name, game.nameEn) : gameId
-    room.send(`🎮 ${title}\n__GAME__:${gameId}:${instanceId}`, undefined, replyTo)
+    rewardMessage(room.send(`🎮 ${title}\n__GAME__:${gameId}:${instanceId}`, undefined, replyTo))
     recordMessageSent()
     setSentMessageSequence((sequence) => sequence + 1)
     setReplyTo(null)
@@ -581,7 +601,7 @@ export default function App() {
       )
       return false
     }
-    room.send(buildPollContent(draft.question, pollId), undefined, replyTo, { expiresAt })
+    rewardMessage(room.send(buildPollContent(draft.question, pollId), undefined, replyTo, { expiresAt }))
     recordMessageSent()
     setSentMessageSequence((sequence) => sequence + 1)
     setReplyTo(null)
@@ -597,7 +617,7 @@ export default function App() {
       const blob = await withTimeout(fileToChatImage(file), 60_000)
       const whisperOpt = pendingWhisper ? { whisperTo: pendingWhisper.userId, whisperToName: pendingWhisper.displayName } : undefined
       if (whisperOpt) setPendingWhisper(null)
-      room.send('', blob, replyTo, whisperOpt)
+      rewardMessage(room.send('', blob, replyTo, whisperOpt))
       recordMessageSent()
       setSentMessageSequence((sequence) => sequence + 1)
       setReplyTo(null)
@@ -628,7 +648,7 @@ export default function App() {
       try {
         const blob = await withTimeout(fileToChatImage(file), 60_000)
         const whisperOpt = pendingWhisper ? { whisperTo: pendingWhisper.userId, whisperToName: pendingWhisper.displayName } : undefined
-        room.send('', blob, replyForNext, whisperOpt)
+        rewardMessage(room.send('', blob, replyForNext, whisperOpt))
         recordMessageSent()
         setSentMessageSequence((sequence) => sequence + 1)
         if (replyForNext) {
@@ -895,6 +915,9 @@ export default function App() {
               layoutKey={fold === 'unfolding'}
               incomingMessageSequence={room.incomingMessageSequence}
               sentMessageSequence={sentMessageSequence}
+              starScore={starScore}
+              starRewards={starRewards}
+              onStarRewardComplete={completeStarReward}
               reactions={mergedReactions}
               onImageClick={openImage}
               onRetry={room.retry}
@@ -1020,7 +1043,7 @@ export default function App() {
           onComplete={handleSummaryComplete}
           onFarewell={(userId, name, expiresAt, sentence) => {
             void userId
-            room.send(`@${name} ${sentence}`, undefined, null, { expiresAt, farewell: true })
+            rewardMessage(room.send(`@${name} ${sentence}`, undefined, null, { expiresAt, farewell: true }))
           }}
         />
       ) : (!profile || welcomeOpen) ? (

@@ -56,7 +56,7 @@ export interface ChatCallbacks {
 }
 
 export interface ChatApi {
-  send(content: string, imageBlob?: Blob, replyTo?: MessageReply | null, options?: { expiresAt?: number; farewell?: boolean; whisperTo?: string | null; whisperToName?: string | null }): void
+  send(content: string, imageBlob?: Blob, replyTo?: MessageReply | null, options?: { expiresAt?: number; farewell?: boolean; whisperTo?: string | null; whisperToName?: string | null }): string | null
   /** Retry every failed/pending message right now. */
   retry(): void
   /** Load and prepend the page older than the current oldest message. */
@@ -528,7 +528,7 @@ export function enterChat(
   return {
     send(content, imageBlob, replyTo, options) {
       const trimmed = content.trim()
-      if ((!trimmed && !imageBlob) || closed) return
+      if ((!trimmed && !imageBlob) || closed) return null
       const item: ChatOutboxItem = {
         id: newId(),
         content: trimmed,
@@ -571,6 +571,7 @@ export function enterChat(
       entries = [...entries, entry].slice(-MEMORY_CAP)
       emit(entry)
       void enqueueOutbox(item).then(() => flush())
+      return item.id
     },
     retry() {
       // Reset nothing: failed attempts keep their budget; a manual retry
