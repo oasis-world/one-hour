@@ -7,6 +7,8 @@ import SudokuGame from './sudoku/SudokuGame'
 import { GomokuIcon, XiangqiGeneralIcon, ChessCrownIcon } from '../components/icons'
 import SolitaireIcon from './solitaire/SolitaireIcon'
 import SudokuIcon from './sudoku/SudokuIcon'
+import SlotMachine from './slot-machine/SlotMachine'
+import SlotMachineIcon from './slot-machine/SlotMachineIcon'
 
 export const GAMES: GameDefinition[] = [
   {
@@ -68,6 +70,18 @@ export const GAMES: GameDefinition[] = [
     minPlayers: 1,
     maxPlayers: 1,
     Component: SudokuGame,
+  },
+  {
+    id: 'slot-machine',
+    name: '老虎机',
+    nameEn: 'Slot Machine',
+    icon: '🎰',
+    Icon: SlotMachineIcon,
+    tagline: '幸运旋转，经典水果机',
+    taglineEn: 'A little luck, a classic spin',
+    minPlayers: 1,
+    maxPlayers: 1,
+    Component: SlotMachine,
   },
 ]
 

@@ -12,6 +12,10 @@
   overflow-anchor: auto;
 }
 
+.msg-row:has(.slot-card) {
+  overflow-anchor: none;
+}
+
 .chat-log {
   overflow-anchor: none;
 }

@@ -2,6 +2,11 @@ import type { Lang } from './i18n'
 
 export type TranslationDict = Partial<Record<Lang, Record<string, string>>>
 
+const SLOT_GAME_NAMES: Record<Exclude<Lang, 'zh' | 'en'>, string> = {
+  'zh-TW': '老虎機', ja: 'スロットマシン', fr: 'Machine à sous', es: 'Tragaperras',
+  de: 'Spielautomat', ko: '슬롯머신', it: 'Slot Machine', ar: 'ماكينة الحظ',
+}
+
 const SOLITAIRE_TRANSLATIONS: Record<Exclude<Lang, 'zh' | 'en'>, Record<string, string>> = {
   'zh-TW': {
     'Klondike Solitaire': '克朗代克接龍', Solitaire: '接龍', 'CLASSIC · KLONDIKE': '經典 · 克朗代克', SCORE: '分數', TIME: '時間',
@@ -1596,4 +1601,8 @@ export const TRANSLATIONS: TranslationDict = {
     'Smileys & People': 'الوجوه والأشخاص', 'Animals & Nature': 'الحيوانات والطبيعة', 'Food & Drink': 'الطعام والشراب',
     'Activities': 'الأنشطة', 'Travel & Places': 'السفر والأماكن', 'Objects': 'الأشياء', 'Symbols': 'الرموز', 'Flags': 'الأعلام',
   },
+}
+
+for (const lang of Object.keys(SLOT_GAME_NAMES) as (keyof typeof SLOT_GAME_NAMES)[]) {
+  TRANSLATIONS[lang] = { ...TRANSLATIONS[lang], 'Slot Machine': SLOT_GAME_NAMES[lang] }
 }

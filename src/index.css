@@ -755,7 +755,7 @@ button {
   min-width: 1ch;
   font-size: 14px;
   font-weight: 850;
-  letter-spacing: .02em;
+  letter-spacing: -.035em;
 }
 
 .star-score.is-pulsing {
@@ -3072,4 +3072,14 @@ button {
 }
 @media (prefers-reduced-motion: reduce) {
   .typing-dot { animation: none; opacity: 0.8; }
+}
+
+/* Slot cards use the same full-row mobile layout as the other games, with
+   the cabinet's left edge aligned to the sender avatar. */
+@media (max-width: 820px) {
+  .msg-row:has(.slot-card) { grid-template-columns: 39px minmax(0, 1fr); padding-inline: 8px; }
+  .msg-row:has(.slot-card) .msg-main { display: contents; }
+  .msg-row:has(.slot-card) .msg-head { grid-column: 2; }
+  .msg-row:has(.slot-card) .msg-body,
+  .msg-row:has(.slot-card) .msg-reactions { grid-column: 1 / -1; }
 }
