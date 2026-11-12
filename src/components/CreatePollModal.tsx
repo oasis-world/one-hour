@@ -157,7 +157,12 @@ export default function CreatePollModal({ onSend, onClose }: Props) {
         />
         <PollModalSeg<PollDurationId>
           label={t('持续时间', 'Duration')}
-          choices={POLL_DURATIONS.map((d) => ({ value: d.id, label: `${d.minutes}${t(' 分钟', ' min')}` }))}
+          choices={POLL_DURATIONS.map((d) => ({
+            value: d.id,
+            label: d.id === '1h'
+              ? t('1 小时', '1 hour')
+              : t('{minutes} 分钟', '{minutes} minutes').replace('{minutes}', String(d.minutes)),
+          }))}
           value={durationId}
           onChange={setDurationId}
         />

@@ -34,6 +34,46 @@
   border: 1px solid var(--line); background: transparent;
   color: var(--accent); font-size: 12px; font-weight: 750; cursor: pointer;
 }
+.poll-confirm-backdrop {
+  position: fixed; inset: 0; z-index: 10000;
+  display: grid; place-items: center; padding: 18px;
+  background: rgb(6 8 12 / 58%);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+}
+.poll-confirm {
+  position: relative; overflow: hidden;
+  width: min(100%, 360px); box-sizing: border-box; padding: 21px 20px 18px;
+  border: 1px solid rgb(255 255 255 / 18%); border-radius: 18px;
+  background: linear-gradient(145deg, #292d36, #191b21 76%); color: #f4f1e8;
+  box-shadow: 0 22px 65px rgb(0 0 0 / 58%), inset 0 1px rgb(255 255 255 / 8%);
+}
+.poll-confirm::before {
+  position: absolute; top: 0; left: 18px; right: 18px; height: 2px;
+  content: ''; background: linear-gradient(90deg, transparent, #efc35f, transparent);
+}
+.app-shell.theme-warm .poll-confirm {
+  border-color: rgb(90 59 24 / 20%);
+  background: linear-gradient(145deg, #fff9e9, #f5e7c9 76%); color: #3b2918;
+  box-shadow: 0 22px 65px rgb(61 36 18 / 35%), inset 0 1px rgb(255 255 255 / 90%);
+}
+.poll-confirm h3 { display: flex; align-items: center; gap: 9px; margin: 0 0 8px; font-size: 16px; }
+.poll-confirm h3::before {
+  display: grid; place-items: center; flex: 0 0 25px; height: 25px;
+  content: '!'; border: 1px solid rgb(239 195 95 / 48%); border-radius: 50%;
+  background: rgb(239 195 95 / 12%); color: #efc35f; font-size: 14px; font-weight: 900;
+}
+.app-shell.theme-warm .poll-confirm h3::before { color: #9a641d; background: rgb(196 92 38 / 9%); border-color: rgb(154 100 29 / 28%); }
+.poll-confirm p { margin: 0; color: #c9c2b4; font-size: 13px; line-height: 1.5; }
+.app-shell.theme-warm .poll-confirm p { color: #604b35; }
+.poll-confirm-actions { display: flex; gap: 8px; margin-top: 16px; }
+.poll-confirm-actions > button {
+  flex: 1; min-width: 0; min-height: 38px; padding: 7px 10px;
+  border-radius: 9px; font: inherit; font-size: 13px; font-weight: 750; cursor: pointer;
+  transition: filter .15s ease, transform .15s ease;
+}
+.poll-confirm-cancel { border: 1px solid var(--line); background: transparent; color: var(--ink); }
+.poll-confirm-submit { border: 1px solid var(--danger); background: var(--danger); color: #fff; }
+.poll-confirm-actions > button:hover { filter: brightness(1.1); transform: translateY(-1px); }
 .poll-head { position: relative; margin-bottom: 10px; }
 .poll-badge, .poll-mode, .poll-status {
   display: inline-flex; align-items: center;

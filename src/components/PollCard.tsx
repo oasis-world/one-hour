@@ -18,6 +18,8 @@ import {
 } from '../lib/pollTypes'
 import PollOption from './PollOption'
 import { PollLoading, PollUnavailable } from './PollCardStates'
+import PollConfirmDialog from './PollConfirmDialog'
+import PollCardFooter from './PollCardFooter'
 import './PollCard.css'
 
 interface Props {
@@ -34,9 +36,11 @@ export default function PollCard({ pollId, hostUserId, selfId, onlineMembers }: 
   const [poll, setPoll] = useState<PollData | null>(null)
   const [votes, setVotes] = useState<PollVoteRow[]>([])
   const [voting, setVoting] = useState(false)
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const aliveRef = useRef(true)
+  const cancelClosePoll = useCallback(() => setCloseConfirmOpen(false), [])
 
   const load = useCallback(async () => {
     const [pollRes, voteRes] = await Promise.all([fetchPoll(pollId), fetchPollVotes(pollId)])
@@ -123,7 +127,12 @@ export default function PollCard({ pollId, hostUserId, selfId, onlineMembers }: 
 
   const onClosePoll = () => {
     if (!poll || !selfId || voting) return
-    if (!window.confirm(t('关闭后大家就不能再投票了，确定吗？', 'Close voting for everyone?'))) return
+    setCloseConfirmOpen(true)
+  }
+
+  const confirmClosePoll = () => {
+    if (!selfId || voting) return
+    setCloseConfirmOpen(false)
     setVoting(true)
     void closePoll(pollId, selfId)
       .then((ok) => {
@@ -172,22 +181,20 @@ export default function PollCard({ pollId, hostUserId, selfId, onlineMembers }: 
         })}
       </div>
 
-      <footer className="poll-foot">
-        <span>
-          {tallies.voterCount > 0
-            ? t(`${tallies.voterCount} 人参与 · ${tallies.totalVotes} 票`, `${tallies.voterCount} voters · ${tallies.totalVotes} votes`)
-            : t('等待大家投票…', 'Waiting for votes…')}
-        </span>
-        <span className="poll-time">
-          {open ? formatPollRemaining(remaining) : '🏁'}
-        </span>
-        {open && mine && (
-          <button type="button" className="poll-close-btn" disabled={voting} onClick={onClosePoll}>
-            {t('关闭投票', 'Close poll')}
-          </button>
-        )}
-      </footer>
+      <PollCardFooter
+        voterCount={tallies.voterCount}
+        totalVotes={tallies.totalVotes}
+        remainingLabel={open ? formatPollRemaining(remaining) : '🏁'}
+        canClose={open && mine}
+        closeDisabled={voting}
+        onClose={onClosePoll}
+      />
       {error && <p className="poll-error" role="alert">{error}</p>}
+      <PollConfirmDialog
+        open={closeConfirmOpen}
+        onCancel={cancelClosePoll}
+        onConfirm={confirmClosePoll}
+      />
     </section>
   )
 }

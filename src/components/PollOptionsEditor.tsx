@@ -33,7 +33,7 @@ export default function PollOptionsEditor({
               type="text"
               value={value}
               maxLength={POLL_OPTION_MAX}
-              placeholder={t(`选项 ${index + 1}`, `Option ${index + 1}`)}
+              placeholder={t('选项 {index}', 'Option {index}').replace('{index}', String(index + 1))}
               spellCheck={false}
               autoComplete="off"
               onChange={(e) => onSetOption(index, e.target.value)}

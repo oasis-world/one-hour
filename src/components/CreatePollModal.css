@@ -30,6 +30,7 @@
 .poll-modal-titles strong { font-size: 17px; font-weight: 850; color: var(--ink); }
 .poll-modal-titles small { font-size: 11.5px; color: var(--ink-mute); margin-top: 2px; }
 .poll-modal-x {
+  position: relative; top: -5px;
   width: 30px; height: 30px; flex-shrink: 0; display: grid; place-items: center;
   border-radius: 50%; border: 1px solid var(--line); background: transparent;
   color: var(--ink-mute); cursor: pointer;
