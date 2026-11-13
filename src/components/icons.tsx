@@ -3,6 +3,7 @@ import { useId } from 'react'
 
 interface GlyphProps {
   size?: number
+  className?: string
 }
 
 export function ThinXIcon({ size = 16 }: GlyphProps) {
@@ -436,24 +437,22 @@ export function VoteIcon({ size = 17 }: GlyphProps) {
   )
 }
 
-export function GameIcon({ size = 17 }: GlyphProps) {
+export function GameIcon({ size = 17, className }: GlyphProps) {
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      viewBox="0 0 32 32"
+      className={className}
       aria-hidden="true"
+      focusable="false"
     >
-      <path d="M7.3 7h9.4a4.4 4.4 0 0 1 4.3 5.2l-.6 2.8a2.7 2.7 0 0 1-4.5 1.4l-1.7-1.6h-4.4l-1.7 1.6a2.7 2.7 0 0 1-4.5-1.4L3 12.2A4.4 4.4 0 0 1 7.3 7z" />
-      <path d="M7 9.8v4M5 11.8h4" />
-      <circle cx="15.7" cy="10.7" r=".8" fill="currentColor" stroke="none" />
-      <circle cx="18" cy="12.7" r=".8" fill="currentColor" stroke="none" />
-      <path d="m18.2 4 .5 1.4 1.4.5-1.4.5-.5 1.4-.5-1.4-1.4-.5 1.4-.5.5-1.4Z" strokeWidth="1.2" />
+      <path className="gamepad-shell" d="M9 10h14a5.5 5.5 0 0 1 5.3 4.1l1.1 4.2a3.4 3.4 0 0 1-5.5 3.5l-3-2.3h-9.8l-3 2.3a3.4 3.4 0 0 1-5.5-3.5l1.1-4.2A5.5 5.5 0 0 1 9 10Z" fill="currentColor" fillOpacity=".14" stroke="currentColor" strokeWidth="1.6" />
+      <path className="gamepad-controls" d="M10 13v6m-3-3h6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle className="gamepad-button" cx="21" cy="14" r="1.4" fill="currentColor" />
+      <circle className="gamepad-button" cx="24" cy="17" r="1.4" fill="currentColor" />
+      <path className="gamepad-spark" d="m24 3 .9 2.2L27 6l-2.1.8L24 9l-.9-2.2L21 6l2.1-.8L24 3Z" fill="currentColor" />
+      <path className="gamepad-spark" d="m7 4 .6 1.4L9 6l-1.4.6L7 8l-.6-1.4L5 6l1.4-.6L7 4Z" fill="currentColor" />
     </svg>
   )
 }

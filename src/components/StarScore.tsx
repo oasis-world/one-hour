@@ -20,6 +20,15 @@ export interface StarReward {
   kind?: 'message' | 'photo'
 }
 
+export function StarPointsCount({ score, className = '', label }: { score: number; className?: string; label?: string }) {
+  return (
+    <span className={`star-points-count${className ? ` ${className}` : ''}`} aria-label={label}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.85 5.78 6.38.93-4.62 4.5 1.09 6.35L12 17.36l-5.7 3 1.09-6.35-4.62-4.5 6.38-.93L12 2.8Z" /></svg>
+      <span className="star-score-value">{score.toLocaleString()}</span>
+    </span>
+  )
+}
+
 interface Props {
   score: number
   rewards: StarReward[]
@@ -180,10 +189,7 @@ export default function StarScore({ score, rewards, onRewardComplete }: Props) {
       aria-label={`${copy.label}: ${score}`}
       title={copy.title}
     >
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="m12 2.8 2.85 5.78 6.38.93-4.62 4.5 1.09 6.35L12 17.36l-5.7 3 1.09-6.35-4.62-4.5 6.38-.93L12 2.8Z" />
-      </svg>
-      <span className="star-score-value">{score.toLocaleString()}</span>
+      <StarPointsCount score={score} />
       {delta !== null && <span className={`star-score-change${delta < 0 ? ' is-loss' : ''}`} aria-hidden="true">{delta > 0 ? '+' : ''}{delta}</span>}
       {bonuses.map((reward) => (
         <span

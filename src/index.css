@@ -744,7 +744,15 @@ button {
   pointer-events: none;
 }
 
-.star-score > svg {
+.star-points-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.star-points-count > svg {
   width: 19px;
   height: 19px;
   fill: #f3b52f;

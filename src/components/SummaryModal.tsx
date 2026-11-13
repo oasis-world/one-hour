@@ -6,6 +6,8 @@ import { FAREWELL_TTL_MS } from '../lib/expiry'
 import type { PresenceMember } from '../lib/chatTypes'
 import MessageAuthorCard from './MessageAuthorCard'
 import AvatarBadge from './AvatarBadge'
+import { GameIcon } from './icons'
+import { StarPointsCount } from './StarScore'
 import { HourglassIcon } from './icons'
 import { SUMMARY_COPY } from './summaryCopy'
 
@@ -25,8 +27,14 @@ function pickFarewell(lang: Lang): string {
   return list[Math.floor(Math.random() * list.length)]
 }
 
-function format(copy: string, values: Record<string, number>): string {
-  return copy.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? 0))
+function StatIcon({ type }: { type: 'message' | 'photo' | 'game' }) {
+  if (type === 'message') return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 1 1 20 11.5Z" /><path d="M8 11h8M8 14h5" /></svg>
+  if (type === 'photo') return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" /><circle cx="8.5" cy="9" r="1.5" /><path d="m4 17 5-5 3 3 3-4 5 6" /></svg>
+  return <GameIcon size={30} className="summary-game-icon" />
+}
+
+function StarMark() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.85 5.78 6.38.93-4.62 4.5 1.09 6.35L12 17.36l-5.7 3 1.09-6.35-4.62-4.5 6.38-.93L12 2.8Z" /></svg>
 }
 
 export default function SummaryModal({ stats, presence, selfId, profile, pointsBalance, gifts, onComplete, onFarewell }: Props) {
@@ -51,9 +59,8 @@ export default function SummaryModal({ stats, presence, selfId, profile, pointsB
       .map((member) => [member.userId, member]),
   )
   const interactions = Object.entries(stats.interactions).filter(([id]) => liveMembers.has(id))
-  const gameLine = format(copy.gameSummary, {
-    gomoku: stats.gomokuPlayed, xiangqi: stats.xiangqiPlayed, chess: stats.chessPlayed, points: stats.gamePoints,
-  })
+  const gamesPlayed = stats.gomokuPlayed + stats.xiangqiPlayed + stats.chessPlayed
+  const pointText = (points: number) => `${points > 0 ? '+' : ''}${points}`
 
   return (
     <div className="welcome-backdrop" role="presentation">
@@ -66,20 +73,41 @@ export default function SummaryModal({ stats, presence, selfId, profile, pointsB
         <p className="welcome-copy summary-copy"><strong>{copy.headline}</strong> <span>{copy.farewell}</span></p>
 
         <div className="summary-stats">
-          <div className="summary-stat-row"><span>{format(copy.messageSummary, { count: stats.messagesSent, points: stats.messagePoints })}</span></div>
-          <hr className="summary-divider" />
-          <div className="summary-stat-row"><span>{format(copy.photoSummary, { count: stats.photosSent, points: stats.photoPoints })}</span></div>
-          <hr className="summary-divider" />
-          <div className="summary-stat-row"><span>{gameLine}</span></div>
-          <hr className="summary-divider" />
-          <div className="summary-stat-row summary-balance"><strong>{format(copy.balanceSummary, { points: pointsBalance })}</strong></div>
-          {gifts.length > 0 ? <div className="summary-gifts">
-            <strong>{copy.giftsSummary}</strong>
-            {gifts.map((gift) => <span key={gift.userId}>{gift.name} +{gift.points}</span>)}
-          </div> : <div className="summary-gifts"><span>{pointsBalance > 0 ? copy.noGifts : copy.noPoints}</span></div>}
+          <div className="summary-metrics">
+            <article className="summary-metric">
+              <StatIcon type="message" />
+              <strong className="summary-metric-value">{stats.messagesSent}</strong>
+              <span className="summary-metric-label">{copy.messages}</span>
+              <span className="summary-points" aria-label={`${copy.pointsLabel}: ${pointText(stats.messagePoints)}`}><StarMark />{pointText(stats.messagePoints)}</span>
+            </article>
+            <article className="summary-metric">
+              <StatIcon type="photo" />
+              <strong className="summary-metric-value">{stats.photosSent}</strong>
+              <span className="summary-metric-label">{copy.photos}</span>
+              <span className="summary-points" aria-label={`${copy.pointsLabel}: ${pointText(stats.photoPoints)}`}><StarMark />{pointText(stats.photoPoints)}</span>
+            </article>
+            <article className="summary-metric summary-metric-games">
+              <StatIcon type="game" />
+              <strong className="summary-metric-value">{gamesPlayed}</strong>
+              <span className="summary-metric-label">{copy.games}</span>
+              <span className={`summary-points${stats.gamePoints < 0 ? ' is-loss' : ''}`} aria-label={`${copy.pointsLabel}: ${pointText(stats.gamePoints)}`}><StarMark />{pointText(stats.gamePoints)}</span>
+            </article>
+          </div>
 
-          <hr className="summary-divider" />
-          <div className="summary-interactions">
+          <div className="summary-points-card">
+            <div className="summary-balance-card">
+              <span className="summary-balance-label">{copy.balanceLabel}</span>
+              <StarPointsCount score={pointsBalance} className="summary-balance-count" label={`${copy.pointsLabel}: ${pointsBalance}`} />
+            </div>
+            <div className="summary-gifts">
+              <strong>{copy.giftsSummary}</strong>
+              {gifts.length > 0 ? <div className="summary-gift-list">
+                {gifts.map((gift) => <span className="summary-gift-chip" key={gift.userId}><span>{gift.name}</span><b>+{gift.points}</b></span>)}
+              </div> : <span className="summary-gifts-empty">{pointsBalance > 0 ? copy.noGifts : copy.noPoints}</span>}
+            </div>
+          </div>
+
+          <div className="summary-interactions summary-interactions-card">
             <div className="summary-stat-label">{copy.interactions}</div>
             {interactions.length > 0 ? <div className="summary-interaction-list">
               {interactions.map(([id, name]) => {
