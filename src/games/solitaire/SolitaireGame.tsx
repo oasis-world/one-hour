@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { GameComponentProps } from '../types'
 import { t, useLang } from '../../lib/i18n'
+import { recordGamePlayed } from '../../lib/lifetimeStats'
 import CardArt from './CardArt'
 import { autoFoundation, autoFoundationStep, drawCards, moveToFoundation, moveToTableau, newGame, rankLabel, SUITS, topCard, undo, type Card, type SolitaireState, type Source } from './model'
 import SolitaireIcon from './SolitaireIcon'
@@ -46,6 +47,7 @@ export default function SolitaireGame({ instanceId }: GameComponentProps) {
   useEffect(() => {
     try { localStorage.setItem(keyFor(instanceId), JSON.stringify(state)) } catch { /* Local storage may be unavailable. */ }
   }, [instanceId, state])
+  useEffect(() => recordGamePlayed('solitaire', `${instanceId}:${state.startedAt}`), [instanceId, state.startedAt])
   useEffect(() => {
     const timer = window.setInterval(() => setSeconds(Math.floor((Date.now() - state.startedAt) / 1000)), 1000)
     return () => window.clearInterval(timer)

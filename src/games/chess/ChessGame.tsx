@@ -10,7 +10,7 @@ import AvatarBadge from '../../components/AvatarBadge'
 import { ChessCrownIcon } from '../../components/icons'
 import OnlineList from '../../components/OnlineList'
 import { setPopoverOpen } from '../../lib/popoverGuard'
-import { recordGameResult, recordInteraction } from '../../lib/lifetimeStats'
+import { recordGamePlayed, recordGameResult, recordInteraction } from '../../lib/lifetimeStats'
 import { acquireGameChannelSlot, canSendGameBroadcast, getGamePresenceKey, installGameWakeRecovery, isGameHostAuthority, pokeGameSocket, removeStaleGameChannel, watchGameChannelClose } from '../realtime'
 import { createInitialState, isChessState, joinChess, addChessAi, inCheck, legalMoves, removeChessPlayer, restartChessRound, tryMove, type ChessState, type Color, type Piece, type Square } from './logic' // Square imported via logic
 import { chooseChessAiMove } from './ai'
@@ -194,11 +194,16 @@ export default function ChessGame({ instanceId, hostUserId, onlineMembers = [] }
   },[selfId,state.players])
 
   useEffect(()=>{
+    if(!selfId||!state.players.some(player=>player.userId===selfId))return
+    recordGamePlayed('chess',`${instanceId}:${state.round}`)
+  },[instanceId,selfId,state.round,state.players])
+
+  useEffect(()=>{
     if(!selfId||state.status!=='result')return
     const key=`${instanceId}:${state.round}`
     if(recordedRoundRef.current===key||!state.players.some(player=>player.userId===selfId))return
     recordedRoundRef.current=key
-    recordGameResult('chess',selfId,state.winnerId,state.players.map(player=>player.userId))
+    recordGameResult('chess',selfId,state.winnerId,state.players.map(player=>player.userId),`${instanceId}:${state.round}`)
   },[instanceId,selfId,state.status,state.round,state.winnerId,state.players])
 
   useEffect(()=>()=>{

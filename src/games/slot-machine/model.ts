@@ -7,15 +7,17 @@ export const PAYLINES = [
   [0, 1, 2, 1, 0], [2, 1, 0, 1, 2],
 ] as const
 
-// Symbol frequencies and paytable are tuned together for about 97% theoretical
-// return in this free-play demo; this is a design target, not certified casino RTP.
+// Keep common fruit frequencies close enough that every fruit can hit regularly.
+// These weights and payouts together target about 98% theoretical return for this
+// free-play demo; this is a design target, not certified casino RTP.
 const WEIGHTS: SymbolId[] = [
-  ...Array<SymbolId>(13).fill('cherry'), 'lemon', 'lemon', 'orange', 'orange',
-  'grapes', 'grapes', 'bell', 'bell', 'star', 'diamond', 'wild',
+  ...Array<SymbolId>(8).fill('cherry'), ...Array<SymbolId>(3).fill('lemon'),
+  ...Array<SymbolId>(3).fill('orange'), ...Array<SymbolId>(3).fill('grapes'),
+  ...Array<SymbolId>(2).fill('bell'), 'star', 'diamond', ...Array<SymbolId>(2).fill('wild'),
 ]
 export const PAYOUTS: Record<SymbolId, readonly [number, number, number]> = {
-  cherry: [1, 4, 10], lemon: [1, 2.5, 7.5], orange: [1.2, 3, 9], grapes: [1.5, 4, 12],
-  bell: [2, 6, 20], star: [2.5, 8, 25], diamond: [5, 15, 50], wild: [8, 30, 100],
+  cherry: [3, 10, 26], lemon: [3, 7, 20], orange: [3, 8, 23], grapes: [4, 10, 31],
+  bell: [5, 16, 52], star: [7, 21, 65], diamond: [13, 39, 130], wild: [21, 78, 260],
 }
 
 export function randomSymbol(): SymbolId {
@@ -33,17 +35,34 @@ export function scoreGrid(grid: ReelGrid, lineBet: number): SlotScore {
   const wins: SlotWin[] = []
   PAYLINES.forEach((line) => {
     const lineSymbols = line.map((row, reel) => grid[reel][row])
-    const symbol = lineSymbols.find((value) => value !== 'wild') ?? 'wild'
-    let count = 0
-    for (let reel = 0; reel < 5; reel += 1) {
-      const landed = grid[reel][line[reel]]
-      if (landed !== symbol && landed !== 'wild') break
-      count += 1
+    const symbols: SymbolId[] = [...new Set(lineSymbols)].filter((value) => value !== 'wild')
+    if (symbols.length === 0) symbols.push('wild')
+    let best: SlotWin | null = null
+
+    for (const symbol of symbols) {
+      let reel = 0
+      while (reel < lineSymbols.length) {
+        const matches = (value: SymbolId) => symbol === 'wild' ? value === 'wild' : value === symbol || value === 'wild'
+        while (reel < lineSymbols.length && !matches(lineSymbols[reel])) reel += 1
+        const start = reel
+        while (reel < lineSymbols.length && matches(lineSymbols[reel])) reel += 1
+        const count = reel - start
+        if (count < 3) continue
+
+        const amount = Math.round(lineBet * PAYOUTS[symbol][count - 3])
+        const candidate: SlotWin = {
+          symbol,
+          count,
+          amount,
+          cells: line.slice(start, reel).map((row, offset) => (start + offset) * 3 + row),
+        }
+        if (!best || candidate.count > best.count || (candidate.count === best.count && candidate.amount > best.amount)) {
+          best = candidate
+        }
+      }
     }
-    if (count >= 3) {
-      const amount = Math.round(lineBet * PAYOUTS[symbol][count - 3])
-      wins.push({ symbol, count, amount, cells: line.slice(0, count).map((row, reel) => reel * 3 + row) })
-    }
+
+    if (best) wins.push(best)
   })
   return { payout: wins.reduce((sum, win) => sum + win.amount, 0), wins }
 }

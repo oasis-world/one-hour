@@ -4,7 +4,7 @@ import { isSupabaseConfigured } from '../../lib/supabaseConfig'
 import { useAccount } from '../../lib/useAccount'
 import { fetchCloudProfile } from '../../lib/profileCloud'
 import { loadUserProfile } from '../../lib/userProfile'
-import { recordGameResult, recordInteraction } from '../../lib/lifetimeStats'
+import { recordGamePlayed, recordGameResult, recordInteraction } from '../../lib/lifetimeStats'
 import { resolveChatIdentity } from '../../lib/identity'
 import { t, useLang } from '../../lib/i18n'
 import AvatarBadge from '../../components/AvatarBadge'
@@ -298,12 +298,17 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
   }, [selfId, state.players])
 
   useEffect(() => {
+    if (!selfId || !state.players.some((player) => player.userId === selfId)) return
+    recordGamePlayed('xiangqi', `${instanceId}:${state.round}`)
+  }, [instanceId, selfId, state.round, state.players])
+
+  useEffect(() => {
     if (!selfId || state.status !== 'result') return
     const key = `${instanceId}:${state.round}`
     if (recordedRoundRef.current === key) return
     if (!state.players.some((p) => p.userId === selfId)) return
     recordedRoundRef.current = key
-    recordGameResult('xiangqi', selfId, state.winnerId ?? null, state.players.map((p) => p.userId))
+    recordGameResult('xiangqi', selfId, state.winnerId ?? null, state.players.map((p) => p.userId), `${instanceId}:${state.round}`)
   }, [instanceId, selfId, state.status, state.round, state.winnerId, state.players])
   useEffect(() => { selfIdRef.current = selfId }, [selfId])
   useEffect(() => {

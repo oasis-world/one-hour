@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import type { GameComponentProps } from '../types'
 import { t, useLang } from '../../lib/i18n'
+import { recordGamePlayed } from '../../lib/lifetimeStats'
 import SudokuIcon from './SudokuIcon'
 import { createSudoku, getConflicts, isSolved, isSudokuState, type Difficulty, type SudokuSnapshot, type SudokuState } from './model'
 import './SudokuGame.css'
@@ -30,6 +31,7 @@ export default function SudokuGame({ instanceId }: GameComponentProps) {
   useEffect(() => {
     try { localStorage.setItem(storageKey(instanceId), JSON.stringify(state)) } catch { /* Storage may be unavailable. */ }
   }, [instanceId, state])
+  useEffect(() => recordGamePlayed('sudoku', `${instanceId}:${state.startedAt}`), [instanceId, state.startedAt])
   useEffect(() => {
     if (state.complete) return
     const timer = window.setInterval(() => setNow(Date.now()), 1000)

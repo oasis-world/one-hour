@@ -11,6 +11,10 @@ export interface LifetimeStats {
   messagePoints: number
   photoPoints: number
   gamePoints: number
+  gamesPlayed: number
+  slotSpins: number
+  gamePlayIds: string[]
+  gameResultIds: string[]
   gomokuPlayed: number
   xiangqiPlayed: number
   chessPlayed: number
@@ -40,6 +44,10 @@ const EMPTY_STATS: LifetimeStats = {
   messagePoints: 0,
   photoPoints: 0,
   gamePoints: 0,
+  gamesPlayed: 0,
+  slotSpins: 0,
+  gamePlayIds: [],
+  gameResultIds: [],
   gomokuPlayed: 0,
   xiangqiPlayed: 0,
   chessPlayed: 0,
@@ -88,6 +96,14 @@ function parseStats(raw: string | null): LifetimeStats {
       messagePoints: typeof data.messagePoints === 'number' ? data.messagePoints : 0,
       photoPoints: typeof data.photoPoints === 'number' ? data.photoPoints : 0,
       gamePoints: typeof data.gamePoints === 'number' ? data.gamePoints : 0,
+      gamesPlayed: typeof data.gamesPlayed === 'number'
+        ? data.gamesPlayed
+        : (typeof data.gomokuPlayed === 'number' ? data.gomokuPlayed : 0)
+          + (typeof data.xiangqiPlayed === 'number' ? data.xiangqiPlayed : 0)
+          + (typeof data.chessPlayed === 'number' ? data.chessPlayed : 0),
+      slotSpins: typeof data.slotSpins === 'number' ? data.slotSpins : 0,
+      gamePlayIds: Array.isArray(data.gamePlayIds) ? data.gamePlayIds.filter((id): id is string => typeof id === 'string') : [],
+      gameResultIds: Array.isArray(data.gameResultIds) ? data.gameResultIds.filter((id): id is string => typeof id === 'string') : [],
       gomokuPlayed: typeof data.gomokuPlayed === 'number' ? data.gomokuPlayed : 0,
       xiangqiPlayed: typeof data.xiangqiPlayed === 'number' ? data.xiangqiPlayed : 0,
       chessPlayed: typeof data.chessPlayed === 'number' ? data.chessPlayed : 0,
@@ -157,14 +173,29 @@ export function recordGamePoints(points: number): void {
   saveStats(stats)
 }
 
+export function recordGamePlayed(gameType: string, playId: string): void {
+  if (!playId) return
+  const stats = loadStats()
+  const key = `${gameType}:${playId}`
+  if (stats.gamePlayIds.includes(key)) return
+  stats.gamePlayIds = [...stats.gamePlayIds.slice(-499), key]
+  stats.gamesPlayed += 1
+  if (gameType === 'slot-machine') stats.slotSpins += 1
+  saveStats(stats)
+}
+
 export function recordGameResult(
   gameType: 'gomoku' | 'xiangqi' | 'chess',
   selfId: string,
   winnerId: string | null,
   playerIds: string[],
+  resultId: string,
 ): void {
   if (!playerIds.includes(selfId)) return
   const stats = loadStats()
+  const key = `${gameType}:${resultId}`
+  if (stats.gameResultIds.includes(key)) return
+  stats.gameResultIds = [...stats.gameResultIds.slice(-499), key]
   if (gameType === 'gomoku') {
     stats.gomokuPlayed += 1
     if (winnerId && winnerId === selfId) stats.gomokuWins += 1
@@ -198,7 +229,7 @@ export function loadPendingSummary(): PendingSummary | null {
   try {
     const data = JSON.parse(raw) as PendingSummary
     if (!data || typeof data.startedAt !== 'number') return null
-    return data
+    return { ...data, stats: parseStats(JSON.stringify(data.stats ?? {})) }
   } catch {
     return null
   }

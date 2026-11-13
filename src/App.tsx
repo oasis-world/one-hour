@@ -59,6 +59,7 @@ import { createPoll } from './lib/pollRemote'
 import { buildPollContent, durationMinutes, newPollId, type PollDraft } from './lib/pollTypes'
 import { clearLocalReactions, loadLocalReactions, pruneLocalReactions, removeLocalReaction, removeLocalReactionsForMessage, saveLocalReaction } from './lib/localReactions'
 import { adjustStarPoints, claimStarReward, readStarPoints, setStarPoints, subscribeStarPoints, syncStarPoints, transferStarPoints } from './lib/starPoints'
+import { buildPointGiftMessage } from './lib/pointGiftMessage'
 
 /**
  * 一小时 / one-hour — the ephemeral chat room. Every message, text or
@@ -159,13 +160,13 @@ export default function App() {
   const rewardMessage = (id: string | null, kind?: 'message' | 'photo'): number => {
     if (!id || !kind || !claimStarReward(kind, currentUserId)) return 0
     const points = kind === 'photo' ? Math.floor(Math.random() * 6) + 5 : Math.floor(Math.random() * 5) + 1
-    setStarScore(adjustStarPoints(points))
-    if (kind === 'photo') recordPhotoPoints(points)
-    else recordMessagePoints(points)
     setStarRewards((rewards) => [...rewards, { id, points, kind }])
     return points
   }
   const completeStarReward = useCallback((reward: StarReward) => {
+    setStarScore(adjustStarPoints(reward.points))
+    if (reward.kind === 'photo') recordPhotoPoints(reward.points)
+    else if (reward.kind === 'message') recordMessagePoints(reward.points)
     setStarRewards((rewards) => rewards.filter((item) => item.id !== reward.id))
   }, [])
 
@@ -222,6 +223,7 @@ export default function App() {
   // which re-opens the welcome gate.
   const expiringRef = useRef(false)
   const expireUserMessages = room.expireUserMessages
+  const sendRoomMessage = room.send
   const [pendingSummary, setPendingSummary] = useState<PendingSummary | null>(() => loadPendingSummary())
   useEffect(() => {
     if (!currentUserId) return
@@ -253,6 +255,13 @@ export default function App() {
         void transferStarPoints(`hour-end:${currentUserId}:${exp}:${gift.userId}`, gift.userId, gift.points)
       })
       if (currentUserId) expireUserMessages(currentUserId)
+      let giftNoticesSent = 0
+      gifts.forEach((gift) => {
+        const recipient = eligible.find((member) => member.userId === gift.userId)
+        if (currentUserId) recordInteraction(gift.userId, gift.name, currentUserId)
+        if (sendRoomMessage(buildPointGiftMessage(gift.name, gift.points, recipient?.lang), undefined, null)) giftNoticesSent += 1
+      })
+      if (giftNoticesSent) setSentMessageSequence((sequence) => sequence + giftNoticesSent)
       clearCompanionProfile()
       void clearCompanionMessages()
       void clearLocalReactions()
@@ -272,7 +281,7 @@ export default function App() {
     check()
     const id = window.setInterval(check, 1000)
     return () => window.clearInterval(id)
-  }, [currentUserId, expireUserMessages, pendingSummary, profile, room.presence])
+  }, [currentUserId, expireUserMessages, sendRoomMessage, pendingSummary, profile, room.presence])
 
   const systemTheme = (): ThemeName => {
     try {
@@ -733,6 +742,25 @@ export default function App() {
     all.sort((a, b) => a.at - b.at || a.id.localeCompare(b.id))
     return all
   }, [room.entries, privateChatEntries])
+  const observedInteractionEntriesRef = useRef(new Set<string>())
+  useEffect(() => {
+    const selfId = currentUserId
+    if (!selfId || !profile) return
+    const profileStartedAt = Math.max(0, (getProfileExpiresAt() ?? Date.now()) - 60 * 60 * 1000)
+    for (const entry of room.entries) {
+      const key = `${selfId}:${entry.id}`
+      if (observedInteractionEntriesRef.current.has(key)) continue
+      observedInteractionEntriesRef.current.add(key)
+      if (entry.userId === selfId || entry.at < profileStartedAt) continue
+      const isWhisperToSelf = entry.whisperTo === selfId
+      const repliedToSelf = entry.replyTo?.userId === selfId
+      const mentionedSelf = Boolean(profile?.nickname && entry.content.includes(`@${profile.nickname}`))
+      const giftToSelf = Boolean(profile?.nickname && entry.content.startsWith('🎁 @') && mentionedSelf)
+      if (isWhisperToSelf || repliedToSelf || mentionedSelf || giftToSelf) {
+        recordInteraction(entry.userId, entry.displayName, selfId)
+      }
+    }
+  }, [currentUserId, profile?.nickname, room.entries])
   // Merge local reactions (IndexedDB) with cloud reactions for display
   const mergedReactions = useMemo(() => {
     const selfId = room.identity?.userId ?? null

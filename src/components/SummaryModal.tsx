@@ -59,7 +59,9 @@ export default function SummaryModal({ stats, presence, selfId, profile, pointsB
       .map((member) => [member.userId, member]),
   )
   const interactions = Object.entries(stats.interactions).filter(([id]) => liveMembers.has(id))
-  const gamesPlayed = stats.gomokuPlayed + stats.xiangqiPlayed + stats.chessPlayed
+  const gamesPlayed = typeof stats.gamesPlayed === 'number'
+    ? stats.gamesPlayed
+    : stats.gomokuPlayed + stats.xiangqiPlayed + stats.chessPlayed + (stats.slotSpins ?? 0)
   const pointText = (points: number) => `${points > 0 ? '+' : ''}${points}`
 
   return (
@@ -113,9 +115,8 @@ export default function SummaryModal({ stats, presence, selfId, profile, pointsB
               {interactions.map(([id, name]) => {
                 const member = liveMembers.get(id)
                 if (!member) return null
-                return <button key={id} type="button" className="summary-interaction-name" onClick={() => setSelected({ userId: id, name: member.displayName || name, member })}>
-                  {member.displayName || name}
-                </button>
+                const displayName = member.displayName || name
+                return <button key={id} type="button" className="summary-interaction-name" onClick={() => setSelected({ userId: id, name: displayName, member })}>{displayName}</button>
               })}
             </div> : <div className="summary-interaction-empty">{copy.noInteractions}</div>}
           </div>

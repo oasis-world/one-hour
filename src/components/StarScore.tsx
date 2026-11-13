@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLang, type Lang } from '../lib/i18n'
+import type { ChatEntry } from '../lib/chatTypes'
 
 const COPY: Record<Lang, { label: string; title: string }> = {
   zh: { label: '星星积分', title: '发送消息、照片或玩游戏可获得积分' },
@@ -32,6 +33,7 @@ export function StarPointsCount({ score, className = '', label }: { score: numbe
 interface Props {
   score: number
   rewards: StarReward[]
+  entries: ChatEntry[]
   onRewardComplete: (reward: StarReward) => void
 }
 
@@ -114,7 +116,7 @@ function makeFlight(source: HTMLElement, target: HTMLElement, finish: () => void
   }
 }
 
-export default function StarScore({ score, rewards, onRewardComplete }: Props) {
+export default function StarScore({ score, rewards, entries, onRewardComplete }: Props) {
   const lang = useLang()
   const copy = COPY[lang]
   const badgeRef = useRef<HTMLDivElement>(null)
@@ -124,14 +126,15 @@ export default function StarScore({ score, rewards, onRewardComplete }: Props) {
   const completedBonusesRef = useRef(new Set<string>())
   const [pulsing, setPulsing] = useState(false)
   const [bonuses, setBonuses] = useState<StarReward[]>([])
-  const [delta, setDelta] = useState<number | null>(null)
+  const [scoreChange, setScoreChange] = useState<{ id: number; delta: number } | null>(null)
+  const scoreChangeId = useRef(0)
 
   useEffect(() => {
     const onDelta = (event: Event) => {
       const value = (event as CustomEvent<{ delta?: number }>).detail?.delta
       if (!value) return
-      setDelta(value)
-      window.setTimeout(() => setDelta(null), 1000)
+      scoreChangeId.current += 1
+      setScoreChange({ id: scoreChangeId.current, delta: value })
     }
     window.addEventListener('one-hour:star-points-delta', onDelta)
     return () => window.removeEventListener('one-hour:star-points-delta', onDelta)
@@ -145,7 +148,7 @@ export default function StarScore({ score, rewards, onRewardComplete }: Props) {
     const badge = badgeRef.current
     if (!badge) return
     for (const reward of rewards) {
-      if (completedRef.current.has(reward.id)) continue
+      if (completedRef.current.has(reward.id) || flightsRef.current.has(reward.id)) continue
       const row = document.getElementById(`msg-${reward.id}`)
       const source = row?.querySelector('.msg-author-avatar-trigger')
       if (!(source instanceof HTMLElement)) continue
@@ -157,7 +160,15 @@ export default function StarScore({ score, rewards, onRewardComplete }: Props) {
       const cancel = makeFlight(source, badge, complete)
       flightsRef.current.set(reward.id, cancel)
     }
-  }, [rewards])
+    const fallback = window.setTimeout(() => {
+      for (const reward of rewards) {
+        if (completedRef.current.has(reward.id) || flightsRef.current.has(reward.id)) continue
+        completedRef.current.add(reward.id)
+        setBonuses((items) => [...items, reward])
+      }
+    }, 1200)
+    return () => window.clearTimeout(fallback)
+  }, [entries, rewards])
 
   const finishBonus = useCallback((reward: StarReward) => {
     if (completedBonusesRef.current.has(reward.id)) return
@@ -176,6 +187,15 @@ export default function StarScore({ score, rewards, onRewardComplete }: Props) {
     return () => window.clearTimeout(timer)
   }, [bonuses, finishBonus])
 
+  useEffect(() => {
+    if (!scoreChange) return
+    const { id } = scoreChange
+    const timer = window.setTimeout(() => {
+      setScoreChange((current) => current?.id === id ? null : current)
+    }, 1200)
+    return () => window.clearTimeout(timer)
+  }, [scoreChange])
+
   useEffect(() => () => {
     flightsRef.current.forEach((cancel) => cancel())
     flightsRef.current.clear()
@@ -190,7 +210,12 @@ export default function StarScore({ score, rewards, onRewardComplete }: Props) {
       title={copy.title}
     >
       <StarPointsCount score={score} />
-      {delta !== null && <span className={`star-score-change${delta < 0 ? ' is-loss' : ''}`} aria-hidden="true">{delta > 0 ? '+' : ''}{delta}</span>}
+      {scoreChange && <span
+        key={scoreChange.id}
+        className={`star-score-bonus${scoreChange.delta < 0 ? ' is-loss' : ''}`}
+        aria-hidden="true"
+        onAnimationEnd={() => setScoreChange((current) => current?.id === scoreChange.id ? null : current)}
+      >{scoreChange.delta > 0 ? '+' : ''}{scoreChange.delta}</span>}
       {bonuses.map((reward) => (
         <span
           key={reward.id}

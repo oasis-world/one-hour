@@ -257,7 +257,7 @@ export default function MessageList({
   return (
     <div className="chat-log-wrap">
       <div className="chat-list-backdrop" aria-hidden="true" />
-      <StarScore score={starScore} rewards={starRewards} onRewardComplete={onStarRewardComplete} />
+      <StarScore score={starScore} rewards={starRewards} entries={entries} onRewardComplete={onStarRewardComplete} />
       <div
         className="chat-log"
         ref={logRef}

@@ -4,7 +4,7 @@ import type { GameComponentProps } from '../types'
 import { t, useLang } from '../../lib/i18n'
 import { setPopoverOpen, suppressNextClick } from '../../lib/popoverGuard'
 import { adjustStarPoints, readStarPoints, subscribeStarPoints } from '../../lib/starPoints'
-import { recordGamePoints } from '../../lib/lifetimeStats'
+import { recordGamePlayed, recordGamePoints } from '../../lib/lifetimeStats'
 import { PAYLINES, PAYOUTS, randomGrid, readSave, scoreGrid, SYMBOLS, type ReelGrid, type SlotSave, type SymbolId } from './model'
 import SlotBetSelector from './SlotBetSelector'
 import { slotText as s } from './slotText'
@@ -14,7 +14,7 @@ const STORAGE = (id: string) => `slot-machine:${id}`
 const ART: Record<SymbolId, string> = { cherry: '🍒', lemon: '🍋', orange: '🍊', grapes: '🍇', bell: '🔔', star: '⭐', diamond: '💎', wild: '' }
 const SEVEN_IMAGE = '/games/slot-machine/lucky-seven.png'
 const WIN_SOUND = '/games/slot-machine/magical-coin-win.mp3'
-const SPIN_SYMBOLS: SymbolId[] = ['cherry', 'bell', 'lemon', 'star', 'orange', 'wild']
+const SPIN_SYMBOLS: SymbolId[] = ['cherry', 'lemon', 'orange', 'grapes', 'bell', 'star', 'diamond', 'wild']
 interface SpinResult { payout: number; net: number; wager: number }
 let soundContext: AudioContext | null = null
 const LABELS: Record<SymbolId, [string, string]> = {
@@ -149,7 +149,7 @@ export default function SlotMachine({ instanceId }: GameComponentProps) {
     const totalWager = save.bet * PAYLINES.length
     if (rollingRef.current.some(Boolean) || balance < totalWager) return
     const outcome = randomGrid(), bet = save.bet
-    adjustStarPoints(-totalWager, true)
+    recordGamePlayed('slot-machine', `${instanceId}:${save.spins + 1}`)
     setSave((current) => ({ ...current, spins: current.spins + 1 }))
     setLastWin(0); setWins([]); setToast(null)
     if (toastTimer.current !== null) window.clearTimeout(toastTimer.current)
@@ -163,12 +163,12 @@ export default function SlotMachine({ instanceId }: GameComponentProps) {
       if (index === 4) {
         const score = scoreGrid(outcome, bet)
         setWins(score.wins.flatMap((win) => win.cells)); setLastWin(score.payout)
-        if (score.payout) adjustStarPoints(score.payout, true)
-        recordGamePoints(score.payout - totalWager)
-        setSave((current) => ({ ...current, bestWin: Math.max(current.bestWin, score.payout) }))
         const net = score.payout - totalWager
+        if (net) adjustStarPoints(net, true)
+        recordGamePoints(net)
+        setSave((current) => ({ ...current, bestWin: Math.max(current.bestWin, score.payout) }))
         setToast({ payout: score.payout, net, wager: totalWager })
-        toastTimer.current = window.setTimeout(() => setToast(null), 5000)
+        toastTimer.current = window.setTimeout(() => setToast(null), 3500)
         if (net > 0) {
           try { navigator.vibrate?.([24, 30, 55]) } catch { /* Haptics are optional. */ }
         }
@@ -193,7 +193,7 @@ export default function SlotMachine({ instanceId }: GameComponentProps) {
           {helpOpen && createPortal(<div className="slot-help-backdrop" role="presentation">
             <section ref={helpPanelRef} className="slot-help-modal" dir={lang === 'ar' ? 'rtl' : 'ltr'} role="dialog" aria-modal="true" aria-label={s('游戏说明', 'How to play')} onClick={(event) => event.stopPropagation()}>
               <header><strong>{s('游戏说明', 'How to play')}</strong><button type="button" aria-label={t('关闭', 'Close')} onClick={() => setHelpOpen(false)}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg></button></header>
-              <p>{s('5 条固定赔付线 · 从左至右连线获胜', '5 fixed paylines · wins pay left to right')}</p>
+               <p>{s('5 条固定赔付线 · 任意位置连续 3 个及以上相同符号即可中奖', '5 fixed paylines · 3+ matching symbols in a row win anywhere')}</p>
               <p>{s('每条赔付线都使用完整下注', 'Bet applies to each of the 5 lines')}</p>
               <p>{s('百搭可代替任何符号', 'Wild substitutes for any symbol')}</p>
               <p className="slot-free-note">ⓘ {s('消耗星星积分 · 不涉及真钱', 'Uses your star points · no real money')}</p>
