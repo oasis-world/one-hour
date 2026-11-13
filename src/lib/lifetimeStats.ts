@@ -7,6 +7,10 @@ const VAULT_PENDING_KEY = 'one-hour-pending-summary-v'
 
 export interface LifetimeStats {
   messagesSent: number
+  photosSent: number
+  messagePoints: number
+  photoPoints: number
+  gamePoints: number
   gomokuPlayed: number
   xiangqiPlayed: number
   chessPlayed: number
@@ -25,10 +29,17 @@ export interface PendingSummary {
   stats: LifetimeStats
   profileExpiresAt: number | null
   startedAt: number
+  profile?: { nickname: string; style: string; seed: string; avatarUrl?: string | null }
+  pointsBalance?: number
+  gifts?: { userId: string; name: string; points: number }[]
 }
 
 const EMPTY_STATS: LifetimeStats = {
   messagesSent: 0,
+  photosSent: 0,
+  messagePoints: 0,
+  photoPoints: 0,
+  gamePoints: 0,
   gomokuPlayed: 0,
   xiangqiPlayed: 0,
   chessPlayed: 0,
@@ -73,6 +84,10 @@ function parseStats(raw: string | null): LifetimeStats {
     const data = JSON.parse(raw) as Partial<LifetimeStats>
     return {
       messagesSent: typeof data.messagesSent === 'number' ? data.messagesSent : 0,
+      photosSent: typeof data.photosSent === 'number' ? data.photosSent : 0,
+      messagePoints: typeof data.messagePoints === 'number' ? data.messagePoints : 0,
+      photoPoints: typeof data.photoPoints === 'number' ? data.photoPoints : 0,
+      gamePoints: typeof data.gamePoints === 'number' ? data.gamePoints : 0,
       gomokuPlayed: typeof data.gomokuPlayed === 'number' ? data.gomokuPlayed : 0,
       xiangqiPlayed: typeof data.xiangqiPlayed === 'number' ? data.xiangqiPlayed : 0,
       chessPlayed: typeof data.chessPlayed === 'number' ? data.chessPlayed : 0,
@@ -115,6 +130,30 @@ export function resetStats(): void {
 export function recordMessageSent(): void {
   const stats = loadStats()
   stats.messagesSent += 1
+  saveStats(stats)
+}
+
+export function recordPhotoCount(): void {
+  const stats = loadStats()
+  stats.photosSent += 1
+  saveStats(stats)
+}
+
+export function recordPhotoPoints(points: number): void {
+  const stats = loadStats()
+  stats.photoPoints += points
+  saveStats(stats)
+}
+
+export function recordMessagePoints(points: number): void {
+  const stats = loadStats()
+  stats.messagePoints += points
+  saveStats(stats)
+}
+
+export function recordGamePoints(points: number): void {
+  const stats = loadStats()
+  stats.gamePoints += points
   saveStats(stats)
 }
 

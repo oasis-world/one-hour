@@ -16,6 +16,7 @@
 @media(max-width:360px){.slot-reel{grid-template-rows:repeat(3,minmax(36px,1fr))}.slot-symbol{font-size:27px}.slot-stats{gap:8px}.slot-stats>div:not(.slot-stat-sep){min-width:80px}.slot-pay-head,.slot-pay-row{grid-template-columns:1.1fr repeat(3,.72fr);gap:1px}.slot-pay-row{font-size:8px}}
 @keyframes slot-roll{0%{transform:translateY(-8px) scale(.9)}50%{transform:translateY(8px) scale(1.08)}100%{transform:translateY(-8px) scale(.9)}}@keyframes slot-turn{to{transform:rotate(360deg)}}@keyframes slot-hit{to{filter:brightness(1.12)}}@keyframes slot-glint{50%{opacity:.45;transform:scale(.8)}}
 @media(prefers-reduced-motion:reduce){.slot-card *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+.slot-refill-note{margin:12px auto 0;color:var(--slot-muted);font-size:11px;font-weight:700;line-height:1.5;text-align:center}
 
 /* Compact cabinet layout, matching the chess card's desktop footprint. */
 .slot-card{max-width:440px;overflow:visible;padding:12px 13px 10px;border-radius:19px}

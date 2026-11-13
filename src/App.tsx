@@ -35,6 +35,9 @@ import {
   clearPendingSummary,
   loadStats,
   recordMessageSent,
+  recordMessagePoints,
+  recordPhotoCount,
+  recordPhotoPoints,
   recordInteraction,
   resetStats,
   type PendingSummary,
@@ -55,6 +58,7 @@ import { applyRoomReactionChange, recordEmojiUse, summarizeRoomReactions, type R
 import { createPoll } from './lib/pollRemote'
 import { buildPollContent, durationMinutes, newPollId, type PollDraft } from './lib/pollTypes'
 import { clearLocalReactions, loadLocalReactions, pruneLocalReactions, removeLocalReaction, removeLocalReactionsForMessage, saveLocalReaction } from './lib/localReactions'
+import { adjustStarPoints, claimStarReward, readStarPoints, setStarPoints, subscribeStarPoints, syncStarPoints, transferStarPoints } from './lib/starPoints'
 
 /**
  * 一小时 / one-hour — the ephemeral chat room. Every message, text or
@@ -72,10 +76,22 @@ type FoldState = 'open' | 'folding' | 'folded' | 'unfolding'
 const FOLD_MS = 500
 const UNFOLD_MS = 540
 
+function distributePoints(balance: number, candidates: { userId: string; displayName: string }[]) {
+  const shuffled = [...candidates].sort(() => Math.random() - 0.5).slice(0, Math.min(3, balance))
+  let remaining = balance
+  return shuffled.map((member, index) => {
+    const placesLeft = shuffled.length - index - 1
+    const points = placesLeft === 0 ? remaining : 1 + Math.floor(Math.random() * (remaining - placesLeft))
+    remaining -= points
+    return { userId: member.userId, name: member.displayName, points }
+  })
+}
+
 export default function App() {
   const account = useAccount()
   const profile = useUserProfile()
   const room = useChatRoom(true)
+  const currentUserId = room.identity?.userId
 
   // Backfill an expiry for profiles created before the lifetime rule existed.
   useEffect(() => {
@@ -128,13 +144,9 @@ export default function App() {
   const [replyTo, setReplyTo] = useState<MessageReply | null>(null)
   const [editingMessage, setEditingMessage] = useState<ChatEntry | null>(null)
   const [sentMessageSequence, setSentMessageSequence] = useState(0)
-  const [starScore, setStarScore] = useState(() => {
-    try {
-      const stored = Number(localStorage.getItem('one-hour-star-score'))
-      return Number.isFinite(stored) && stored > 0 ? Math.floor(stored) : 0
-    } catch { return 0 }
-  })
+  const [starScore, setStarScore] = useState(readStarPoints)
   const [starRewards, setStarRewards] = useState<StarReward[]>([])
+  const [localReactionRows, setLocalReactionRows] = useState<RoomReactionRecord[]>([])
   const toastTimer = useRef<number | null>(null)
   const bgReadyRef = useRef(false)
   const revealTimer = useRef<number | null>(null)
@@ -144,18 +156,22 @@ export default function App() {
       the second call would clobber the first mid-flight (its inner timer
       escapes cancellation) and the unfold animation plays twice. */
   const revealActive = useRef(false)
-  const rewardMessage = (id: string | null) => {
-    if (!id) return
-    setStarRewards((rewards) => [...rewards, { id, points: Math.floor(Math.random() * 5) + 1 }])
+  const rewardMessage = (id: string | null, kind?: 'message' | 'photo'): number => {
+    if (!id || !kind || !claimStarReward(kind, currentUserId)) return 0
+    const points = kind === 'photo' ? Math.floor(Math.random() * 6) + 5 : Math.floor(Math.random() * 5) + 1
+    setStarScore(adjustStarPoints(points))
+    if (kind === 'photo') recordPhotoPoints(points)
+    else recordMessagePoints(points)
+    setStarRewards((rewards) => [...rewards, { id, points, kind }])
+    return points
   }
   const completeStarReward = useCallback((reward: StarReward) => {
-    setStarScore((score) => score + reward.points)
     setStarRewards((rewards) => rewards.filter((item) => item.id !== reward.id))
   }, [])
 
   useEffect(() => {
-    try { localStorage.setItem('one-hour-star-score', String(starScore)) } catch { /* Storage is optional. */ }
-  }, [starScore])
+    return subscribeStarPoints(setStarScore)
+  }, [])
   const cancelRevealTimers = useCallback(() => {
     if (revealTimer.current) {
       window.clearTimeout(revealTimer.current)
@@ -205,9 +221,18 @@ export default function App() {
   // purge the profile (local + cloud) and recreate the anonymous session,
   // which re-opens the welcome gate.
   const expiringRef = useRef(false)
-  const currentUserId = room.identity?.userId
   const expireUserMessages = room.expireUserMessages
   const [pendingSummary, setPendingSummary] = useState<PendingSummary | null>(() => loadPendingSummary())
+  useEffect(() => {
+    if (!currentUserId) return
+    let live = true
+    let dispose: () => void = () => undefined
+    void syncStarPoints(currentUserId).then((cleanup) => {
+      if (live) dispose = cleanup
+      else cleanup()
+    })
+    return () => { live = false; dispose() }
+  }, [currentUserId])
   useEffect(() => {
     const check = () => {
       // Already in summary window: nothing to do.
@@ -219,6 +244,14 @@ export default function App() {
       if (!exp || expiringRef.current) return
       if (Date.now() < exp) return
       expiringRef.current = true
+      const balance = readStarPoints()
+      const eligible = room.presence.filter((member) => member.userId !== currentUserId && (!member.profileExpiresAt || member.profileExpiresAt > Date.now()))
+      const gifts = distributePoints(balance, eligible)
+      setStarPoints(0)
+      if (gifts.length === 0 && balance > 0 && eligible.length === 0) adjustStarPoints(-balance)
+      gifts.forEach((gift) => {
+        void transferStarPoints(`hour-end:${currentUserId}:${exp}:${gift.userId}`, gift.userId, gift.points)
+      })
       if (currentUserId) expireUserMessages(currentUserId)
       clearCompanionProfile()
       void clearCompanionMessages()
@@ -228,6 +261,9 @@ export default function App() {
         stats: loadStats(),
         profileExpiresAt: exp,
         startedAt: Date.now(),
+        profile: profile ? { nickname: profile.nickname, style: profile.style, seed: profile.seed, avatarUrl: profile.avatarUrl ?? null } : undefined,
+        pointsBalance: balance,
+        gifts,
       }
       savePendingSummary(summary)
       setPendingSummary(summary)
@@ -236,7 +272,7 @@ export default function App() {
     check()
     const id = window.setInterval(check, 1000)
     return () => window.clearInterval(id)
-  }, [currentUserId, expireUserMessages, pendingSummary])
+  }, [currentUserId, expireUserMessages, pendingSummary, profile, room.presence])
 
   const systemTheme = (): ThemeName => {
     try {
@@ -362,7 +398,6 @@ export default function App() {
   }, [room.identity, companion, enterPrivateChat])
   const consumeInsert = useCallback(() => setPendingInsertName(null), [])
   // Reactions for local messages (companion chats + MUD card) — persisted in IndexedDB
-  const [localReactionRows, setLocalReactionRows] = useState<RoomReactionRecord[]>([])
   useEffect(() => subscribeCompanion(setCompanion), [])
   useEffect(() => {
     const tick = () => { const alive = getCompanionIfAlive(); setCompanion((prev) => (prev?.id !== alive?.id || prev?.expiresAt !== alive?.expiresAt ? alive : prev)) }
@@ -450,6 +485,7 @@ export default function App() {
     setLocalReactionRows([])
     setCompanion(null)
     resetStats()
+    setStarPoints(100)
     clearPendingSummary()
     setPendingSummary(null)
     expiringRef.current = false
@@ -482,8 +518,7 @@ export default function App() {
     if (!room.identity || !companion) return
     const instanceId = (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2))
     const title = gameTitle(gameId, t)
-    rewardMessage(room.send(`🎮 ${title}\n__GAME__:${gameId}:${instanceId}`, undefined, null))
-    recordMessageSent()
+    room.send(`🎮 ${title}\n__GAME__:${gameId}:${instanceId}`, undefined, null)
     setSentMessageSequence((s) => s + 1)
     // Create game state with companion already joined; host is current user
     try {
@@ -519,7 +554,8 @@ export default function App() {
   const handleSend = (text: string, reply?: MessageReply | null) => {
     // Whisper takes precedence: explicit pending target from @ selection
     if (pendingWhisper && text.includes(`@${pendingWhisper.displayName}`)) {
-      rewardMessage(room.send(text, undefined, reply, { whisperTo: pendingWhisper.userId, whisperToName: pendingWhisper.displayName }))
+      const id = room.send(text, undefined, reply, { whisperTo: pendingWhisper.userId, whisperToName: pendingWhisper.displayName })
+      rewardMessage(id, 'message')
       recordMessageSent()
       if (pendingWhisper.userId !== (room.identity?.userId ?? null)) {
         recordInteraction(pendingWhisper.userId, pendingWhisper.displayName, room.identity?.userId ?? undefined)
@@ -538,7 +574,8 @@ export default function App() {
         if (after) {
           const hit = room.presence.find((m) => m.displayName === after && m.userId !== room.identity?.userId)
           if (hit && text.includes(`@${hit.displayName}`)) {
-            rewardMessage(room.send(text, undefined, reply, { whisperTo: hit.userId, whisperToName: hit.displayName }))
+            const id = room.send(text, undefined, reply, { whisperTo: hit.userId, whisperToName: hit.displayName })
+            rewardMessage(id, 'message')
             recordMessageSent()
             recordInteraction(hit.userId, hit.displayName, room.identity?.userId ?? undefined)
             setSentMessageSequence((sequence) => sequence + 1)
@@ -556,7 +593,7 @@ export default function App() {
       void sendPrivateAndReply(text)
       return
     }
-    rewardMessage(room.send(text, undefined, reply))
+    rewardMessage(room.send(text, undefined, reply), 'message')
     recordMessageSent()
     if (reply?.userId && reply.userId !== (room.identity?.userId ?? null)) {
       recordInteraction(reply.userId, reply.displayName, room.identity?.userId ?? undefined)
@@ -569,8 +606,7 @@ export default function App() {
     const instanceId = (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2))
     const game = getGameById(gameId)
     const title = game ? t(game.name, game.nameEn) : gameId
-    rewardMessage(room.send(`🎮 ${title}\n__GAME__:${gameId}:${instanceId}`, undefined, replyTo))
-    recordMessageSent()
+    room.send(`🎮 ${title}\n__GAME__:${gameId}:${instanceId}`, undefined, replyTo)
     setSentMessageSequence((sequence) => sequence + 1)
     setReplyTo(null)
   }
@@ -601,8 +637,7 @@ export default function App() {
       )
       return false
     }
-    rewardMessage(room.send(buildPollContent(draft.question, pollId), undefined, replyTo, { expiresAt }))
-    recordMessageSent()
+    room.send(buildPollContent(draft.question, pollId), undefined, replyTo, { expiresAt })
     setSentMessageSequence((sequence) => sequence + 1)
     setReplyTo(null)
     return true
@@ -617,8 +652,9 @@ export default function App() {
       const blob = await withTimeout(fileToChatImage(file), 60_000)
       const whisperOpt = pendingWhisper ? { whisperTo: pendingWhisper.userId, whisperToName: pendingWhisper.displayName } : undefined
       if (whisperOpt) setPendingWhisper(null)
-      rewardMessage(room.send('', blob, replyTo, whisperOpt))
-      recordMessageSent()
+      const id = room.send('', blob, replyTo, whisperOpt)
+      rewardMessage(id, 'photo')
+      recordPhotoCount()
       setSentMessageSequence((sequence) => sequence + 1)
       setReplyTo(null)
     } catch {
@@ -648,8 +684,9 @@ export default function App() {
       try {
         const blob = await withTimeout(fileToChatImage(file), 60_000)
         const whisperOpt = pendingWhisper ? { whisperTo: pendingWhisper.userId, whisperToName: pendingWhisper.displayName } : undefined
-        rewardMessage(room.send('', blob, replyForNext, whisperOpt))
-        recordMessageSent()
+        const id = room.send('', blob, replyForNext, whisperOpt)
+        rewardMessage(id, 'photo')
+        recordPhotoCount()
         setSentMessageSequence((sequence) => sequence + 1)
         if (replyForNext) {
           replyForNext = null
@@ -1039,7 +1076,9 @@ export default function App() {
           stats={pendingSummary.stats}
           presence={room.presence}
           selfId={room.identity?.userId ?? null}
-          startedAt={pendingSummary.startedAt}
+          profile={pendingSummary.profile}
+          pointsBalance={pendingSummary.pointsBalance ?? 0}
+          gifts={pendingSummary.gifts ?? []}
           onComplete={handleSummaryComplete}
           onFarewell={(userId, name, expiresAt, sentence) => {
             void userId

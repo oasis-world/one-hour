@@ -559,6 +559,96 @@ create trigger delete_profile_messages
   after delete on public.profiles
   for each row execute function public.delete_profile_messages();
 
+-- ── Star points ─────────────────────────────────────────────────────────────
+-- The balance is separate from the expiring profile so a recipient keeps
+-- gifted points even after the giver's one-hour profile is removed.
+
+create table if not exists public.star_points (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  balance integer not null default 100 check (balance >= 0),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.star_point_transfers (
+  sender_id uuid not null references auth.users (id) on delete cascade,
+  transfer_id text not null,
+  recipient_id uuid not null references auth.users (id) on delete cascade,
+  amount integer not null check (amount > 0),
+  created_at timestamptz not null default now(),
+  primary key (sender_id, transfer_id),
+  check (sender_id <> recipient_id)
+);
+
+alter table public.star_points enable row level security;
+drop policy if exists "players may read their own star points" on public.star_points;
+create policy "players may read their own star points" on public.star_points
+  for select using (auth.uid() = user_id);
+grant select on public.star_points to authenticated;
+revoke insert, update, delete on public.star_points from authenticated;
+revoke all on public.star_point_transfers from anon, authenticated;
+
+create or replace function public.ensure_star_points()
+returns integer language plpgsql security definer set search_path = public
+as $$
+declare uid uuid := auth.uid(); result integer;
+begin
+  if uid is null then raise exception 'authentication required'; end if;
+  insert into public.star_points (user_id) values (uid) on conflict (user_id) do nothing;
+  select balance into result from public.star_points where user_id = uid;
+  return result;
+end;
+$$;
+
+create or replace function public.change_star_points(p_delta integer)
+returns integer language plpgsql security definer set search_path = public
+as $$
+declare uid uuid := auth.uid(); result integer;
+begin
+  if uid is null then raise exception 'authentication required'; end if;
+  if p_delta is null or abs(p_delta) > 1000000 then raise exception 'invalid point change'; end if;
+  insert into public.star_points (user_id) values (uid) on conflict (user_id) do nothing;
+  update public.star_points set balance = balance + p_delta, updated_at = now()
+    where user_id = uid and balance + p_delta >= 0 returning balance into result;
+  if result is null then raise exception 'insufficient star points'; end if;
+  return result;
+end;
+$$;
+
+create or replace function public.transfer_star_points(p_transfer_id text, p_recipient uuid, p_amount integer)
+returns boolean language plpgsql security definer set search_path = public
+as $$
+declare uid uuid := auth.uid(); sender_balance integer;
+begin
+  if uid is null then raise exception 'authentication required'; end if;
+  if p_recipient is null or p_recipient = uid or p_amount is null or p_amount <= 0
+    or char_length(p_transfer_id) not between 1 and 160 then raise exception 'invalid point transfer'; end if;
+  insert into public.star_points (user_id) values (uid) on conflict (user_id) do nothing;
+  insert into public.star_points (user_id) values (p_recipient) on conflict (user_id) do nothing;
+  perform 1 from public.star_points where user_id in (uid, p_recipient) order by user_id for update;
+  insert into public.star_point_transfers (sender_id, transfer_id, recipient_id, amount)
+    values (uid, p_transfer_id, p_recipient, p_amount) on conflict (sender_id, transfer_id) do nothing;
+  if not found then return true; end if;
+  update public.star_points set balance = balance - p_amount, updated_at = now()
+    where user_id = uid and balance >= p_amount returning balance into sender_balance;
+  if sender_balance is null then raise exception 'insufficient star points'; end if;
+  update public.star_points set balance = balance + p_amount, updated_at = now() where user_id = p_recipient;
+  return true;
+end;
+$$;
+
+revoke all on function public.ensure_star_points() from public, anon;
+revoke all on function public.change_star_points(integer) from public, anon;
+revoke all on function public.transfer_star_points(text, uuid, integer) from public, anon;
+grant execute on function public.ensure_star_points() to authenticated;
+grant execute on function public.change_star_points(integer) to authenticated;
+grant execute on function public.transfer_star_points(text, uuid, integer) to authenticated;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.star_points;
+exception when duplicate_object then null;
+end $$;
+
 -- ── Scheduled bucket sweep (Edge Function) ─────────────────────────────────
 --
 -- Photos of vanished authors are swept by the Edge Function

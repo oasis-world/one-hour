@@ -3,7 +3,9 @@ import { createPortal } from 'react-dom'
 import type { GameComponentProps } from '../types'
 import { t, useLang } from '../../lib/i18n'
 import { setPopoverOpen, suppressNextClick } from '../../lib/popoverGuard'
-import { DEFAULT_SAVE, PAYLINES, PAYOUTS, randomGrid, readSave, scoreGrid, SYMBOLS, type ReelGrid, type SlotSave, type SymbolId } from './model'
+import { adjustStarPoints, readStarPoints, subscribeStarPoints } from '../../lib/starPoints'
+import { recordGamePoints } from '../../lib/lifetimeStats'
+import { PAYLINES, PAYOUTS, randomGrid, readSave, scoreGrid, SYMBOLS, type ReelGrid, type SlotSave, type SymbolId } from './model'
 import SlotBetSelector from './SlotBetSelector'
 import { slotText as s } from './slotText'
 import './SlotMachine.css'
@@ -102,6 +104,7 @@ function SymbolArt({ symbol, className }: { symbol: SymbolId; className: string 
 export default function SlotMachine({ instanceId }: GameComponentProps) {
   const lang = useLang()
   const [save, setSave] = useState<SlotSave>(() => readSave(STORAGE(instanceId)))
+  const [balance, setBalance] = useState(readStarPoints)
   const [reels, setReels] = useState<ReelGrid>(() => randomGrid())
   const [rolling, setRolling] = useState([false, false, false, false, false])
   const [wins, setWins] = useState<number[]>([])
@@ -118,6 +121,7 @@ export default function SlotMachine({ instanceId }: GameComponentProps) {
   useEffect(() => {
     try { localStorage.setItem(STORAGE(instanceId), JSON.stringify(save)) } catch { /* Storage may be unavailable. */ }
   }, [instanceId, save])
+  useEffect(() => subscribeStarPoints(setBalance), [])
   useEffect(() => () => {
     timers.current.forEach(window.clearTimeout)
     if (toastTimer.current !== null) window.clearTimeout(toastTimer.current)
@@ -143,9 +147,10 @@ export default function SlotMachine({ instanceId }: GameComponentProps) {
 
   const spin = () => {
     const totalWager = save.bet * PAYLINES.length
-    if (rollingRef.current.some(Boolean) || save.credits < totalWager) return
+    if (rollingRef.current.some(Boolean) || balance < totalWager) return
     const outcome = randomGrid(), bet = save.bet
-    setSave((current) => ({ ...current, credits: current.credits - totalWager, spins: current.spins + 1 }))
+    adjustStarPoints(-totalWager, true)
+    setSave((current) => ({ ...current, spins: current.spins + 1 }))
     setLastWin(0); setWins([]); setToast(null)
     if (toastTimer.current !== null) window.clearTimeout(toastTimer.current)
     rollingRef.current = [true, true, true, true, true]
@@ -158,7 +163,9 @@ export default function SlotMachine({ instanceId }: GameComponentProps) {
       if (index === 4) {
         const score = scoreGrid(outcome, bet)
         setWins(score.wins.flatMap((win) => win.cells)); setLastWin(score.payout)
-        setSave((current) => ({ ...current, credits: current.credits + score.payout, bestWin: Math.max(current.bestWin, score.payout) }))
+        if (score.payout) adjustStarPoints(score.payout, true)
+        recordGamePoints(score.payout - totalWager)
+        setSave((current) => ({ ...current, bestWin: Math.max(current.bestWin, score.payout) }))
         const net = score.payout - totalWager
         setToast({ payout: score.payout, net, wager: totalWager })
         toastTimer.current = window.setTimeout(() => setToast(null), 5000)
@@ -174,7 +181,6 @@ export default function SlotMachine({ instanceId }: GameComponentProps) {
 
   const busy = rolling.some(Boolean)
   const totalWager = save.bet * PAYLINES.length
-  const refill = () => setSave((current) => ({ ...current, credits: current.credits + DEFAULT_SAVE.credits }))
   const symbolName = (symbol: SymbolId) => s(...LABELS[symbol])
 
   return <section className={`slot-card${helpOpen ? ' has-help-open' : ''}`} dir={lang === 'ar' ? 'rtl' : 'ltr'} aria-label={s('老虎机游戏', 'Slot Machine')}>
@@ -190,7 +196,7 @@ export default function SlotMachine({ instanceId }: GameComponentProps) {
               <p>{s('5 条固定赔付线 · 从左至右连线获胜', '5 fixed paylines · wins pay left to right')}</p>
               <p>{s('每条赔付线都使用完整下注', 'Bet applies to each of the 5 lines')}</p>
               <p>{s('百搭可代替任何符号', 'Wild substitutes for any symbol')}</p>
-              <p className="slot-free-note">ⓘ {s('仅供娱乐的免费点数 · 不涉及真钱', 'Free play credits only · no real money')}</p>
+              <p className="slot-free-note">ⓘ {s('消耗星星积分 · 不涉及真钱', 'Uses your star points · no real money')}</p>
               <div className="slot-paytable">
                 <b>{s('赔付表', 'Pay table')}</b>
                 <div className="slot-pay-head"><span /><span>{s('连续 3 个', '3 in a row')}</span><span>{s('连续 4 个', '4 in a row')}</span><span>{s('连续 5 个', '5 in a row')}</span></div>
@@ -204,7 +210,7 @@ export default function SlotMachine({ instanceId }: GameComponentProps) {
     </header>
 
     <div className="slot-stats">
-      <div className="slot-stat"><small>{s('余额', 'BALANCE')}</small><strong>{save.credits.toLocaleString()}</strong></div>
+      <div className="slot-stat"><small>{s('余额', 'BALANCE')}</small><strong>{balance.toLocaleString()}</strong></div>
       <div className="slot-stat"><small>{s('上次赢得', 'LAST WIN')}</small><strong className={lastWin ? 'has-win' : ''}>{lastWin.toLocaleString()}</strong></div>
       <div className="slot-stat"><small>{s('旋转次数', 'Spins')}</small><strong>{save.spins}</strong></div>
       <div className="slot-stat"><small>{s('最高奖金', 'Best win')}</small><strong>{save.bestWin.toLocaleString()}</strong></div>
@@ -236,11 +242,11 @@ export default function SlotMachine({ instanceId }: GameComponentProps) {
 
     <div className="slot-controls">
       <SlotBetSelector id={`slot-bet-${instanceId}`} label={s('下注', 'Bet')} dir={lang === 'ar' ? 'rtl' : 'ltr'} value={save.bet} disabled={busy} onChange={(bet) => setSave((current) => ({ ...current, bet }))} />
-      <button type="button" className="slot-spin" onClick={spin} disabled={busy || save.credits < totalWager}>
+      <button type="button" className="slot-spin" onClick={spin} disabled={busy || balance < totalWager}>
         <span className={`slot-joystick${busy ? ' is-moving' : ''}`}><JoystickIcon /></span>{busy ? s('旋转中', 'SPINNING') : s('旋转', 'SPIN')}
       </button>
     </div>
 
-    {save.credits < totalWager && !busy && <button type="button" className="slot-refill" onClick={refill}>＋ {s('补充 500 点', 'Refill 500 credits')}</button>}
+    {balance < totalWager && !busy && <p className="slot-refill-note">{s('请发送消息、图片、玩其它游戏来赚取积分', 'Send messages, photos, or play other games to earn points')}</p>}
   </section>
 }

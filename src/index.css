@@ -758,6 +758,20 @@ button {
   letter-spacing: -.035em;
 }
 
+.star-score-change {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: -6px;
+  color: #168144;
+  font-size: 14px;
+  font-weight: 900;
+  text-shadow: 0 1px 4px #fff;
+  white-space: nowrap;
+  animation: star-score-change 1s ease-out both;
+}
+.star-score-change.is-loss { color: #c63838; }
+@keyframes star-score-change { 0% { opacity:0; transform:translateY(9px) scale(.85) } 18% { opacity:1; transform:translateY(0) scale(1.08) } 72% { opacity:1 } 100% { opacity:0; transform:translateY(-12px) } }
+
 .star-score.is-pulsing {
   animation: star-score-pop .5s cubic-bezier(.2, .9, .25, 1.25);
 }

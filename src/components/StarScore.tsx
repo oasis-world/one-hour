@@ -1,9 +1,23 @@
-import { useEffect, useRef, useState } from 'react'
-import { t } from '../lib/i18n'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLang, type Lang } from '../lib/i18n'
+
+const COPY: Record<Lang, { label: string; title: string }> = {
+  zh: { label: '星星积分', title: '发送消息、照片或玩游戏可获得积分' },
+  'zh-TW': { label: '星星積分', title: '傳送訊息、照片或玩遊戲可獲得積分' },
+  en: { label: 'Star points', title: 'Send messages, share photos, or play games to earn points' },
+  ja: { label: 'スター ポイント', title: 'メッセージや写真を送信したり、ゲームをプレイしたりしてポイントを獲得' },
+  fr: { label: 'Points étoile', title: 'Envoyez des messages ou des photos, ou jouez pour gagner des points' },
+  es: { label: 'Puntos estrella', title: 'Envía mensajes o fotos, o juega para ganar puntos' },
+  de: { label: 'Sternpunkte', title: 'Sende Nachrichten oder Fotos oder spiele, um Punkte zu verdienen' },
+  ko: { label: '별 포인트', title: '메시지나 사진을 보내거나 게임을 플레이해 포인트를 획득하세요' },
+  it: { label: 'Punti stella', title: 'Invia messaggi o foto, oppure gioca per guadagnare punti' },
+  ar: { label: 'نقاط النجوم', title: 'أرسل رسائل أو صورًا، أو العب ألعابًا لكسب النقاط' },
+}
 
 export interface StarReward {
   id: string
   points: number
+  kind?: 'message' | 'photo'
 }
 
 interface Props {
@@ -92,6 +106,8 @@ function makeFlight(source: HTMLElement, target: HTMLElement, finish: () => void
 }
 
 export default function StarScore({ score, rewards, onRewardComplete }: Props) {
+  const lang = useLang()
+  const copy = COPY[lang]
   const badgeRef = useRef<HTMLDivElement>(null)
   const completedRef = useRef(new Set<string>())
   const flightsRef = useRef(new Map<string, () => void>())
@@ -99,6 +115,18 @@ export default function StarScore({ score, rewards, onRewardComplete }: Props) {
   const completedBonusesRef = useRef(new Set<string>())
   const [pulsing, setPulsing] = useState(false)
   const [bonuses, setBonuses] = useState<StarReward[]>([])
+  const [delta, setDelta] = useState<number | null>(null)
+
+  useEffect(() => {
+    const onDelta = (event: Event) => {
+      const value = (event as CustomEvent<{ delta?: number }>).detail?.delta
+      if (!value) return
+      setDelta(value)
+      window.setTimeout(() => setDelta(null), 1000)
+    }
+    window.addEventListener('one-hour:star-points-delta', onDelta)
+    return () => window.removeEventListener('one-hour:star-points-delta', onDelta)
+  }, [])
 
   useEffect(() => {
     onCompleteRef.current = onRewardComplete
@@ -122,14 +150,22 @@ export default function StarScore({ score, rewards, onRewardComplete }: Props) {
     }
   }, [rewards])
 
-  const finishBonus = (reward: StarReward) => {
+  const finishBonus = useCallback((reward: StarReward) => {
     if (completedBonusesRef.current.has(reward.id)) return
     completedBonusesRef.current.add(reward.id)
     onCompleteRef.current(reward)
     setBonuses((items) => items.filter((item) => item.id !== reward.id))
     setPulsing(true)
     window.setTimeout(() => setPulsing(false), 520)
-  }
+  }, [])
+
+  // CSS animations may be disabled by reduced-motion preferences, in which
+  // case animationend never fires. Always release the visual reward either way.
+  useEffect(() => {
+    if (bonuses.length === 0) return
+    const timer = window.setTimeout(() => bonuses.forEach(finishBonus), 1200)
+    return () => window.clearTimeout(timer)
+  }, [bonuses, finishBonus])
 
   useEffect(() => () => {
     flightsRef.current.forEach((cancel) => cancel())
@@ -141,13 +177,14 @@ export default function StarScore({ score, rewards, onRewardComplete }: Props) {
       ref={badgeRef}
       className={`star-score${pulsing ? ' is-pulsing' : ''}`}
       role="status"
-      aria-label={t(`星星积分：${score}`, `Star points: ${score}`)}
-      title={t('发送消息获得星星积分', 'Send messages to earn star points')}
+      aria-label={`${copy.label}: ${score}`}
+      title={copy.title}
     >
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="m12 2.8 2.85 5.78 6.38.93-4.62 4.5 1.09 6.35L12 17.36l-5.7 3 1.09-6.35-4.62-4.5 6.38-.93L12 2.8Z" />
       </svg>
       <span className="star-score-value">{score.toLocaleString()}</span>
+      {delta !== null && <span className={`star-score-change${delta < 0 ? ' is-loss' : ''}`} aria-hidden="true">{delta > 0 ? '+' : ''}{delta}</span>}
       {bonuses.map((reward) => (
         <span
           key={reward.id}

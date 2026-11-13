@@ -48,16 +48,16 @@ export function scoreGrid(grid: ReelGrid, lineBet: number): SlotScore {
   return { payout: wins.reduce((sum, win) => sum + win.amount, 0), wins }
 }
 
-export interface SlotSave { credits: number; bet: number; spins: number; bestWin: number }
-export const DEFAULT_SAVE: SlotSave = { credits: 500, bet: 1, spins: 0, bestWin: 0 }
+export interface SlotSave { bet: number; spins: number; bestWin: number }
+export const DEFAULT_SAVE: SlotSave = { bet: 1, spins: 0, bestWin: 0 }
 
 export function readSave(key: string): SlotSave {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(key) ?? 'null')
     if (value && typeof value === 'object') {
       const save = value as Partial<SlotSave>
-      if (Number.isFinite(save.credits) && Number.isFinite(save.bet) && Number.isFinite(save.spins) && Number.isFinite(save.bestWin)) {
-        return { credits: Math.max(0, save.credits!), bet: [1, 2, 5, 10, 20].includes(save.bet!) ? save.bet! : 1, spins: Math.max(0, save.spins!), bestWin: Math.max(0, save.bestWin!) }
+      if (Number.isFinite(save.bet) && Number.isFinite(save.spins) && Number.isFinite(save.bestWin)) {
+        return { bet: [1, 2, 5, 10, 20].includes(save.bet!) ? save.bet! : 1, spins: Math.max(0, save.spins!), bestWin: Math.max(0, save.bestWin!) }
       }
     }
   } catch { /* Storage may be unavailable. */ }
