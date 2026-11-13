@@ -3097,4 +3097,9 @@ button {
   .msg-row:has(.slot-card) .msg-head { grid-column: 2; }
   .msg-row:has(.slot-card) .msg-body,
   .msg-row:has(.slot-card) .msg-reactions { grid-column: 1 / -1; }
+  .msg-row:has(.match3-card) { grid-template-columns: 39px minmax(0, 1fr); padding-inline: 8px; }
+  .msg-row:has(.match3-card) .msg-main { display: contents; }
+  .msg-row:has(.match3-card) .msg-head { grid-column: 2; }
+  .msg-row:has(.match3-card) .msg-body,
+  .msg-row:has(.match3-card) .msg-reactions { grid-column: 1 / -1; }
 }

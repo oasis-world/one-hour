@@ -9,6 +9,8 @@ import SolitaireIcon from './solitaire/SolitaireIcon'
 import SudokuIcon from './sudoku/SudokuIcon'
 import SlotMachine from './slot-machine/SlotMachine'
 import SlotMachineIcon from './slot-machine/SlotMachineIcon'
+import Match3Game from './match3/Match3Game'
+import Match3Icon from './match3/Match3Icon'
 
 export const GAMES: GameDefinition[] = [
   {
@@ -82,6 +84,18 @@ export const GAMES: GameDefinition[] = [
     minPlayers: 1,
     maxPlayers: 1,
     Component: SlotMachine,
+  },
+  {
+    id: 'match3',
+    name: '三消',
+    nameEn: 'Match-3',
+    icon: '🧩',
+    Icon: Match3Icon,
+    tagline: '交换消除，连鎖不停',
+    taglineEn: 'Swap and match, chain away',
+    minPlayers: 1,
+    maxPlayers: 1,
+    Component: Match3Game,
   },
 ]
 
