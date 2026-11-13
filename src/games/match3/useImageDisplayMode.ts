@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 
 export type ImageDisplayMode = 'cover' | 'contain'
 
-const STORAGE_KEY = 'match3:image-display'
-const MODES: ImageDisplayMode[] = ['contain', 'cover']
+const STORAGE_KEY = 'match3:image-display-v2'
+const MODES: ImageDisplayMode[] = ['cover', 'contain']
 
 export function useImageDisplayMode() {
   const [mode, setMode] = useState<ImageDisplayMode>(() => {
@@ -11,7 +11,7 @@ export function useImageDisplayMode() {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored === 'cover' || stored === 'contain') return stored
     } catch { /* storage is optional */ }
-    return 'contain'
+    return 'cover'
   })
 
   useEffect(() => {

@@ -8,7 +8,7 @@ import './Match3Game.css'
 
 type Cell = [number, number]
 type SwapAnimation = { from: Cell; to: Cell }
-type DragSprite = { src: string; x: number; y: number; width: number; height: number }
+type DragSprite = { src: string; x: number; y: number; width: number; height: number; aboveFinger: boolean }
 
 interface Match3BoardProps {
   board: Board
@@ -33,7 +33,7 @@ export default function Match3Board({
   falling, isShaking, combo, onTileClick, onSwap, onDragStart,
   imageMode,
 }: Match3BoardProps) {
-  const dragRef = useRef<{ start: Cell; x: number; y: number; moved: boolean } | null>(null)
+  const dragRef = useRef<{ start: Cell; x: number; y: number; moved: boolean; pointerType: string } | null>(null)
   const justDraggedRef = useRef(false)
   const [dragSprite, setDragSprite] = useState<DragSprite | null>(null)
   const [dragOrigin, setDragOrigin] = useState<Cell | null>(null)
@@ -50,11 +50,18 @@ export default function Match3Board({
       const rect = event.currentTarget.getBoundingClientRect()
       const image = event.currentTarget.querySelector('img')
       const ratio = image?.naturalWidth && image?.naturalHeight ? image.naturalWidth / image.naturalHeight : 1
-      let width = rect.width * 1.48
-      let height = rect.height * 1.48
+      let width = rect.width * 1.62
+      let height = rect.height * 1.62
       if (width / height > ratio) width = height * ratio
       else height = width / ratio
-      setDragSprite({ src: image?.src ?? '', x: event.clientX, y: event.clientY, width, height })
+      setDragSprite({
+        src: image?.src ?? '',
+        x: event.clientX,
+        y: event.clientY,
+        width,
+        height,
+        aboveFinger: drag.pointerType === 'touch',
+      })
       onDragStart(drag.start)
     } else {
       setDragSprite((sprite) => sprite ? { ...sprite, x: event.clientX, y: event.clientY } : sprite)
@@ -124,7 +131,7 @@ export default function Match3Board({
               }}
               onPointerDown={(event) => {
                 if (busy || event.button !== 0) return
-                dragRef.current = { start: [r, c], x: event.clientX, y: event.clientY, moved: false }
+                dragRef.current = { start: [r, c], x: event.clientX, y: event.clientY, moved: false, pointerType: event.pointerType }
                 try { event.currentTarget.setPointerCapture(event.pointerId) } catch { /* optional */ }
               }}
               onPointerMove={pointerMove}
@@ -146,7 +153,9 @@ export default function Match3Board({
           draggable={false}
           style={{
             left: Math.round(dragSprite.x - dragSprite.width / 2),
-            top: Math.round(dragSprite.y - dragSprite.height / 2),
+            top: Math.round(dragSprite.aboveFinger
+              ? dragSprite.y - dragSprite.height - 12
+              : dragSprite.y - dragSprite.height / 2),
             width: Math.round(dragSprite.width),
             height: Math.round(dragSprite.height),
           }}

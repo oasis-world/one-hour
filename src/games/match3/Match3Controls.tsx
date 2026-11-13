@@ -83,7 +83,7 @@ export function ImageModeButton({ mode, onCycle, disabled }: { mode: ImageDispla
     cover: m('铺满格子，边缘可能裁切', 'Fill tile; crop image edges'),
     contain: m('完整显示，保持原图比例', 'Show full image at original ratio'),
   } satisfies Record<ImageDisplayMode, string>
-  const modeNumber = mode === 'contain' ? 1 : 2
+  const modeNumber = mode === 'cover' ? 1 : 2
   return (
     <button
       type="button"
@@ -129,16 +129,23 @@ export function DifficultyPicker({ boardSize, busy, onDifficultyChange }: Diffic
 interface Match3ControlRowProps {
   mode: Match3Mode
   imageMode: ImageDisplayMode
-  score: number
-  best: number
   busy: boolean
   onModeChange: (mode: Match3Mode) => void
   onImageModeCycle: () => void
   onNewGame: () => void
 }
 
+export function Match3StatsRow({ score, best }: { score: number; best: number }) {
+  return (
+    <div className="m3-stats-row">
+      <div className="m3-stat" aria-label={m('分数', 'Score')}><span className="m3-stat-icon m3-score-icon"><ScoreIcon /></span><strong>{score}</strong></div>
+      <div className="m3-stat" aria-label={m('最高分', 'Best')}><span className="m3-stat-icon m3-trophy"><BestIcon /></span><strong>{best}</strong></div>
+    </div>
+  )
+}
+
 export function Match3ControlRow({
-  mode, imageMode, score, best, busy, onModeChange, onImageModeCycle, onNewGame,
+  mode, imageMode, busy, onModeChange, onImageModeCycle, onNewGame,
 }: Match3ControlRowProps) {
   const modes: { key: Match3Mode; label: string }[] = [
     { key: 'male', label: m('男角', 'Male') },
@@ -147,8 +154,6 @@ export function Match3ControlRow({
   ]
   return (
     <div className="m3-control-row">
-      <div className="m3-stat" aria-label={m('分数', 'Score')}><span className="m3-stat-icon m3-score-icon"><ScoreIcon /></span><strong>{score}</strong></div>
-      <div className="m3-stat" aria-label={m('最高分', 'Best')}><span className="m3-stat-icon m3-trophy"><BestIcon /></span><strong>{best}</strong></div>
       <div className="m3-tabs" role="group" aria-label={m('人物类型', 'Character selection')}>
         {modes.map((item) => (
           <button
