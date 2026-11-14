@@ -195,6 +195,9 @@ export function enterChat(
     if (existing?.authorRole && !merged.authorRole) {
       merged.authorRole = existing.authorRole
     }
+    if (existing?.authorExpiresAt !== undefined && merged.authorExpiresAt === undefined) {
+      merged.authorExpiresAt = existing.authorExpiresAt
+    }
     if (existing?.replyTo && !merged.replyTo) {
       merged.replyTo = existing.replyTo
     }
@@ -315,6 +318,7 @@ export function enterChat(
               avatar: item.avatar,
               avatarUrl: item.avatarUrl ?? null,
               authorRole: item.authorRole ?? null,
+              authorExpiresAt: item.authorExpiresAt ?? null,
               imageBlob: item.imageBlob,
               expiresAt: item.expiresAt,
               farewell: item.farewell,
@@ -393,6 +397,7 @@ export function enterChat(
         avatarSeed: item.avatar?.seed ?? null,
         avatarUrl: item.avatarUrl ?? null,
         authorRole: item.authorRole ?? null,
+        authorExpiresAt: item.authorExpiresAt,
         content: item.content,
         replyTo: item.replyTo ?? null,
         at: item.at,
@@ -537,6 +542,7 @@ export function enterChat(
         avatar: currentIdentity.avatar ?? undefined,
         avatarUrl: currentIdentity.avatarUrl,
         authorRole: currentIdentity.role,
+        authorExpiresAt: currentIdentity.profileExpiresAt,
         at: Date.now(),
         attempts: 0,
         expiresAt: options?.expiresAt,
@@ -553,6 +559,7 @@ export function enterChat(
         avatarSeed: currentIdentity.avatar?.seed ?? null,
         avatarUrl: currentIdentity.avatarUrl,
         authorRole: currentIdentity.role,
+        authorExpiresAt: currentIdentity.profileExpiresAt,
         content: trimmed,
         replyTo: replyTo ?? null,
         at: item.at,

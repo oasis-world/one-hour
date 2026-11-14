@@ -20,6 +20,8 @@ export interface ChatOutboxItem {
   avatarUrl?: string | null
   /** Author role snapshot for profiles that may expire before the message. */
   authorRole?: string | null
+  /** Author profile expiry snapshot, epoch ms; null means no expiry. */
+  authorExpiresAt?: number | null
   /** epoch ms */
   at: number
   /** Optional per-message expiry (epoch ms). */

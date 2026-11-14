@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { ChatEntry, PresenceMember } from '../lib/chatTypes'
+import type { GamePopularity } from '../lib/gamePopularity'
 import { t } from '../lib/i18n'
 import { setPopoverOpen, suppressNextClick } from '../lib/popoverGuard'
 import type { RoomReactionMap } from '../lib/chatReactions'
@@ -20,6 +21,7 @@ import MsgHoverBar from './MsgHoverBar'
 import MsgReactions from './MsgReactions'
 import MessageAuthorCard from './MessageAuthorCard'
 import CompanionGreetingActions from './CompanionGreetingActions'
+import CompanionGreetingGames from './CompanionGreetingGames'
 import { parseMentions } from '../lib/mention'
 
 interface Props {
@@ -43,8 +45,10 @@ interface Props {
   isPrivate?: boolean
   onEnterPrivateChat?: (member: PresenceMember) => void
   onOpenGames?: () => void
+  onStartGame?: (gameId: string) => void
   privateMode?: boolean
   selfId?: string | null
+  gamePopularity?: GamePopularity
 }
 
 /** Touch form factors (phones, tablets) get the long-press sheet. */
@@ -152,8 +156,10 @@ export default function MessageRow({
   isPrivate,
   onEnterPrivateChat,
   onOpenGames,
+  onStartGame,
   privateMode,
   selfId,
+  gamePopularity = {},
 }: Props) {
   const imageSrc = entry.imageUrl ?? entry.localImage ?? null
   const messageMedia = findMessageMedia(entry.content)
@@ -161,6 +167,8 @@ export default function MessageRow({
   const gameRef = parseGameRef(entry.content)
   const pollRef = parsePollRef(entry.content)
   const mentionNames = (onlineMembers ?? []).map((m) => m.displayName).filter(Boolean)
+  const authorCanPrivateChat = Boolean(isPrivate && !mine)
+    || onlineMembers.some((member) => member.userId === entry.userId)
   const isMentioned = (() => {
     try {
       const nick = localStorage.getItem('one-hour-user-profile') ? JSON.parse(localStorage.getItem('one-hour-user-profile')!).nickname : null
@@ -423,6 +431,9 @@ export default function MessageRow({
         {entry.isGreeting && isPrivate && !mine && !privateMode && onEnterPrivateChat && (
           <CompanionGreetingActions onPrivateChat={handleEnterPrivate} onOpenGames={onOpenGames} />
         )}
+        {entry.isGreeting && isPrivate && !mine && onStartGame && (
+          <CompanionGreetingGames counts={gamePopularity} onSelectGame={onStartGame} />
+        )}
         {!entry.expiring && (
           <MsgHoverBar
             mine={mine || Boolean(isPrivate)}
@@ -443,8 +454,7 @@ export default function MessageRow({
             <MessageAuthorCard
               member={author}
               expired={Boolean(entry.farewell)}
-              onPrivateChat={handleEnterPrivate}
-              isCompanion={Boolean(isPrivate && !mine)}
+              onPrivateChat={authorCanPrivateChat ? handleEnterPrivate : undefined}
               selfId={selfId}
             />
         </div>,

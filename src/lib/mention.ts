@@ -37,7 +37,7 @@ export function parseMentions(text: string, extraNames?: string[]): Array<{ type
     // Only the first word after @ is taken as candidate; 2-word names are
     // already in knownNames via companion/user/presence, so "Hey" after
     // @kz never becomes part of the mention.
-    const firstWord = seg.split(/\s+/).filter(Boolean)[0]
+    const firstWord = seg.split(/[\s,!?，。！？、；：:;()[\]{}<>]+/).filter(Boolean)[0]
     if (firstWord && firstWord.length <= 24 && !/\d{2,}/.test(firstWord)) {
       atSegments.push(firstWord)
     }

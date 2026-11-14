@@ -11,6 +11,8 @@ export interface ChatMessage {
   avatarUrl?: string | null
   /** Author role snapshot, retained after an anonymous profile expires. */
   authorRole?: string | null
+  /** Author profile expiry snapshot, independent of this message's lifetime. */
+  authorExpiresAt?: number | null
   content: string
   /** Snapshot of the message this one replies to, retained with this message. */
   replyTo?: MessageReply | null

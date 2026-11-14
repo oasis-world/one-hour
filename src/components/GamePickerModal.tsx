@@ -1,14 +1,17 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLang, t } from '../lib/i18n'
 import { setPopoverOpen } from '../lib/popoverGuard'
-import { getGameList } from '../games/registry'
+import type { GamePopularity } from '../lib/gamePopularity'
+import { rankGames } from '../games/popularity'
 import { GameIcon, ThinXIcon } from './icons'
+import GamePopularityIcon from './GamePopularityIcon'
 import './GamePickerModal.css'
 
 interface Props {
   /** Called with the chosen game id. The modal closes itself afterwards. */
   onSelect: (gameId: string) => void
   onClose: () => void
+  popularity: GamePopularity
 }
 
 function MarqueeName({ text }: { text: string }) {
@@ -35,7 +38,7 @@ function MarqueeName({ text }: { text: string }) {
   )
 }
 
-export default function GamePickerModal({ onSelect, onClose }: Props) {
+export default function GamePickerModal({ onSelect, onClose, popularity }: Props) {
   useLang()
 
   useEffect(() => {
@@ -51,7 +54,7 @@ export default function GamePickerModal({ onSelect, onClose }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const games = getGameList()
+  const games = rankGames(popularity)
 
   return (
     <div
@@ -79,8 +82,7 @@ export default function GamePickerModal({ onSelect, onClose }: Props) {
         </header>
 
         <div className="game-picker-grid">
-          {games.map((game, i) => {
-            const Icon = game.Icon
+          {games.map(({ game, count, rank }, i) => {
             const name = t(game.name, game.nameEn)
             return (
               <button
@@ -93,9 +95,7 @@ export default function GamePickerModal({ onSelect, onClose }: Props) {
                   onClose()
                 }}
               >
-                <span className="game-picker-icon">
-                  {Icon ? <Icon size={40} /> : <span className="game-picker-emoji">{game.icon}</span>}
-                </span>
+                <GamePopularityIcon game={game} count={count} rank={rank} />
                 <MarqueeName text={name} />
               </button>
             )

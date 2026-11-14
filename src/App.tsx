@@ -61,6 +61,7 @@ import { MESSAGE_TTL_MS } from './lib/expiry'
 import { clearLocalReactions, loadLocalReactions, pruneLocalReactions, removeLocalReaction, removeLocalReactionsForMessage, saveLocalReaction } from './lib/localReactions'
 import { adjustStarPoints, claimStarReward, readStarPoints, setStarPoints, subscribeStarPoints, syncStarPoints, transferStarPoints } from './lib/starPoints'
 import { buildPointGiftMessage } from './lib/pointGiftMessage'
+import { loadGamePopularity, recordGameSelection, watchGamePopularity, type GamePopularity } from './lib/gamePopularity'
 
 /**
  * 一小时 / one-hour — the ephemeral chat room. Every message, text or
@@ -118,12 +119,33 @@ export default function App() {
   const [welcomeOpen, setWelcomeOpen] = useState(false)
   const [pollOpen, setPollOpen] = useState(false)
   const [gamePickerOpen, setGamePickerOpen] = useState(false)
+  const [gamePopularity, setGamePopularity] = useState<GamePopularity>({})
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   /** Composer popover open (plus/emoji) — mobile hides the gear meanwhile. */
   const [composerMenuOpen, setComposerMenuOpen] = useState(false)
   /** Mobile top-right tool stack (background / music / gear / online) —
       collapsed behind one toggle; ignored on desktop (toggle hidden). */
   const [cornerOpen, setCornerOpen] = useState(false)
+
+  useEffect(() => {
+    if (!currentUserId) return
+    let active = true
+    let unsubscribe: (() => void) | undefined
+    const refresh = () => {
+      void loadGamePopularity()
+        .then((counts) => { if (active) setGamePopularity(counts) })
+        .catch((error) => console.warn('[game-popularity] Could not load counts.', error))
+    }
+    refresh()
+    void watchGamePopularity(refresh).then((stop) => {
+      if (active) unsubscribe = stop
+      else stop()
+    }).catch((error) => console.warn('[game-popularity] Realtime subscription failed.', error))
+    return () => {
+      active = false
+      unsubscribe?.()
+    }
+  }, [currentUserId])
   /**
    * A blank click that just dismissed a composer popover must not also
    * fold the chat: the popover closes on pointerdown, before this click
@@ -626,6 +648,14 @@ export default function App() {
     setReplyTo(null)
   }
 
+  const handleGamePickerSelect = (gameId: string) => {
+    handleStartGame(gameId)
+    void recordGameSelection(gameId)
+      .then(() => loadGamePopularity())
+      .then(setGamePopularity)
+      .catch((error) => console.warn('[game-popularity] Could not record selection.', error))
+  }
+
   const handleStartEdit = (entry: ChatEntry) => {
     setEditingMessage(entry)
     setReplyTo(null)
@@ -1012,6 +1042,8 @@ export default function App() {
               privateMode={privateMode}
               onEnterPrivateChat={handleMemberPrivateClick}
               onOpenGames={() => setGamePickerOpen(true)}
+              onStartGame={handleGamePickerSelect}
+              gamePopularity={gamePopularity}
             />
 
             {room.identity ? (
@@ -1129,7 +1161,7 @@ export default function App() {
         <CreatePollModal onClose={() => setPollOpen(false)} onSend={handleSendPoll} />
       )}
       {gamePickerOpen && !pendingSummary && profile && room.identity && (
-        <GamePickerModal onSelect={handleStartGame} onClose={() => setGamePickerOpen(false)} />
+        <GamePickerModal onSelect={handleGamePickerSelect} onClose={() => setGamePickerOpen(false)} popularity={gamePopularity} />
       )}
       {toast && <div className="app-toast">{toast}</div>}
     </div>

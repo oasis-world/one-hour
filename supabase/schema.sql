@@ -34,6 +34,7 @@ alter table public.chat_messages add column if not exists avatar_style text;
 alter table public.chat_messages add column if not exists avatar_seed text;
 alter table public.chat_messages add column if not exists avatar_url text;
 alter table public.chat_messages add column if not exists author_role text;
+alter table public.chat_messages add column if not exists author_expires_at timestamptz;
 alter table public.chat_messages add column if not exists reply_to jsonb;
 alter table public.chat_messages add column if not exists edited_at timestamptz;
 alter table public.chat_messages add column if not exists farewell boolean not null default false;
@@ -247,6 +248,58 @@ begin
   alter publication supabase_realtime add table public.poll_votes;
 exception
   when duplicate_object then null;
+end $$;
+
+-- ── Shared game popularity ──────────────────────────────────────────────────
+-- A single atomic counter per game keeps the all-time hot-game ranking small
+-- and avoids lost updates when several players select the same game.
+
+create table if not exists public.game_popularity (
+  game_id text primary key check (game_id in (
+    'gomoku', 'xiangqi', 'chess', 'solitaire', 'sudoku', 'slot-machine', 'match3'
+  )),
+  click_count bigint not null default 0 check (click_count >= 0),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.game_popularity enable row level security;
+drop policy if exists "game popularity is readable by signed-in players" on public.game_popularity;
+create policy "game popularity is readable by signed-in players"
+  on public.game_popularity for select using (auth.uid() is not null);
+grant select on public.game_popularity to authenticated;
+revoke all on public.game_popularity from anon;
+revoke insert, update, delete on public.game_popularity from anon, authenticated;
+
+create or replace function public.record_game_selection(p_game_id text)
+returns bigint
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  result bigint;
+begin
+  if auth.uid() is null then raise exception 'authentication required'; end if;
+  if p_game_id is null or p_game_id not in (
+    'gomoku', 'xiangqi', 'chess', 'solitaire', 'sudoku', 'slot-machine', 'match3'
+  ) then raise exception 'invalid game id'; end if;
+  insert into public.game_popularity as popularity (game_id, click_count, updated_at)
+    values (p_game_id, 1, now())
+    on conflict (game_id) do update
+      set click_count = popularity.click_count + 1,
+          updated_at = now()
+    returning click_count into result;
+  return result;
+end;
+$$;
+
+revoke all on function public.record_game_selection(text) from public, anon;
+grant execute on function public.record_game_selection(text) to authenticated;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.game_popularity;
+exception when duplicate_object then null;
 end $$;
 
 -- ── Gomoku game state ──────────────────────────────────────────────────────

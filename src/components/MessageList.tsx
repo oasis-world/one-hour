@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ChatEntry, ChatStatus, MessageReply, PresenceMember } from '../lib/chatTypes'
+import type { GamePopularity } from '../lib/gamePopularity'
 import { setPopoverOpen } from '../lib/popoverGuard'
 import {
   recordEmojiUse,
@@ -47,6 +48,8 @@ interface Props {
   privateMode?: boolean
   onEnterPrivateChat?: (member: PresenceMember) => void
   onOpenGames?: () => void
+  onStartGame?: (gameId: string) => void
+  gamePopularity?: GamePopularity
 }
 
 interface OpenMenu {
@@ -92,6 +95,8 @@ export default function MessageList({
   privateMode,
   onEnterPrivateChat,
   onOpenGames,
+  onStartGame,
+  gamePopularity = {},
 }: Props) {
   useLang() // re-render on language flips
   const logRef = useRef<HTMLDivElement>(null)
@@ -304,7 +309,9 @@ export default function MessageList({
               avatarSeed: entry.avatarSeed ?? null,
               avatarUrl: entry.avatarUrl ?? null,
               role: entry.authorRole ?? '',
-              profileExpiresAt: entry.farewell ? 0 : entry.at + 60 * 60 * 1000,
+              profileExpiresAt: entry.authorExpiresAt !== undefined
+                ? entry.authorExpiresAt
+                : entry.farewell ? 0 : entry.at + 60 * 60 * 1000,
               enteredAt: entry.at,
             }}
             menuOpen={menu?.entry.id === entry.id}
@@ -321,6 +328,8 @@ export default function MessageList({
             privateMode={privateMode}
             onEnterPrivateChat={onEnterPrivateChat}
             onOpenGames={onOpenGames}
+            onStartGame={onStartGame}
+            gamePopularity={gamePopularity}
             selfId={selfId}
           />
         ))}

@@ -16,24 +16,18 @@ export default function MessageAuthorCard({
   expired = false,
   onPrivateChat,
   selfId,
-  isCompanion: _isCompanion = false,
 }: {
   member: PresenceMember
   className?: string
   expired?: boolean
   onPrivateChat?: (member: PresenceMember) => void
-  isCompanion?: boolean
   selfId?: string | null
 }) {
-  const [now, setNow] = useState<number | null>(null)
+  const [now, setNow] = useState(() => Date.now())
   const [cloudProfile, setCloudProfile] = useState<CloudProfileSnapshot | null>(null)
   useEffect(() => {
-    const firstTick = window.setTimeout(() => setNow(Date.now()), 0)
     const id = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => {
-      window.clearTimeout(firstTick)
-      window.clearInterval(id)
-    }
+    return () => window.clearInterval(id)
   }, [])
   useEffect(() => {
     let active = true
@@ -50,13 +44,14 @@ export default function MessageAuthorCard({
     avatarUrl: member.avatarUrl,
   }
   const role = cloudProfile?.profile.role?.trim() || member.role?.trim() || ''
-  const expiresAt = cloudProfile?.expiresAt ?? member.profileExpiresAt
-  const remaining = expired || now == null ? 0 : Math.max(0, (expiresAt ?? now) - now)
+  const expiresAt = cloudProfile?.expiryKnown ? cloudProfile.expiresAt : member.profileExpiresAt
+  const authorExpired = expired || (expiresAt != null && expiresAt <= now)
+  const remaining = authorExpired || expiresAt == null ? 0 : Math.max(0, expiresAt - now)
   return (
     <div className={`account-pop${className ? ` ${className}` : ''}`} role="status">
       <div className="account-pop-head">
         <div
-          className={`account-pop-avatar${expired ? ' is-expired' : ''}`}
+          className={`account-pop-avatar${authorExpired ? ' is-expired' : ''}`}
           style={{ ['--avatar-progress' as string]: String(remaining / 3_600_000) }}
         >
           <AvatarBadge
@@ -71,7 +66,7 @@ export default function MessageAuthorCard({
           <span className="account-pop-countdown">{countdown(remaining)}</span>
         </div>
       </div>
-      {onPrivateChat && member.userId !== selfId && (
+      {onPrivateChat && !authorExpired && member.userId !== selfId && (
         <div className="account-pop-actions">
           <button type="button" className="account-pop-private-btn" onClick={() => onPrivateChat(member)}>
             {t('私聊', 'Private chat')}

@@ -17,6 +17,7 @@ interface ProfileRow {
 export interface CloudProfileSnapshot {
   profile: UserProfile
   expiresAt: number | null
+  expiryKnown: boolean
 }
 
 /** Read any authenticated room member's profile for the message avatar card. */
@@ -36,7 +37,9 @@ export async function fetchCloudProfile(userId: string, signal?: AbortSignal): P
       return query.maybeSingle()
     }
     let result = await read()
+    let expiryKnown = true
     if (result.error && isMissingColumn(result.error)) {
+      expiryKnown = false
       const query = client.from(TABLE)
         .select('nickname, avatar_style, avatar_seed')
         .eq('user_id', userId)
@@ -56,6 +59,7 @@ export async function fetchCloudProfile(userId: string, signal?: AbortSignal): P
         avatarUrl: row.avatar_url ?? null,
       },
       expiresAt: Number.isFinite(parsedExpiry) ? parsedExpiry : null,
+      expiryKnown,
     }
   } catch {
     return null

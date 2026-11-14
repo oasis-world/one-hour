@@ -80,6 +80,7 @@ export interface RoomHandle {
     avatar?: { style: string; seed: string }
     avatarUrl?: string | null
     authorRole?: string | null
+    authorExpiresAt?: number | null
     imageBlob?: Blob
     expiresAt?: number
     farewell?: boolean
@@ -103,6 +104,7 @@ interface MessageRow {
   avatar_seed: string | null
   avatar_url: string | null
   author_role?: string | null
+  author_expires_at?: string | null
   content: string
   reply_to?: MessageReply | null
   image_url: string | null
@@ -442,6 +444,7 @@ export async function joinChatRoom(options: {
           avatar_style: draft.avatar?.style ?? null,
           avatar_seed: draft.avatar?.seed ?? null,
           avatar_url: draft.avatarUrl ?? null,
+          author_expires_at: draft.authorExpiresAt == null ? null : new Date(draft.authorExpiresAt).toISOString(),
         }
         const insert = () => withTimeout(
           ctx.from(MESSAGES_TABLE).insert({ ...base, ...optional }),
@@ -561,6 +564,7 @@ function rowToMessage(row: MessageRow): ChatMessage {
     avatarSeed: row.avatar_seed ?? null,
     avatarUrl: row.avatar_url ?? null,
     authorRole: row.author_role ?? null,
+    authorExpiresAt: row.author_expires_at == null ? row.author_expires_at : new Date(row.author_expires_at).getTime(),
     content: row.content,
     replyTo: row.reply_to ?? null,
     at: new Date(row.created_at).getTime(),
@@ -583,12 +587,12 @@ function isNetworkError(error: { message?: string }): boolean {
 function isMissingColumnError(error: { message?: string; code?: string }): boolean {
   return (
     error.code === 'PGRST204' ||
-    /could not find the .*(avatar_(style|seed|url)|edited_at|farewell|expires_at) column/i.test(error.message ?? '')
+    /could not find the .*(avatar_(style|seed|url)|author_expires_at|edited_at|farewell|expires_at) column/i.test(error.message ?? '')
   )
 }
 
 function missingOptionalMessageColumn(error: { message?: string }): string | null {
   const message = (error.message ?? '').toLowerCase()
-  return ['reply_to', 'avatar_style', 'avatar_seed', 'avatar_url', 'author_role', 'farewell', 'expires_at', 'whisper_to', 'whisper_to_name']
+  return ['reply_to', 'avatar_style', 'avatar_seed', 'avatar_url', 'author_role', 'author_expires_at', 'farewell', 'expires_at', 'whisper_to', 'whisper_to_name']
     .find((column) => message.includes(column)) ?? null
 }
