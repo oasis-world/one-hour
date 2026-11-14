@@ -1176,7 +1176,7 @@ button {
 .app-shell.theme-warm .author-pop-portal .account-pop { background: #fcf3dc; }
 
 .msg-name {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
@@ -1204,7 +1204,7 @@ button {
 }
 
 .msg-body {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.55;
   color: var(--ink);
   white-space: pre-wrap;

@@ -101,9 +101,28 @@ export function playInvalidSound(enabled: boolean) {
   playTone(enabled, 180, 0.1, 0.05, 'sawtooth', 0.06)
 }
 
-export function playClearSound(combo: number, enabled: boolean) {
-  playTone(enabled, 660 + combo * 60, 0.1, 0.07, 'sine')
-  playTone(enabled, 990 + combo * 90, 0.12, 0.06, 'triangle', 0.05)
+export function playScoreSound(combo: number, enabled: boolean) {
+  const melody = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98, 1318.51, 1046.5]
+  const pitch = 2 ** (Math.min(combo - 1, 5) / 12)
+  melody.forEach((note, index) => {
+    const accent = index === 4 || index === 5 || index === melody.length - 1
+    playTone(
+      enabled,
+      note * pitch,
+      accent ? 0.42 : 0.3,
+      accent ? 0.05 : 0.038,
+      accent ? 'triangle' : 'sine',
+      index * 0.18,
+    )
+  })
+  const harmony = [261.63, 392, 523.25, 392]
+  harmony.forEach((note, index) => {
+    playTone(enabled, note * pitch, 0.58, 0.016, 'sine', index * 0.46)
+  })
+  const sparkles = [1567.98, 2093, 1760]
+  sparkles.forEach((note, index) => {
+    playTone(enabled, note * pitch, 0.2, 0.016, 'triangle', 0.3 + index * 0.5)
+  })
 }
 
 export function playCascadeSound(combo: number, enabled: boolean) {
