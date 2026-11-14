@@ -43,6 +43,8 @@ export default function OnlineList({
       const target = e.target as HTMLElement | null
       if (popRef.current?.contains(target)) return
       if (target?.closest?.('.top-bar') || target?.closest?.('.settings-bar')) return
+      // SettingsBar waits for pointerup here so chat scrolling is not canceled.
+      if (target?.closest?.('.chat-log')) return
       if (ownerSelector && target?.closest?.(ownerSelector)) return
       suppressNextClick()
       e.preventDefault()

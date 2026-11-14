@@ -48,14 +48,19 @@ export default function SettingsBar({
     return () => setPopoverOpen(false)
   }, [anyOpen])
 
-  // Clicks anywhere outside the corner (popovers included via the ref)
-  // fold both layers back down.
+  // Outside taps close the popovers. A drag beginning in the chat log is
+  // allowed to scroll; only a stationary tap there dismisses the popover.
   useEffect(() => {
     if (!anyOpen) return
+    let listPointer: { id: number; x: number; y: number; moved: boolean } | null = null
     const onDown = (e: PointerEvent) => {
       const target = e.target as HTMLElement | null
       if (barRef.current?.contains(target)) return
       if (target?.closest?.('.online-pop')) return
+      if (target?.closest?.('.chat-log')) {
+        listPointer = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false }
+        return
+      }
       suppressNextClick()
       e.preventDefault()
       e.stopPropagation()
@@ -63,6 +68,25 @@ export default function SettingsBar({
       setOpen(false)
       setListOpen(false)
       setSubview(null)
+    }
+    const onMove = (e: PointerEvent) => {
+      if (!listPointer || listPointer.id !== e.pointerId || listPointer.moved) return
+      if (Math.hypot(e.clientX - listPointer.x, e.clientY - listPointer.y) > 8) {
+        listPointer.moved = true
+      }
+    }
+    const onUp = (e: PointerEvent) => {
+      if (!listPointer || listPointer.id !== e.pointerId) return
+      const wasScroll = listPointer.moved
+      listPointer = null
+      if (wasScroll) return
+      suppressNextClick()
+      setOpen(false)
+      setListOpen(false)
+      setSubview(null)
+    }
+    const onCancel = (e: PointerEvent) => {
+      if (listPointer?.id === e.pointerId) listPointer = null
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -72,26 +96,21 @@ export default function SettingsBar({
       }
     }
     document.addEventListener('pointerdown', onDown, true)
+    document.addEventListener('pointermove', onMove, true)
+    document.addEventListener('pointerup', onUp, true)
+    document.addEventListener('pointercancel', onCancel, true)
     window.addEventListener('keydown', onKey)
     return () => {
       document.removeEventListener('pointerdown', onDown, true)
+      document.removeEventListener('pointermove', onMove, true)
+      document.removeEventListener('pointerup', onUp, true)
+      document.removeEventListener('pointercancel', onCancel, true)
       window.removeEventListener('keydown', onKey)
     }
   }, [anyOpen])
 
   return (
     <>
-    {anyOpen && (
-      <div
-        className="settings-dismiss-layer"
-        aria-hidden="true"
-        onPointerDown={() => {
-          setOpen(false)
-          setListOpen(false)
-          setSubview(null)
-        }}
-      />
-    )}
     <div
       className={`settings-bar${suppressed ? ' is-suppressed' : ''}`}
       ref={barRef}

@@ -555,7 +555,9 @@ export default function App() {
     if (!room.identity || !companion) return
     const instanceId = (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2))
     const title = gameTitle(gameId, t)
-    room.send(`🎮 ${title}\n__GAME__:${gameId}:${instanceId}`, undefined, null)
+    const messageId = room.send(`🎮 ${title}\n__GAME__:${gameId}:${instanceId}`, undefined, null)
+    rewardMessage(messageId, 'message')
+    recordMessageSent()
     setSentMessageSequence((s) => s + 1)
     // Create game state with companion already joined; host is current user
     try {
@@ -643,7 +645,9 @@ export default function App() {
     const instanceId = (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2))
     const game = getGameById(gameId)
     const title = game ? t(game.name, game.nameEn) : gameId
-    room.send(`🎮 ${title}\n__GAME__:${gameId}:${instanceId}`, undefined, replyTo)
+    const messageId = room.send(`🎮 ${title}\n__GAME__:${gameId}:${instanceId}`, undefined, replyTo)
+    rewardMessage(messageId, 'message')
+    recordMessageSent()
     setSentMessageSequence((sequence) => sequence + 1)
     setReplyTo(null)
   }
