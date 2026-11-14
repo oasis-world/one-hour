@@ -3,6 +3,8 @@ import type { CSSProperties, PointerEvent } from 'react'
 import type { TileDef } from './tiles'
 import { adjacent, type Board } from './model'
 import type { ImageDisplayMode } from './useImageDisplayMode'
+import type { Match3ToastData } from './match3ToastTypes'
+import Match3Toast from './Match3Toast'
 import { matchText as m } from './matchText'
 import './Match3Game.css'
 
@@ -23,6 +25,7 @@ interface Match3BoardProps {
   isShaking: boolean
   combo: number
   imageMode: ImageDisplayMode
+  toast: Match3ToastData | null
   onTileClick: (r: number, c: number) => void
   onSwap: (from: Cell, to: Cell) => void
   onDragStart: (cell: Cell) => void
@@ -31,7 +34,7 @@ interface Match3BoardProps {
 export default function Match3Board({
   board, tileSet, selected, busy, clearing, shakeCells, swapAnim, swapNoTransition,
   falling, isShaking, combo, onTileClick, onSwap, onDragStart,
-  imageMode,
+  imageMode, toast,
 }: Match3BoardProps) {
   const dragRef = useRef<{ start: Cell; x: number; y: number; moved: boolean; pointerType: string } | null>(null)
   const justDraggedRef = useRef(false)
@@ -50,8 +53,8 @@ export default function Match3Board({
       const rect = event.currentTarget.getBoundingClientRect()
       const image = event.currentTarget.querySelector('img')
       const ratio = image?.naturalWidth && image?.naturalHeight ? image.naturalWidth / image.naturalHeight : 1
-      let width = rect.width * 1.62
-      let height = rect.height * 1.62
+      let width = rect.width * 1.9
+      let height = rect.height * 1.9
       if (width / height > ratio) width = height * ratio
       else height = width / ratio
       setDragSprite({
@@ -97,7 +100,7 @@ export default function Match3Board({
   }
 
   return (
-    <>
+    <div className="m3-board-stage">
       <div
         className={`m3-grid display-${imageMode}${falling ? ' is-falling' : ''}${isShaking ? ' is-shaking' : ''}${combo > 1 ? ' is-cascade' : ''}`}
         style={{
@@ -162,6 +165,7 @@ export default function Match3Board({
         />
       )}
       {combo > 1 && <div className="m3-combo" role="status"><span>{m('连消', 'CHAIN')}</span><strong>×{combo}</strong></div>}
-    </>
+      <Match3Toast toast={toast} />
+    </div>
   )
 }

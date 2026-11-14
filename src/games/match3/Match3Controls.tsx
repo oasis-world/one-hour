@@ -50,10 +50,6 @@ function ScoreIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.8 5.7 6.3.9-4.6 4.5 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.5 6.3-.9L12 2.8Z" /></svg>
 }
 
-function BestIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v3.2a5 5 0 0 1-10 0V4Zm5 8.2V17m-4 3h8m-6-3h4m3-10h2.5v2a3.5 3.5 0 0 1-3.5 3.5M7 7H4.5v2A3.5 3.5 0 0 0 8 12.5" /></svg>
-}
-
 function ImageModeIcon({ mode }: { mode: ImageDisplayMode }) {
   if (mode === 'cover') {
     return (
@@ -135,11 +131,10 @@ interface Match3ControlRowProps {
   onNewGame: () => void
 }
 
-export function Match3StatsRow({ score, best }: { score: number; best: number }) {
+export function Match3StatsRow({ score }: { score: number }) {
   return (
     <div className="m3-stats-row">
-      <div className="m3-stat" aria-label={m('分数', 'Score')}><span className="m3-stat-icon m3-score-icon"><ScoreIcon /></span><strong>{score}</strong></div>
-      <div className="m3-stat" aria-label={m('最高分', 'Best')}><span className="m3-stat-icon m3-trophy"><BestIcon /></span><strong>{best}</strong></div>
+      <div className="m3-stat" aria-label={m('星星积分', 'Star points')}><span className="m3-stat-icon m3-score-icon"><ScoreIcon /></span><strong>{score.toLocaleString()}</strong></div>
     </div>
   )
 }
@@ -171,7 +166,7 @@ export function Match3ControlRow({
         ))}
       </div>
       <ImageModeButton mode={imageMode} onCycle={onImageModeCycle} disabled={busy} />
-      <button type="button" className="m3-new" onClick={onNewGame} disabled={busy} title={m('新局', 'New game')} aria-label={m('新局', 'New game')}>
+      <button type="button" className="m3-new" onClick={onNewGame} disabled={busy} title={m('刷新（消耗 10 积分）', 'Refresh (10 points)')} aria-label={m('刷新（消耗 10 积分）', 'Refresh (10 points)')}>
         <NewGameIcon />
       </button>
     </div>

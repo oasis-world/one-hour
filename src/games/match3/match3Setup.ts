@@ -2,8 +2,6 @@ import { TILE_TYPES } from './model'
 import { TILES, type TileDef } from './tiles'
 import type { Match3Mode } from './Match3Controls'
 
-export const bestScoreKey = (instanceId: string) => `match3:best:${instanceId}`
-
 export function makeTileSet(mode: Match3Mode): TileDef[] {
   const pool = mode === 'mixed' ? TILES : TILES.filter((tile) => tile.gender === mode)
   const available = pool.length >= TILE_TYPES ? pool : TILES

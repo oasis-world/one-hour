@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { GameComponentProps } from '../types'
 import { useLang } from '../../lib/i18n'
-import { recordGamePlayed } from '../../lib/lifetimeStats'
+import { recordGamePlayed, recordGamePoints } from '../../lib/lifetimeStats'
+import { adjustStarPoints, readStarPoints, subscribeStarPoints } from '../../lib/starPoints'
 import type { TileDef } from './tiles'
 import {
   TILE_TYPES, randomBoard, trySwap, findMatches, collapseBoard, removeMatches,
@@ -15,9 +16,10 @@ import {
 import Match3Header from './Match3Header'
 import Match3Board from './Match3Board'
 import Match3HelpDialog from './Match3HelpDialog'
+import { useMatch3Toast } from './useMatch3Toast'
 import { useImageDisplayMode } from './useImageDisplayMode'
 import { useMatch3Sound } from './useMatch3Sound'
-import { bestScoreKey, makeTileSet } from './match3Setup'
+import { makeTileSet } from './match3Setup'
 import { delay } from './match3Delay'
 import {
   playCascadeSound, playClearSound, playInvalidSound, playSelectSound, playSwapSound,
@@ -30,10 +32,7 @@ export default function Match3Game({ instanceId }: GameComponentProps) {
   const [boardSize, setBoardSize] = useState<BoardSize>(6)
   const [tileSet, setTileSet] = useState<TileDef[]>(() => makeTileSet('mixed'))
   const [board, setBoard] = useState<number[][]>(() => randomBoard(TILE_TYPES, 6))
-  const [score, setScore] = useState(0)
-  const [best, setBest] = useState(() => {
-    try { return Number(localStorage.getItem(bestScoreKey(instanceId)) || 0) } catch { return 0 }
-  })
+  const [starPoints, setStarPoints] = useState(readStarPoints)
   const [selected, setSelected] = useState<[number, number] | null>(null)
   const [busy, setBusy] = useState(false)
   const [clearing, setClearing] = useState<Set<string>>(new Set())
@@ -45,39 +44,37 @@ export default function Match3Game({ instanceId }: GameComponentProps) {
   const [swapNoTransition, setSwapNoTransition] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [playCount, setPlayCount] = useState(0)
+  const { toast, showToast } = useMatch3Toast()
   const { mode: imageMode, cycleMode: cycleImageMode } = useImageDisplayMode()
   const { enabled: sound, enabledRef: soundRef, toggle: toggleSound } = useMatch3Sound(instanceId)
 
   useEffect(() => {
-    try { localStorage.setItem(bestScoreKey(instanceId), String(best)) } catch { /* ignore */ }
-  }, [instanceId, best])
-
+    return subscribeStarPoints(setStarPoints)
+  }, [])
   useEffect(() => {
     if (combo <= 1) return
     const timeout = window.setTimeout(() => { setCombo(0); setIsShaking(false) }, 1500)
     return () => window.clearTimeout(timeout)
   }, [combo])
-
   const resetGame = (nextMode = mode, nextSize = boardSize) => {
     setTileSet(makeTileSet(nextMode))
     setBoard(randomBoard(TILE_TYPES, nextSize))
-    setScore(0)
     setSelected(null)
     setClearing(new Set())
     setShakeCells(new Set())
     setCombo(0)
     setIsShaking(false)
   }
-
   const processCascade = async (start: number[][]) => {
     let boardNow = start
     setBoard(boardNow)
     let comboWave = 1
-    let runningScore = score
     while (true) {
       const matches = findMatches(boardNow)
       if (!matches.size) break
+      const earnedPoints = matches.size * 10 * comboWave
       setClearing(matches)
+      showToast({ kind: 'reward', title: m('获得积分', 'Points earned'), amount: earnedPoints })
       if (comboWave >= 2) {
         setCombo(comboWave)
         setIsShaking(comboWave >= 3)
@@ -85,9 +82,8 @@ export default function Match3Game({ instanceId }: GameComponentProps) {
       playClearSound(comboWave, soundRef.current)
       await delay(620)
       const cleared = removeMatches(boardNow, matches)
-      runningScore += matches.size * 10 * comboWave
-      setScore(runningScore)
-      if (runningScore > best) setBest(runningScore)
+      adjustStarPoints(earnedPoints, true)
+      recordGamePoints(earnedPoints)
       setClearing(new Set())
       const collapsed = collapseBoard(cleared, TILE_TYPES)
       setFalling(true)
@@ -101,7 +97,6 @@ export default function Match3Game({ instanceId }: GameComponentProps) {
     if (!hasAnyMove(boardNow)) setBoard(randomBoard(TILE_TYPES, boardSize))
     setBusy(false)
   }
-
   const swapTiles = async (from: [number, number], to: [number, number]) => {
     if (busy || !adjacent(from, to)) return
     setBusy(true)
@@ -129,7 +124,6 @@ export default function Match3Game({ instanceId }: GameComponentProps) {
     window.requestAnimationFrame(() => setSwapNoTransition(false))
     await processCascade(next)
   }
-
   const handleTile = async (r: number, c: number) => {
     if (busy) return
     if (!selected) { setSelected([r, c]); playSelectSound(soundRef.current); return }
@@ -139,7 +133,15 @@ export default function Match3Game({ instanceId }: GameComponentProps) {
     await swapTiles([sr, sc], [r, c])
   }
 
-  const newGame = () => resetGame(mode, boardSize)
+  const newGame = () => {
+    if (readStarPoints() < 10) {
+      showToast({ kind: 'error', message: m('星星积分不足，刷新需要 10 分', 'Not enough star points; refresh costs 10') })
+      return
+    }
+    adjustStarPoints(-10, true)
+    resetGame(mode, boardSize)
+    showToast({ kind: 'refresh', title: m('刷新消耗积分', 'Refresh cost'), amount: -10 })
+  }
   const setDifficulty = (size: BoardSize) => {
     setBoardSize(size)
     resetGame(mode, size)
@@ -160,7 +162,7 @@ export default function Match3Game({ instanceId }: GameComponentProps) {
       />
 
       <div className="m3-overview-row">
-        <Match3StatsRow score={score} best={best} />
+        <Match3StatsRow score={starPoints} />
         <DifficultyPicker boardSize={boardSize} busy={busy} onDifficultyChange={setDifficulty} />
       </div>
 
@@ -186,11 +188,11 @@ export default function Match3Game({ instanceId }: GameComponentProps) {
         isShaking={isShaking}
         combo={combo}
         imageMode={imageMode}
+        toast={toast}
         onTileClick={handleTile}
         onSwap={swapTiles}
         onDragStart={(cell) => { setSelected(cell); playSelectSound(soundRef.current) }}
       />
-
       {helpOpen && <Match3HelpDialog onClose={closeHelp} />}
     </section>
   )

@@ -57,6 +57,7 @@ import { isEnterPrivateChatIntent } from './lib/privateChatIntent'
 import { applyRoomReactionChange, recordEmojiUse, summarizeRoomReactions, type RoomReactionRecord } from './lib/chatReactions'
 import { createPoll } from './lib/pollRemote'
 import { buildPollContent, durationMinutes, newPollId, type PollDraft } from './lib/pollTypes'
+import { MESSAGE_TTL_MS } from './lib/expiry'
 import { clearLocalReactions, loadLocalReactions, pruneLocalReactions, removeLocalReaction, removeLocalReactionsForMessage, saveLocalReaction } from './lib/localReactions'
 import { adjustStarPoints, claimStarReward, readStarPoints, setStarPoints, subscribeStarPoints, syncStarPoints, transferStarPoints } from './lib/starPoints'
 import { buildPointGiftMessage } from './lib/pointGiftMessage'
@@ -259,7 +260,12 @@ export default function App() {
       gifts.forEach((gift) => {
         const recipient = eligible.find((member) => member.userId === gift.userId)
         if (currentUserId) recordInteraction(gift.userId, gift.name, currentUserId)
-        if (sendRoomMessage(buildPointGiftMessage(gift.name, gift.points, recipient?.lang), undefined, null)) giftNoticesSent += 1
+        if (sendRoomMessage(
+          buildPointGiftMessage(gift.name, gift.points, recipient?.lang),
+          undefined,
+          null,
+          { expiresAt: Date.now() + MESSAGE_TTL_MS },
+        )) giftNoticesSent += 1
       })
       if (giftNoticesSent) setSentMessageSequence((sequence) => sequence + giftNoticesSent)
       clearCompanionProfile()
