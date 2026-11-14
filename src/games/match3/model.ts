@@ -104,24 +104,11 @@ export function randomBoard(typeCount: number, size: number = BOARD_SIZE): Board
   let board: Board = Array.from({ length: size }, () =>
     Array.from({ length: size }, () => Math.floor(Math.random() * typeCount))
   )
-  // remove initial matches
-  let changed = true
-  let guard = 0
-  while (changed && guard < 50) {
-    changed = false
-    guard++
-    const matches = findMatches(board)
-    if (matches.size) {
-      for (const key of matches) {
-        const [r, c] = key.split(',').map(Number)
-        board[r][c] = Math.floor(Math.random() * typeCount)
-        changed = true
-      }
-    }
-  }
-  // ensure at least one move
-  if (!hasAnyMove(board)) {
-    // shuffle all cells
+  // Keep any random starting matches so the game can animate and award them.
+  // A board with matches is cleared first; afterwards the cascade loop checks
+  // for a legal move and reshuffles if needed.
+  let attempts = 0
+  while (!hasAnyMove(board) && attempts < 50) {
     const flat = board.flat()
     for (let i = flat.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
@@ -129,19 +116,7 @@ export function randomBoard(typeCount: number, size: number = BOARD_SIZE): Board
     }
     board = []
     for (let r = 0; r < size; r++) board.push(flat.slice(r * size, (r + 1) * size))
-    // remove matches again
-    changed = true; guard = 0
-    while (changed && guard < 50) {
-      changed = false; guard++
-      const matches = findMatches(board)
-      if (matches.size) {
-        for (const key of matches) {
-          const [r, c] = key.split(',').map(Number)
-          board[r][c] = Math.floor(Math.random() * typeCount)
-          changed = true
-        }
-      }
-    }
+    attempts++
   }
   return board
 }

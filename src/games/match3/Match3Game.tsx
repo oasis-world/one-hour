@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GameComponentProps } from '../types'
 import { useLang } from '../../lib/i18n'
 import { recordGamePlayed, recordGamePoints } from '../../lib/lifetimeStats'
@@ -32,9 +32,10 @@ export default function Match3Game({ instanceId }: GameComponentProps) {
   const [boardSize, setBoardSize] = useState<BoardSize>(6)
   const [tileSet, setTileSet] = useState<TileDef[]>(() => makeTileSet('mixed'))
   const [board, setBoard] = useState<number[][]>(() => randomBoard(TILE_TYPES, 6))
+  const initialBoard = useRef<number[][] | null>(board)
   const [starPoints, setStarPoints] = useState(readStarPoints)
   const [selected, setSelected] = useState<[number, number] | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState(() => findMatches(board).size > 0)
   const [clearing, setClearing] = useState<Set<string>>(new Set())
   const [shakeCells, setShakeCells] = useState<Set<string>>(new Set())
   const [falling, setFalling] = useState(false)
@@ -56,35 +57,34 @@ export default function Match3Game({ instanceId }: GameComponentProps) {
     const timeout = window.setTimeout(() => { setCombo(0); setIsShaking(false) }, 1500)
     return () => window.clearTimeout(timeout)
   }, [combo])
-  const resetGame = (nextMode = mode, nextSize = boardSize) => {
-    setTileSet(makeTileSet(nextMode))
-    setBoard(randomBoard(TILE_TYPES, nextSize))
-    setSelected(null)
-    setClearing(new Set())
-    setShakeCells(new Set())
-    setCombo(0)
-    setIsShaking(false)
-  }
-  const processCascade = async (start: number[][]) => {
+  const processCascade = async (start: number[][], size = boardSize) => {
     let boardNow = start
     setBoard(boardNow)
     let comboWave = 1
     while (true) {
       const matches = findMatches(boardNow)
-      if (!matches.size) break
+      if (!matches.size) {
+        if (!hasAnyMove(boardNow)) {
+          boardNow = randomBoard(TILE_TYPES, size)
+          setBoard(boardNow)
+          comboWave = 1
+          continue
+        }
+        break
+      }
       const earnedPoints = matches.size * 10 * comboWave
       setClearing(matches)
-      showToast({ kind: 'reward', title: m('获得积分', 'Points earned'), amount: earnedPoints })
       if (comboWave >= 2) {
         setCombo(comboWave)
         setIsShaking(comboWave >= 3)
       }
       playClearSound(comboWave, soundRef.current)
-      await delay(620)
+      await delay(2050)
       const cleared = removeMatches(boardNow, matches)
       adjustStarPoints(earnedPoints, true)
       recordGamePoints(earnedPoints)
       setClearing(new Set())
+      showToast({ kind: 'reward', title: m('获得积分', 'Points earned'), amount: earnedPoints })
       const collapsed = collapseBoard(cleared, TILE_TYPES)
       setFalling(true)
       setBoard(collapsed)
@@ -94,8 +94,32 @@ export default function Match3Game({ instanceId }: GameComponentProps) {
       if (comboWave >= 2) playCascadeSound(comboWave, soundRef.current)
       comboWave += 1
     }
-    if (!hasAnyMove(boardNow)) setBoard(randomBoard(TILE_TYPES, boardSize))
     setBusy(false)
+  }
+  useEffect(() => {
+    const start = initialBoard.current
+    initialBoard.current = null
+    if (start && findMatches(start).size) void processCascade(start, 6)
+    // Resolve only the first generated board; later boards are handled by reset/cascade.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const resetGame = (nextMode = mode, nextSize = boardSize, waitForToast = false) => {
+    const nextBoard = randomBoard(TILE_TYPES, nextSize)
+    setTileSet(makeTileSet(nextMode))
+    setBoard(nextBoard)
+    setSelected(null)
+    setClearing(new Set())
+    setShakeCells(new Set())
+    setCombo(0)
+    setIsShaking(false)
+    if (waitForToast) {
+      setBusy(true)
+      return nextBoard
+    }
+    const hasMatches = findMatches(nextBoard).size > 0
+    setBusy(hasMatches)
+    if (hasMatches) void processCascade(nextBoard, nextSize)
+    return nextBoard
   }
   const swapTiles = async (from: [number, number], to: [number, number]) => {
     if (busy || !adjacent(from, to)) return
@@ -139,8 +163,14 @@ export default function Match3Game({ instanceId }: GameComponentProps) {
       return
     }
     adjustStarPoints(-10, true)
-    resetGame(mode, boardSize)
-    showToast({ kind: 'refresh', title: m('刷新消耗积分', 'Refresh cost'), amount: -10 })
+    const nextBoard = resetGame(mode, boardSize, true)
+    showToast(
+      { kind: 'refresh', title: m('刷新消耗积分', 'Refresh cost'), amount: -10 },
+      () => {
+        if (findMatches(nextBoard).size) void processCascade(nextBoard, boardSize)
+        else setBusy(false)
+      },
+    )
   }
   const setDifficulty = (size: BoardSize) => {
     setBoardSize(size)

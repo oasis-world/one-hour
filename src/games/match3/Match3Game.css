@@ -51,10 +51,10 @@
 .m3-drag-sprite{position:fixed;z-index:20;object-fit:contain;pointer-events:none;will-change:left,top,width,height}
 @keyframes m3-select-pulse{0%,100%{box-shadow:0 0 0 2px #8fd3a8,0 0 14px #8fd3a888}50%{box-shadow:0 0 0 3px #b6f0c8,0 0 22px #8fd3a8cc}}
 @keyframes m3-selected-zoom{0%{width:100%;height:100%}72%{width:190%;height:190%}100%{width:180%;height:180%}}
-.m3-tile.is-clearing{overflow:visible;animation:m3-clear .62s cubic-bezier(.2,.75,.24,1) forwards;filter:brightness(1.4) saturate(1.3)}
-.m3-tile.is-clearing img{animation:m3-clear-img .62s ease forwards}
-.m3-tile.is-clearing:before{position:absolute;z-index:4;inset:-15%;border-radius:50%;content:"";background:radial-gradient(circle at 17% 30%,#fff7b8 0 1px,transparent 2px),radial-gradient(circle at 80% 19%,#ffe68a 0 1.5px,transparent 2.5px),radial-gradient(circle at 86% 72%,#fff 0 1px,transparent 2px),radial-gradient(circle at 20% 78%,#ffc95e 0 1.5px,transparent 2.5px),radial-gradient(circle at 49% 7%,#fff 0 1px,transparent 2px);animation:m3-spark-burst .58s ease-out both;pointer-events:none}
-.m3-tile.is-clearing:after{position:absolute;z-index:2;inset:-8%;border-radius:50%;content:"";background:radial-gradient(circle,#fffde5 0%,#ffe98b 12%,#ffd35a44 38%,transparent 72%);animation:m3-clear-flash .58s ease-out both;pointer-events:none}
+.m3-tile.is-clearing{overflow:visible;animation:m3-clear 2s cubic-bezier(.2,.75,.24,1) forwards;filter:brightness(1.4) saturate(1.3)}
+.m3-tile.is-clearing img{animation:m3-clear-img 2s ease forwards}
+.m3-tile.is-clearing:before{position:absolute;z-index:4;inset:-15%;border-radius:50%;content:"";background:radial-gradient(circle at 17% 30%,#fff7b8 0 1px,transparent 2px),radial-gradient(circle at 80% 19%,#ffe68a 0 1.5px,transparent 2.5px),radial-gradient(circle at 86% 72%,#fff 0 1px,transparent 2px),radial-gradient(circle at 20% 78%,#ffc95e 0 1.5px,transparent 2.5px),radial-gradient(circle at 49% 7%,#fff 0 1px,transparent 2px);animation:m3-spark-burst 1.8s ease-out both;pointer-events:none}
+.m3-tile.is-clearing:after{position:absolute;z-index:2;inset:-8%;border-radius:50%;content:"";background:radial-gradient(circle,#fffde5 0%,#ffe98b 12%,#ffd35a44 38%,transparent 72%);animation:m3-clear-flash 1.8s ease-out both;pointer-events:none}
 .m3-grid.is-cascade .m3-tile.is-clearing{filter:brightness(1.7) saturate(1.5) drop-shadow(0 0 8px #ffd36a)}
 .m3-grid.is-cascade .m3-tile.is-clearing:after{background:radial-gradient(circle,#fff 0%,#fff1af 13%,#ffbd4c66 42%,transparent 74%)}
 @keyframes m3-clear{0%{transform:scale(1);opacity:1}35%{transform:scale(1.17) rotate(4deg);opacity:1}58%{transform:scale(1.08) rotate(-4deg);opacity:.95}100%{transform:scale(.12) rotate(18deg);opacity:0}}
