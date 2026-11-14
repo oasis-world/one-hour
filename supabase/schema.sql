@@ -411,22 +411,12 @@ as $$
 begin
   delete from public.chat_messages m
   where m.expires_at <= now()
-     or (coalesce(m.farewell, false) and m.created_at <= now() - interval '10 minutes')
-     or (
-       not coalesce(m.farewell, false)
-       and exists (
-         select 1 from public.profiles p
-         where p.user_id = m.user_id
-           and p.expires_at is not null
-           and p.expires_at <= now()
-       )
-     );
+     or (coalesce(m.farewell, false) and m.created_at <= now() - interval '10 minutes');
   delete from public.gomoku_states where expires_at <= now();
   delete from public.xiangqi_states where expires_at <= now();
   delete from public.chess_states where expires_at <= now();
-  -- Purge expired anonymous profiles (and their now-orphaned messages were
-  -- already removed above). Signed-in profiles have expires_at IS NULL and
-  -- are never touched here.
+  -- Purge expired anonymous profiles. Live chat messages remain until their
+  -- own expires_at, even after the author profile expires.
   delete from public.profiles
    where expires_at is not null
      and expires_at <= now();

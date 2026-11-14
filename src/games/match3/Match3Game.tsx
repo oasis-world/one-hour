@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { GameComponentProps } from '../types'
 import { useLang } from '../../lib/i18n'
 import { recordGamePlayed, recordGamePoints } from '../../lib/lifetimeStats'
@@ -32,10 +32,9 @@ export default function Match3Game({ instanceId }: GameComponentProps) {
   const [boardSize, setBoardSize] = useState<BoardSize>(6)
   const [tileSet, setTileSet] = useState<TileDef[]>(() => makeTileSet('mixed'))
   const [board, setBoard] = useState<number[][]>(() => randomBoard(TILE_TYPES, 6))
-  const initialBoard = useRef<number[][] | null>(board)
   const [starPoints, setStarPoints] = useState(readStarPoints)
   const [selected, setSelected] = useState<[number, number] | null>(null)
-  const [busy, setBusy] = useState(() => findMatches(board).size > 0)
+  const [busy, setBusy] = useState(false)
   const [clearing, setClearing] = useState<Set<string>>(new Set())
   const [shakeCells, setShakeCells] = useState<Set<string>>(new Set())
   const [falling, setFalling] = useState(false)
@@ -96,13 +95,6 @@ export default function Match3Game({ instanceId }: GameComponentProps) {
     }
     setBusy(false)
   }
-  useEffect(() => {
-    const start = initialBoard.current
-    initialBoard.current = null
-    if (start && findMatches(start).size) void processCascade(start, 6)
-    // Resolve only the first generated board; later boards are handled by reset/cascade.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
   const resetGame = (nextMode = mode, nextSize = boardSize, waitForToast = false) => {
     const nextBoard = randomBoard(TILE_TYPES, nextSize)
     setTileSet(makeTileSet(nextMode))
@@ -112,13 +104,7 @@ export default function Match3Game({ instanceId }: GameComponentProps) {
     setShakeCells(new Set())
     setCombo(0)
     setIsShaking(false)
-    if (waitForToast) {
-      setBusy(true)
-      return nextBoard
-    }
-    const hasMatches = findMatches(nextBoard).size > 0
-    setBusy(hasMatches)
-    if (hasMatches) void processCascade(nextBoard, nextSize)
+    setBusy(waitForToast)
     return nextBoard
   }
   const swapTiles = async (from: [number, number], to: [number, number]) => {

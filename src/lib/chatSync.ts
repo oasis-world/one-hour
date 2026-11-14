@@ -120,9 +120,9 @@ export function enterChat(
 
   const expireUserMessages = (userId: string) => {
     for (const entry of [...entries]) {
-      // Farewell notes belong to their recipient's remaining lifetime, not
-      // the sender's profile. Keep them through the post-summary cleanup.
-      if (entry.userId !== userId || entry.farewell) continue
+      // Messages outlive their author's profile when their own one-hour TTL
+      // has not elapsed; a newly posted point-gift notice must remain visible.
+      if (entry.userId !== userId || entry.farewell || !isExpired(entry)) continue
       // Best-effort cloud delete so other clients see the farewell even when
       // the profile trigger / purge RPC is unavailable.
       if (!entry.state) void handle?.deleteMessage(entry.id, imagePathOf(entry.imageUrl))

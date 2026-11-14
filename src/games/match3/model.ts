@@ -100,24 +100,33 @@ export function hasAnyMove(board: Board): boolean {
   return false
 }
 
-export function randomBoard(typeCount: number, size: number = BOARD_SIZE): Board {
-  let board: Board = Array.from({ length: size }, () =>
-    Array.from({ length: size }, () => Math.floor(Math.random() * typeCount))
-  )
-  // Keep any random starting matches so the game can animate and award them.
-  // A board with matches is cleared first; afterwards the cascade loop checks
-  // for a legal move and reshuffles if needed.
-  let attempts = 0
-  while (!hasAnyMove(board) && attempts < 50) {
-    const flat = board.flat()
-    for (let i = flat.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1))
-      const tmp = flat[i]; flat[i] = flat[j]; flat[j] = tmp
-    }
-    board = []
-    for (let r = 0; r < size; r++) board.push(flat.slice(r * size, (r + 1) * size))
-    attempts++
+function createMatchFreeBoard(typeCount: number, size: number, seedMove = false): Board {
+  const board: Board = Array.from({ length: size }, () => Array<number>(size).fill(-1))
+  if (seedMove && typeCount >= 3 && size >= 3) {
+    board[0].splice(0, 3, 1, 0, 2)
+    board[1].splice(0, 3, 1, 2, 0)
+    board[2].splice(0, 3, 2, 1, 2)
   }
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (board[r][c] !== -1) continue
+      const options = Array.from({ length: typeCount }, (_, tile) => tile).filter((tile) =>
+        !(c >= 2 && board[r][c - 1] === tile && board[r][c - 2] === tile) &&
+        !(r >= 2 && board[r - 1][c] === tile && board[r - 2][c] === tile),
+      )
+      board[r][c] = options[Math.floor(Math.random() * options.length)]
+    }
+  }
+  return board
+}
+
+export function randomBoard(typeCount: number, size: number = BOARD_SIZE): Board {
+  let board: Board
+  for (let attempt = 0; attempt < 100; attempt++) {
+    board = createMatchFreeBoard(typeCount, size)
+    if (hasAnyMove(board)) return board
+  }
+  board = createMatchFreeBoard(typeCount, size, true)
   return board
 }
 
