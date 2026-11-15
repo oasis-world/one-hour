@@ -14,7 +14,7 @@ import { useBlackjackSound } from './useBlackjackSound'
 import { BASE_BET, BJ_DEAL_MS } from './model'
 import './BlackjackGame.css'
 
-type RoundToast = { outcome: 'win' | 'push' | 'lose'; net: number; payout: number; stake: number }
+type RoundToast = { outcome: 'win' | 'push' | 'lose'; net: number }
 
 function SoundIcon({ enabled }: { enabled: boolean }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -37,8 +37,12 @@ export default function BlackjackGame({ instanceId }: GameComponentProps) {
   const toastTimer = useRef<number | null>(null)
   const pointsLedger = useRef({ key: '', debited: 0, settled: false })
   const pendingSettlement = useRef<{ key: string; stake: number; balanceDelta: number; gameNet: number } | null>(null)
-  // Points move only after the win/lose toast has finished (or when leaving /
-  // starting the next round early), so the number never jumps mid-animation.
+  // The table round counter resets when this in-memory game card remounts.
+  // Include a per-mount id so an old localStorage settlement cannot suppress
+  // a new round that happens to reuse the same round number.
+  const [pointsSessionId] = useState(() => `${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  const [settlementRound, setSettlementRound] = useState('')
+  // Bets stay in the balance during play; settle the net result after the toast.
   const flushSettlement = useCallback(() => {
     const pending = pendingSettlement.current
     pendingSettlement.current = null
@@ -46,6 +50,7 @@ export default function BlackjackGame({ instanceId }: GameComponentProps) {
     let claimed = false
     try { claimed = Boolean(JSON.parse(localStorage.getItem(pending.key) ?? 'null')?.settled) } catch { /* Best effort duplicate guard. */ }
     pointsLedger.current = { key: pending.key, debited: pending.stake, settled: true }
+    setSettlementRound(pending.key)
     if (claimed) return
     try { localStorage.setItem(pending.key, JSON.stringify({ debited: pending.stake, settled: true })) } catch { /* Best effort duplicate guard. */ }
     if (pending.balanceDelta) adjustStarPoints(pending.balanceDelta, true)
@@ -68,11 +73,11 @@ export default function BlackjackGame({ instanceId }: GameComponentProps) {
     room.leave()
   }, [room, flushSettlement])
   const rematch = useCallback(() => {
+    if (pendingSettlement.current) return
     setRoundToast(null)
     if (toastTimer.current !== null) window.clearTimeout(toastTimer.current)
-    flushSettlement()
     room.rematch(selectedBet)
-  }, [room, selectedBet, flushSettlement])
+  }, [room, selectedBet])
 
   useEffect(() => {
     if (room.state.round && room.state.round !== recordedRound.current && room.state.players.length > 0) {
@@ -85,28 +90,29 @@ export default function BlackjackGame({ instanceId }: GameComponentProps) {
     if (!room.selfId || !room.state.round) return
     const player = room.state.players[0]
     if (!player) return
-    const key = `blackjack-points:${instanceId}:${room.selfId}:${room.state.round}`
+    const key = `blackjack-points:${instanceId}:${room.selfId}:${pointsSessionId}:${room.state.round}`
     if (pointsLedger.current.key !== key) {
       let saved: { debited?: number; settled?: boolean } | null = null
       try { saved = JSON.parse(localStorage.getItem(key) ?? 'null') } catch { /* Local balance remains usable. */ }
       pointsLedger.current = { key, debited: saved?.debited ?? 0, settled: saved?.settled ?? false }
     }
     const ledger = pointsLedger.current
-    if (ledger.settled) return
+    if (ledger.settled) {
+      setSettlementRound(key)
+      return
+    }
     const stake = player.hands.reduce((sum, hand) => sum + hand.bet, 0)
     if (room.state.phase === 'result') {
       const payout = player.hands.reduce((sum, hand) => sum + hand.payout, 0)
-      const balanceDelta = payout - (stake - ledger.debited)
-      pointsLedger.current = { key, debited: stake, settled: true }
-      pendingSettlement.current = { key, stake, balanceDelta, gameNet: payout - stake }
-      return
+      // Include any stake already debited by an older app version if the
+      // player upgraded while a round was in progress.
+      const gameNet = payout - stake
+      const balanceDelta = ledger.debited > 0
+        ? payout - (stake - ledger.debited)
+        : gameNet
+      pendingSettlement.current = { key, stake, balanceDelta, gameNet }
     }
-    const additionalStake = stake - ledger.debited
-    if (additionalStake <= 0) return
-    pointsLedger.current = { key, debited: stake, settled: false }
-    try { localStorage.setItem(key, JSON.stringify({ debited: stake, settled: false })) } catch { /* Best effort duplicate guard. */ }
-    adjustStarPoints(-additionalStake, true)
-  }, [instanceId, room.selfId, room.state])
+  }, [instanceId, pointsSessionId, room.selfId, room.state])
 
   useEffect(() => {
     if (room.state.phase === 'lobby') return
@@ -125,7 +131,7 @@ export default function BlackjackGame({ instanceId }: GameComponentProps) {
     const stake = player.hands.reduce((sum, hand) => sum + hand.bet, 0)
     const net = payout - stake
     const outcome = net > 0 ? 'win' : net === 0 ? 'push' : 'lose'
-    const nextToast: RoundToast = { outcome, net, payout, stake }
+    const nextToast: RoundToast = { outcome, net }
     if (toastTimer.current !== null) window.clearTimeout(toastTimer.current)
     // Show the toast 1s after the last card lands: max deal stagger + deal animation + 1s pause.
     // Points settle when the toast finishes hiding, never mid-animation.
@@ -200,6 +206,7 @@ export default function BlackjackGame({ instanceId }: GameComponentProps) {
       instanceId={instanceId}
       selfId={room.selfId}
       starPoints={starPoints}
+      canRematch={settlementRound === `blackjack-points:${instanceId}:${room.selfId}:${pointsSessionId}:${room.state.round}`}
       bet={selectedBet}
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
       onBetChange={changeBet}
@@ -212,7 +219,7 @@ export default function BlackjackGame({ instanceId }: GameComponentProps) {
       <span className="bj-toast-spark" aria-hidden="true">✦</span>
       <strong>{roundToast.outcome === 'win' ? t('恭喜获胜！', 'YOU WIN') : roundToast.outcome === 'push' ? t('平局', 'PUSH') : t('本局失利', 'ROUND LOST')}</strong>
       <b>{roundToast.net > 0 ? '+' : ''}{roundToast.net.toLocaleString()}</b>
-      <small>{t('净得积分', 'NET POINTS')} · {t('派彩', 'PAYOUT')} {roundToast.payout.toLocaleString()}</small>
+      <small>{t('本局净输赢', 'NET RESULT')}</small>
       <span className="bj-toast-spark" aria-hidden="true">✦</span>
     </div>}
     {leaveConfirmOpen && <BlackjackLeaveDialog

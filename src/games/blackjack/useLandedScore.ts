@@ -2,18 +2,20 @@ import { useEffect, useRef, useState } from 'react'
 import { BJ_DEAL_MS, handValue, type Card as PlayingCard } from './model'
 
 /**
- * Fresh deal: the score stays completely hidden until the cards land, then it
- * appears with the total. Card added mid-hand: keeps showing the previous
- * total and flips to the new one on landing — no hide/show flicker.
+ * Fresh deal: the score pill stays completely hidden until the cards land,
+ * then it appears with the total. Card added mid-hand: keeps showing the
+ * previous total and flips to the new one on landing — no hide/show flicker.
+ * Result badges key off `landed`.
+ *
+ * Completion is tracked per card signature (`settledRef`), never inferred
+ * from intermediate refs. That way an effect re-run whose timer was cleared
+ * (StrictMode double-invoke, HMR remount) always re-arms instead of bailing
+ * out and stranding the pill hidden forever.
  */
 export function useLandedScore(cards: PlayingCard[], lastStaggerMs: number) {
   const [shown, setShown] = useState<{ total: number; soft: boolean } | null>(null)
   const [landed, setLanded] = useState(false)
-  const lenRef = useRef(0)
   const sigRef = useRef('')
-  // Signatures whose landing has fully completed (value shown + flag set).
-  // Unlike bailing on "nothing changed", this survives effect re-runs
-  // (StrictMode double-invoke, HMR) without stranding a cleared timer.
   const settledRef = useRef<string | null>(null)
   useEffect(() => {
     const sig = cards.map((card) => card.id).join(',')
@@ -28,38 +30,20 @@ export function useLandedScore(cards: PlayingCard[], lastStaggerMs: number) {
       setLanded(true)
     }
     if (cards.length === 0) {
-      lenRef.current = 0
       finish(value)
       return
     }
-    if (freshDeal) {
-      lenRef.current = cards.length
-      const reduced = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-        && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      if (reduced) {
-        finish(value)
-        return
-      }
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setShown(null)
-      setLanded(false)
-      const timer = window.setTimeout(() => finish(value), lastStaggerMs + BJ_DEAL_MS)
-      return () => window.clearTimeout(timer)
+    const reduced = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduced) {
+      finish(value)
+      return
     }
-    if (cards.length > lenRef.current) {
-      lenRef.current = cards.length
-      const reduced = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-        && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      if (reduced) {
-        finish(value)
-        return
-      }
-      setLanded(false)
-      const timer = window.setTimeout(() => finish(value), lastStaggerMs + BJ_DEAL_MS)
-      return () => window.clearTimeout(timer)
-    }
-    lenRef.current = cards.length
-    finish(value)
+    if (freshDeal) setShown(null)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLanded(false)
+    const timer = window.setTimeout(() => finish(value), lastStaggerMs + BJ_DEAL_MS)
+    return () => window.clearTimeout(timer)
   }, [cards, lastStaggerMs])
   return { shown, landed }
 }

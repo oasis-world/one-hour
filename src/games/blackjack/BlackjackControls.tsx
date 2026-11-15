@@ -1,10 +1,7 @@
 import { useState } from 'react'
 import { t } from '../../lib/i18n'
-import { handValue, type BlackjackState, type Card as PlayingCard } from './model'
-import { useLandedScore } from './useLandedScore'
+import { handValue, type BlackjackState } from './model'
 import SlotBetSelector from '../slot-machine/SlotBetSelector'
-
-const NO_CARDS: PlayingCard[] = []
 
 const RULE_TIPS: Array<[string, string]> = [
   ['庄家未满 17 点必须补牌，17 点即停', 'Dealer must draw below 17 and stands on all 17s'],
@@ -20,6 +17,7 @@ interface Props {
   instanceId: string
   selfId: string | null
   starPoints: number
+  canRematch: boolean
   bet: number
   dir: 'ltr' | 'rtl'
   onBetChange: (bet: number) => void
@@ -29,23 +27,14 @@ interface Props {
   onLeave: () => void
 }
 
-export default function BlackjackControls({ state, instanceId, selfId, starPoints, bet, dir, onBetChange, onPlay, onAction, onRematch, onLeave }: Props) {
+export default function BlackjackControls({ state, instanceId, selfId, starPoints, canRematch, bet, dir, onBetChange, onPlay, onAction, onRematch, onLeave }: Props) {
   const player = state.players[0]
   const activeHand = player?.hands[0]
   const handStood = Boolean(activeHand?.stood)
   const activeScore = activeHand ? handValue(activeHand.cards).total : 0
-  const canAddWager = Boolean(activeHand && starPoints >= activeHand.bet)
+  const canAddWager = Boolean(activeHand && starPoints >= activeHand.bet * 2)
   const canStartHand = starPoints >= bet
   const leaveButton = <button className="bj-action bj-leave-button" type="button" onClick={onLeave}>{t('离开', 'LEAVE')}</button>
-  // Same landing clock as the table pill: hidden on a fresh deal until the
-  // cards land, then sticky (shows the previous total while a new card flies).
-  // NOTE: fall back to a module-level empty array — an inline `?? []` would
-  // create a new identity every render and loop the effect below forever.
-  const activeCards = activeHand?.cards ?? NO_CARDS
-  const { shown: landedScore } = useLandedScore(activeCards, Math.min(Math.max(activeCards.length - 1, 0), 12) * 150)
-  const handIndicatorText = landedScore
-    ? t('第{{hand}}手 · {{score}}点', 'HAND {{hand}} · {{score}}').replace('{{hand}}', '1').replace('{{score}}', String(landedScore.total))
-    : null
   // Fixed hint slot: when no formal notice applies, show a random house rule
   // so the row above the buttons never collapses mid-round.
   const [tipIndex] = useState(() => Math.floor(Math.random() * RULE_TIPS.length))
@@ -58,7 +47,7 @@ export default function BlackjackControls({ state, instanceId, selfId, starPoint
       : null
 
   if (state.phase === 'players') return <div className="bj-controls">
-    <div className="bj-turn-label"><span className="bj-live-dot" />{t('轮到你了', 'YOUR TURN')}{handIndicatorText && <small className="bj-hand-indicator">{handIndicatorText}</small>}</div>
+    <div className="bj-turn-label"><span className="bj-live-dot" />{t('轮到你了', 'YOUR TURN')}</div>
     <div className="bj-action-buttons">
       <button className="bj-action bj-hit" type="button" disabled={handStood} onClick={() => onAction('hit')}>{t('要牌', 'HIT')}</button>
       <button className="bj-action" type="button" disabled={handStood} onClick={() => onAction('stand')}>{t('停牌', 'STAND')}</button>
@@ -88,7 +77,7 @@ export default function BlackjackControls({ state, instanceId, selfId, starPoint
           labelInside
         />
       </div>
-      <button type="button" className="bj-action bj-hit" disabled={!canStartHand} onClick={onRematch}>{t('再来一局', 'DEAL AGAIN')}</button>{leaveButton}</div>
+      <button type="button" className="bj-action bj-hit" disabled={!canStartHand || !canRematch} onClick={onRematch}>{t('再来一局', 'DEAL AGAIN')}</button>{leaveButton}</div>
   </div>
 
   return <div className="bj-controls">
