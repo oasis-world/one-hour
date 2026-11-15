@@ -53,8 +53,10 @@
 .bj-card { position:relative;display:block;width:74px;height:104px;overflow:hidden;border:0;border-radius:4px;background:transparent;box-shadow:none }
 .bj-card-stack:nth-child(even) .bj-card { transform:none }
 .bj-card>img,.bj-card>.sol-card-art { display:block;width:100%;height:100%;object-fit:fill;border-radius:4px;background:#fff;box-shadow:0 16px 30px #02120ccc,0 4px 8px #02120c66,0 0 20px #f0cf7914;filter:saturate(1.02) }
-/* Rounded top-light + bottom shade: reads as thickness under the table lamp. */
-.bj-card::after { content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 1px 1px #ffffff59,inset 0 -3px 8px #0000001f;pointer-events:none }
+/* Rounded top-light + bottom shade: reads as thickness under the table lamp.
+   The faces ship without a printed edge, so keep a whisper of an inset line
+   so the white plates still read against bright felt. */
+.bj-card::after { content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 1px 1px #ffffff59,inset 0 -3px 8px #0000001f,inset 0 0 0 1px #00000029;pointer-events:none }
 .bj-card.is-back { border:0;background:transparent }
 .bj-card.is-back>img { object-fit:cover;border-radius:4px }
 .bj-cards { min-height:112px }

@@ -9,10 +9,10 @@
 .bj-dealer-hand .bj-cards { min-height:112px }
 .bj-idle-deck { position:relative;width:104px;height:146px;margin:20px auto 26px;filter:drop-shadow(0 8px 10px #02170f88) }
 .bj-dealer-shoe { position:absolute;top:15px;right:18px;width:42px;height:62px;opacity:.82;transform:rotate(8deg);filter:drop-shadow(0 4px 4px #02170f88) }
-.bj-dealer-shoe span { position:absolute;inset:0;border:1px solid #dfcb8b;border-radius:6px;background:#8c2731 url("/games/blackjack/card-back.png") center/cover;box-shadow:inset 0 0 0 2px #792630 }
+.bj-dealer-shoe span { position:absolute;inset:0;border:1px solid #dfcb8b;border-radius:6px;background:#8c2731 url("/games/blackjack/cards-cc0/card-back-blue.svg") center/cover;box-shadow:inset 0 0 0 2px #792630 }
 .bj-dealer-shoe span:nth-child(1) { transform:translate(-4px,3px) rotate(-8deg) }
 .bj-dealer-shoe span:nth-child(2) { transform:translate(-2px,1px) rotate(-4deg) }
-.bj-idle-deck span { position:absolute;inset:0;border:1px solid #dfcb8b;border-radius:9px;background:#8c2731 url("/games/blackjack/card-back.png") center/cover;box-shadow:inset 0 0 0 3px #792630 }
+.bj-idle-deck span { position:absolute;inset:0;border:1px solid #dfcb8b;border-radius:9px;background:#8c2731 url("/games/blackjack/cards-cc0/card-back-blue.svg") center/cover;box-shadow:inset 0 0 0 3px #792630 }
 .bj-idle-deck span:nth-child(1) { transform:translate(-7px,5px) rotate(-8deg) }
 .bj-idle-deck span:nth-child(2) { transform:translate(-3px,2px) rotate(-4deg) }
 @keyframes bj-card-deal { 0% { opacity:0;transform:translate3d(var(--bj-deal-x,0),var(--bj-deal-y,-115px),0) rotate(14deg) scale(.72);filter:blur(1.5px) } 60% { opacity:1;filter:blur(0) } 100% { opacity:1;transform:translate3d(0,0,0) rotate(0) scale(1);filter:blur(0) } }
