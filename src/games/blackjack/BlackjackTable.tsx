@@ -1,14 +1,26 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import AvatarBadge from '../../components/AvatarBadge'
 import MessageAuthorCard from '../../components/MessageAuthorCard'
 import { t } from '../../lib/i18n'
 import { setPopoverOpen, suppressNextClick } from '../../lib/popoverGuard'
 import type { PresenceMember } from '../../lib/chatTypes'
-import { BJ_DEAL_MS, cardLabel, handValue, type BlackjackState, type Card as PlayingCard, type Hand, type Player } from './model'
-import type { CSSProperties } from 'react'
+import { cardLabel, handValue, type BlackjackState, type Card as PlayingCard, type Hand, type Player } from './model'
+import { useLandedScore } from './useLandedScore'
 import BlackjackCard from './BlackjackCard'
 import './BlackjackTable.css'
+
+/** Center of `el` in `ancestor`'s padding-box coordinates (ignores transforms). */
+function relativeCenter(el: HTMLElement, ancestor: HTMLElement): { x: number; y: number } {
+  let x = 0, y = 0
+  let node: HTMLElement | null = el
+  while (node && node !== ancestor) {
+    x += node.offsetLeft
+    y += node.offsetTop
+    node = node.offsetParent as HTMLElement | null
+  }
+  return { x: x + el.offsetWidth / 2, y: y + el.offsetHeight / 2 }
+}
 
 function BotIcon({ size }: { size: number }) {
   return (
@@ -98,63 +110,15 @@ function SeatAvatarButton({ player }: { player: Player }) {
   </>
 }
 
-/**
- * Card lands first, score follows: while a newly dealt card is still
- * animating, keep showing the previous total; flip to the live total the
- * moment the card is in place. A brand-new deal (all card ids replaced,
- * e.g. rematch) counts as "grew" even when the hand length is unchanged.
- */
-function useLandedScore(cards: PlayingCard[], hidden: boolean, lastStaggerMs: number) {
-  const live = hidden ? null : handValue(cards)
-  const [shown, setShown] = useState(live)
-  const [landed, setLanded] = useState(true)
-  const lenRef = useRef(0)
-  const sigRef = useRef('')
-  useEffect(() => {
-    const sig = cards.map((card) => card.id).join(',')
-    const prevIds = sigRef.current ? new Set(sigRef.current.split(',')) : null
-    const freshDeal = Boolean(prevIds && sig !== sigRef.current && !cards.some((card) => prevIds.has(card.id)))
-    sigRef.current = sig
-    if (hidden) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setShown(null)
-      setLanded(true)
-      lenRef.current = cards.length
-      return
-    }
-    const value = handValue(cards)
-    if ((cards.length > lenRef.current || freshDeal) && cards.length > 0) {
-      lenRef.current = cards.length
-      const reduced = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-        && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      if (reduced) {
-        setShown(value)
-        setLanded(true)
-        return
-      }
-      setLanded(false)
-      const timer = window.setTimeout(() => {
-        setShown(value)
-        setLanded(true)
-      }, lastStaggerMs + BJ_DEAL_MS)
-      return () => window.clearTimeout(timer)
-    }
-    lenRef.current = cards.length
-    setShown(value)
-    setLanded(true)
-  }, [cards, hidden, lastStaggerMs])
-  return { shown: shown ?? live, landed }
-}
-
 function HandView({ hand, hidden, result, active = false, dealOrder = 0, lastStaggerMs, avatar }: { hand: Hand; hidden: boolean; result?: string; active?: boolean; dealOrder?: number; lastStaggerMs?: number; avatar?: ReactNode }) {
   const stagger = lastStaggerMs ?? Math.min(dealOrder + Math.max(hand.cards.length - 1, 0), 12) * 150
-  const { shown, landed } = useLandedScore(hand.cards, hidden, stagger)
-  const score = shown ?? handValue(hand.cards)
+  const { shown, landed } = useLandedScore(hand.cards, stagger)
+  const score = shown
   const resultText: Record<string, string> = { win: t('获胜', 'WIN'), lose: t('落败', 'LOSE'), push: t('平局', 'PUSH'), bust: t('爆牌', 'BUST'), blackjack: t('黑杰克', 'BLACKJACK') }
   return <div className={`bj-hand${active ? ' is-current' : ''}${result ? ` is-${result}` : ''}`}>
     <div className="bj-hand-meta">
       {avatar}
-      <strong className="bj-score-pill">{hidden ? cardLabel(hand.cards[0]) : score.total}</strong>{!hidden && score.soft && <small>{t('软牌', 'SOFT')}</small>}
+      {score && <strong className="bj-score-pill">{hidden ? cardLabel(hand.cards[0]) : score.total}</strong>}{!hidden && score?.soft && <small>{t('软牌', 'SOFT')}</small>}
       {landed && result && <span className="bj-hand-result">{resultText[result] ?? result}</span>}
       {hand.doubled && <small>{t('已加倍', 'DOUBLED')}</small>}
       {landed && result && hand.payout > 0 && <small className="bj-payout">{result === 'push' ? `↩ ${hand.payout}` : `+${hand.payout - hand.bet}`}</small>}
@@ -170,10 +134,7 @@ function HandView({ hand, hidden, result, active = false, dealOrder = 0, lastSta
 function PlayerSeat({ player, active, results }: { player: Player; active: boolean; results: BlackjackState['results'] }) {
   const bet = player.hands.reduce((sum, hand) => sum + hand.bet, 0)
   return <article className={`bj-seat${active ? ' is-active' : ''}`}>
-    <div
-      className="bj-player-hands"
-      style={{ '--bj-deal-x': '260px', '--bj-deal-y': '-170px' } as CSSProperties}
-    >
+    <div className="bj-player-hands">
       {player.hands.map((hand, handIndex) => <div className="bj-player-hand" key={`${player.userId}-${handIndex}`}>
         <HandView hand={hand} hidden={false} active={active} result={results[`${player.userId}:${handIndex}`]} dealOrder={0} avatar={<SeatAvatarButton player={player} />} />
       </div>)}
@@ -187,16 +148,15 @@ function PlayerSeat({ player, active, results }: { player: Player; active: boole
 
 function DealerHandView({ dealerHand, hideHoleCard, playersCount, avatar }: { dealerHand: PlayingCard[]; hideHoleCard: boolean; playersCount: number; avatar: ReactNode }) {
   const lastStagger = (playersCount + Math.max(dealerHand.length - 1, 0)) * 180
-  const { shown } = useLandedScore(dealerHand, false, lastStagger)
-  const full = shown ?? handValue(dealerHand)
+  const { shown } = useLandedScore(dealerHand, lastStagger)
   const first = handValue(dealerHand.slice(0, 1))
   return <div className="bj-dealer-hand">
     {dealerHand.length > 0 && <div className="bj-hand-meta">
       {avatar}
-      <strong className="bj-score-pill">{hideHoleCard ? first.total : full.total}</strong>{!hideHoleCard && full.soft && <small>{t('软牌', 'SOFT')}</small>}
+      {shown && <strong className="bj-score-pill">{hideHoleCard ? first.total : shown.total}</strong>}{!hideHoleCard && shown?.soft && <small>{t('软牌', 'SOFT')}</small>}
     </div>}
     <div className="bj-cards" aria-label={t('庄家手牌', "Dealer's hand")}>
-      {dealerHand.map((card, index) => <span className="bj-card-stack" key={card.id} style={{ zIndex: index, '--bj-deal-x': '230px', '--bj-deal-y': '-95px', animationDelay: `${(playersCount + index) * 180}ms` } as CSSProperties}>
+      {dealerHand.map((card, index) => <span className="bj-card-stack" key={card.id} style={{ zIndex: index, animationDelay: `${(playersCount + index) * 180}ms` }}>
         <BlackjackCard card={card} back={hideHoleCard && index === 1} />
       </span>)}
     </div>
@@ -206,7 +166,25 @@ function DealerHandView({ dealerHand, hideHoleCard, playersCount, avatar }: { de
 export default function BlackjackTable({ state }: { state: BlackjackState }) {
   const hideHoleCard = state.phase === 'players'
   const isIdle = state.dealerHand.length === 0
-  return <div className="bj-table" aria-label={t('21 点 · 黑杰克', 'Blackjack table')}>
+  const tableRef = useRef<HTMLDivElement>(null)
+  const shoeRef = useRef<HTMLDivElement>(null)
+  // Every dealt card starts its flight at the shoe: measure the shoe center
+  // and each stack's resting center (transform-independent offsets) and store
+  // the delta as the animation origin. Runs pre-paint so the first frame is
+  // already correct; re-running is idempotent and never restarts animations.
+  useLayoutEffect(() => {
+    const table = tableRef.current
+    const shoe = shoeRef.current
+    if (!table || !shoe) return
+    const origin = relativeCenter(shoe, table)
+    table.querySelectorAll(':scope .bj-card-stack').forEach((node) => {
+      const el = node as HTMLElement
+      const c = relativeCenter(el, table)
+      el.style.setProperty('--bj-from-x', `${Math.round(origin.x - c.x)}px`)
+      el.style.setProperty('--bj-from-y', `${Math.round(origin.y - c.y)}px`)
+    })
+  })
+  return <div className="bj-table" ref={tableRef} aria-label={t('21 点 · 黑杰克', 'Blackjack table')}>
      <section className="bj-dealer-zone">
       {isIdle ? <div className="bj-idle-deck" aria-hidden="true">
         <span /><span /><span />
@@ -214,7 +192,7 @@ export default function BlackjackTable({ state }: { state: BlackjackState }) {
       <div className="bj-dealer-card">
         <DealerHandView dealerHand={state.dealerHand} hideHoleCard={hideHoleCard} playersCount={Math.max(state.players.length, 1)} avatar={<BotIcon size={30} />} />
       </div>
-      <div className="bj-dealer-shoe" aria-hidden="true">
+      <div className="bj-dealer-shoe" ref={shoeRef} key={state.deck.length} aria-hidden="true">
         <span /><span /><span />
       </div>
       </>}

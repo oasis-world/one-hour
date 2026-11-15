@@ -154,11 +154,33 @@ export default function BlackjackGame({ instanceId }: GameComponentProps) {
     flushSettlement()
   }, [flushSettlement])
 
+  // A stood hand (bust / 21 / double / natural) stays on the table until its
+  // last card has landed; only then is the turn handed to the dealer, so the
+  // dealer never reveals while the player's card is still flying in.
+  // (A manual stand adds no card, so it hands over immediately in the model.)
+  const advanceTurn = room.advance
+  const runDealer = room.finishDealer
+  const tablePhase = room.state.phase
+  const tableRound = room.state.round
+  const stoodLongest = tablePhase === 'players'
+    ? (room.state.players[0]?.hands ?? []).filter((hand) => hand.stood).reduce((n, hand) => Math.max(n, hand.cards.length), 0)
+    : 0
+  const stoodSig = tablePhase === 'players'
+    ? (room.state.players[0]?.hands ?? []).filter((hand) => hand.stood).map((hand) => hand.cards.map((card) => card.id).join(',')).join(';')
+    : ''
   useEffect(() => {
-    if (room.state.phase !== 'dealer') return
-    const timer = window.setTimeout(() => room.finishDealer(), 650)
+    if (tablePhase !== 'players' || !stoodLongest) return
+    const reduced = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const wait = reduced ? 0 : Math.min(stoodLongest - 1, 12) * 150 + BJ_DEAL_MS + 250
+    const timer = window.setTimeout(() => advanceTurn(), wait)
     return () => window.clearTimeout(timer)
-  }, [room, room.state.phase, room.state.round])
+  }, [advanceTurn, tablePhase, stoodLongest, stoodSig])
+  useEffect(() => {
+    if (tablePhase !== 'dealer') return
+    const timer = window.setTimeout(() => runDealer(), 650)
+    return () => window.clearTimeout(timer)
+  }, [runDealer, tablePhase, tableRound])
 
   return <section className="blackjack-card" dir={lang === 'ar' ? 'rtl' : 'ltr'} aria-label={t('21 点 · 黑杰克', 'Blackjack · 21')}>
     <header className="bj-header">

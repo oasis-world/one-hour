@@ -3,7 +3,7 @@ import { useAccount } from '../../lib/useAccount'
 import { resolveChatIdentity } from '../../lib/identity'
 import { loadUserProfile } from '../../lib/userProfile'
 import {
-  applyPlayerAction, createBlackjackGame, finishBlackjackDealer, leaveBlackjackTable,
+  advanceToDealer, applyPlayerAction, createBlackjackGame, finishBlackjackDealer, leaveBlackjackTable,
   rematchBlackjackRound, startBlackjackRound, type BlackjackState,
 } from './model'
 
@@ -32,6 +32,10 @@ export function useBlackjackRoom(instanceId: string) {
     setState((current) => applyPlayerAction(current, action))
   }, [])
 
+  const advance = useCallback(() => {
+    setState((current) => advanceToDealer(current))
+  }, [])
+
   const finishDealer = useCallback(() => {
     setState((current) => finishBlackjackDealer(current))
   }, [])
@@ -44,5 +48,5 @@ export function useBlackjackRoom(instanceId: string) {
     setState((current) => leaveBlackjackTable(current))
   }, [])
 
-  return { state, selfId, play, act, finishDealer, rematch, leave }
+  return { state, selfId, play, act, advance, finishDealer, rematch, leave }
 }

@@ -58,7 +58,8 @@ function finishRound(state: BlackjackState, dealerHand: Card[]): BlackjackState 
       const natural = isNatural(hand)
       const outcome = score > 21 ? 'bust' : dealerNatural ? (natural ? 'push' : 'lose') : natural ? 'blackjack' : dealerScore > 21 || score > dealerScore ? 'win' : score === dealerScore ? 'push' : 'lose'
       results[`${player.userId}:${handIndex}`] = outcome
-      const payout = outcome === 'blackjack' ? hand.bet * 2.5 : outcome === 'win' ? hand.bet * 2 : outcome === 'push' ? hand.bet : 0
+      // Blackjack pays 3:2 — round half up so points stay whole everywhere.
+      const payout = outcome === 'blackjack' ? Math.round(hand.bet * 2.5) : outcome === 'win' ? hand.bet * 2 : outcome === 'push' ? hand.bet : 0
       return { ...hand, stood: true, payout }
     }),
   }))
@@ -78,10 +79,9 @@ export function startBlackjackRound(state: BlackjackState, player: Omit<Player, 
   const players = [{ ...player, bet, hands }]
   const initial: BlackjackState = { ...state, players, dealerHand, deck, phase: 'players', round: state.round + 1, results: {} }
   if (handValue(dealerHand).total === 21) return finishRound(initial, dealerHand)
-  if (isNatural(hands[0])) {
-    players[0].hands[0].stood = true
-    return { ...initial, players, phase: 'dealer' }
-  }
+  // A natural stands at once, but the table still waits for the dealt cards
+  // to land before handing the turn to the dealer (see advanceToDealer).
+  if (isNatural(hands[0])) players[0].hands[0].stood = true
   return initial
 }
 
@@ -92,17 +92,29 @@ export function applyPlayerAction(state: BlackjackState, action: 'hit' | 'stand'
   const deck = [...state.deck]
   if (action === 'hit' && handValue(current.cards).total < 21) {
     current.cards.push(deck.pop()!)
-    // Still under 21: the same hand keeps the turn.
+    // The hand keeps the turn until its last card has landed; the table
+    // hands over to the dealer afterwards (see advanceToDealer).
     if (handValue(current.cards).total < 21) return { ...state, players: nextPlayers, deck }
     current.stood = true
-  } else if (action === 'stand') current.stood = true
-  else if (action === 'double' && current.cards.length === 2 && !current.doubled && handValue(current.cards).total < 21) {
+    return { ...state, players: nextPlayers, deck }
+  } else if (action === 'stand' && !current.stood) {
+    current.stood = true
+    // No new card: nothing left to wait for, hand over immediately.
+    return { ...state, players: nextPlayers, deck, phase: 'dealer' }
+  } else if (action === 'double' && current.cards.length === 2 && !current.doubled && handValue(current.cards).total < 21) {
     current.bet *= 2
     current.doubled = true
     current.cards.push(deck.pop()!)
     current.stood = true
+    return { ...state, players: nextPlayers, deck }
   } else return state
-  return { ...state, players: nextPlayers, deck, phase: 'dealer' }
+}
+
+/** Hand the turn to the dealer once every hand has stood and landed. */
+export function advanceToDealer(state: BlackjackState): BlackjackState {
+  if (state.phase !== 'players' || state.players.length === 0) return state
+  if (!state.players.every((player) => player.hands.every((hand) => hand.stood))) return state
+  return { ...state, phase: 'dealer' }
 }
 
 function finishAiDealer(state: BlackjackState): BlackjackState {
