@@ -11,11 +11,12 @@ interface Props {
   value: number
   disabled: boolean
   onChange: (bet: number) => void
+  labelInside?: boolean
 }
 
 interface Position { top: number; left: number; width: number }
 
-export default function SlotBetSelector({ id, label, dir, value, disabled, onChange }: Props) {
+export default function SlotBetSelector({ id, label, dir, value, disabled, onChange, labelInside = false }: Props) {
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState<Position | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -77,7 +78,7 @@ export default function SlotBetSelector({ id, label, dir, value, disabled, onCha
   }
 
   return <div className="slot-bet-selector" ref={rootRef} onClick={(event) => event.stopPropagation()}>
-    <label htmlFor={id}>{label}</label>
+    {!labelInside && <label htmlFor={id}>{label}</label>}
     <button
       id={id}
       type="button"
@@ -95,6 +96,7 @@ export default function SlotBetSelector({ id, label, dir, value, disabled, onCha
         }
       }}
     >
+      {labelInside && <span className="slot-bet-inline-label">{label}</span>}
       <span>{value}</span><span className="slot-bet-chevron" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="m4 6 4 4 4-4" /></svg></span>
     </button>
     {open && createPortal(<div

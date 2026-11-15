@@ -7,3 +7,7 @@ Table photo: `felt-table.jpg`, resized from “Playing Cards Beside and Casino C
 on Green Table” by Vitezslav Vylicil, Pexels.
 Source: https://www.pexels.com/photo/playing-cards-beside-and-casino-chips-on-green-table-5412324/
 License: Pexels License (https://www.pexels.com/license/).
+
+Card fronts: `cards/*.svg`, Vector Playing Cards by Chris Aguilar (notpeter),
+from https://github.com/notpeter/Vector-Playing-Cards.
+License: (see repository; cards are public-domain / CC0-style).

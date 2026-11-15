@@ -11,7 +11,7 @@ import { useBlackjackPoints } from './useBlackjackPoints'
 import BlackjackTable from './BlackjackTable'
 import { useBlackjackRoom } from './useBlackjackRoom'
 import { useBlackjackSound } from './useBlackjackSound'
-import { BASE_BET } from './model'
+import { BASE_BET, BJ_DEAL_MS } from './model'
 import './BlackjackGame.css'
 
 type RoundToast = { outcome: 'win' | 'push' | 'lose'; net: number; payout: number; stake: number }
@@ -23,10 +23,9 @@ function SoundIcon({ enabled }: { enabled: boolean }) {
   </svg>
 }
 
-export default function BlackjackGame({ instanceId, hostUserId }: GameComponentProps) {
+export default function BlackjackGame({ instanceId }: GameComponentProps) {
   const lang = useLang()
-  const room = useBlackjackRoom(instanceId, hostUserId)
-  const { isOwnTabAuthority, leave: leaveRoom, rematch: rematchRoom } = room
+  const room = useBlackjackRoom(instanceId)
   const starPoints = useBlackjackPoints()
   const [selectedBet, setSelectedBet] = useState(BASE_BET)
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false)
@@ -37,12 +36,23 @@ export default function BlackjackGame({ instanceId, hostUserId }: GameComponentP
   const toastedRound = useRef(0)
   const toastTimer = useRef<number | null>(null)
   const pointsLedger = useRef({ key: '', debited: 0, settled: false })
-  const myPlayer = room.state.players.find((player) => player.userId === room.selfId)
-  const myBet = myPlayer?.bet ?? selectedBet
+  const pendingSettlement = useRef<{ key: string; stake: number; balanceDelta: number; gameNet: number } | null>(null)
+  // Points move only after the win/lose toast has finished (or when leaving /
+  // starting the next round early), so the number never jumps mid-animation.
+  const flushSettlement = useCallback(() => {
+    const pending = pendingSettlement.current
+    pendingSettlement.current = null
+    if (!pending) return
+    let claimed = false
+    try { claimed = Boolean(JSON.parse(localStorage.getItem(pending.key) ?? 'null')?.settled) } catch { /* Best effort duplicate guard. */ }
+    pointsLedger.current = { key: pending.key, debited: pending.stake, settled: true }
+    if (claimed) return
+    try { localStorage.setItem(pending.key, JSON.stringify({ debited: pending.stake, settled: true })) } catch { /* Best effort duplicate guard. */ }
+    if (pending.balanceDelta) adjustStarPoints(pending.balanceDelta, true)
+    recordGamePoints(pending.gameNet)
+  }, [])
   const changeBet = (bet: number) => {
-    if (bet !== myBet) blackjackSound(instanceId, 'chip')
     setSelectedBet(bet)
-    if (myPlayer) room.setBet(bet)
   }
   const playAction = (action: 'hit' | 'stand' | 'double') => {
     if (action === 'double') blackjackSound(instanceId, 'chip')
@@ -54,24 +64,26 @@ export default function BlackjackGame({ instanceId, hostUserId }: GameComponentP
     setLeaveConfirmOpen(false)
     setRoundToast(null)
     if (toastTimer.current !== null) window.clearTimeout(toastTimer.current)
-    leaveRoom()
-  }, [leaveRoom])
+    flushSettlement()
+    room.leave()
+  }, [room, flushSettlement])
   const rematch = useCallback(() => {
     setRoundToast(null)
     if (toastTimer.current !== null) window.clearTimeout(toastTimer.current)
-    rematchRoom()
-  }, [rematchRoom])
+    flushSettlement()
+    room.rematch(selectedBet)
+  }, [room, selectedBet, flushSettlement])
 
   useEffect(() => {
-    if (room.state.round && room.state.round !== recordedRound.current && room.state.players.some((player) => player.userId === room.selfId)) {
+    if (room.state.round && room.state.round !== recordedRound.current && room.state.players.length > 0) {
       recordGamePlayed('blackjack', `${instanceId}:${room.state.round}`)
       recordedRound.current = room.state.round
     }
-  }, [instanceId, room.selfId, room.state.round, room.state.players])
+  }, [instanceId, room.state.round, room.state.players])
 
   useEffect(() => {
-    if (!room.selfId || !room.state.round || !isOwnTabAuthority()) return
-    const player = room.state.players.find((entry) => entry.userId === room.selfId)
+    if (!room.selfId || !room.state.round) return
+    const player = room.state.players[0]
     if (!player) return
     const key = `blackjack-points:${instanceId}:${room.selfId}:${room.state.round}`
     if (pointsLedger.current.key !== key) {
@@ -86,9 +98,7 @@ export default function BlackjackGame({ instanceId, hostUserId }: GameComponentP
       const payout = player.hands.reduce((sum, hand) => sum + hand.payout, 0)
       const balanceDelta = payout - (stake - ledger.debited)
       pointsLedger.current = { key, debited: stake, settled: true }
-      try { localStorage.setItem(key, JSON.stringify({ debited: stake, settled: true })) } catch { /* Best effort duplicate guard. */ }
-      if (balanceDelta) adjustStarPoints(balanceDelta, true)
-      recordGamePoints(payout - stake)
+      pendingSettlement.current = { key, stake, balanceDelta, gameNet: payout - stake }
       return
     }
     const additionalStake = stake - ledger.debited
@@ -96,7 +106,7 @@ export default function BlackjackGame({ instanceId, hostUserId }: GameComponentP
     pointsLedger.current = { key, debited: stake, settled: false }
     try { localStorage.setItem(key, JSON.stringify({ debited: stake, settled: false })) } catch { /* Best effort duplicate guard. */ }
     adjustStarPoints(-additionalStake, true)
-  }, [instanceId, isOwnTabAuthority, room.selfId, room.state])
+  }, [instanceId, room.selfId, room.state])
 
   useEffect(() => {
     if (room.state.phase === 'lobby') return
@@ -108,7 +118,7 @@ export default function BlackjackGame({ instanceId, hostUserId }: GameComponentP
 
   useEffect(() => {
     if (room.state.phase !== 'result' || !room.selfId || room.state.round === toastedRound.current) return
-    const player = room.state.players.find((entry) => entry.userId === room.selfId)
+    const player = room.state.players[0]
     if (!player) return
     toastedRound.current = room.state.round
     const payout = player.hands.reduce((sum, hand) => sum + hand.payout, 0)
@@ -117,22 +127,38 @@ export default function BlackjackGame({ instanceId, hostUserId }: GameComponentP
     const outcome = net > 0 ? 'win' : net === 0 ? 'push' : 'lose'
     const nextToast: RoundToast = { outcome, net, payout, stake }
     if (toastTimer.current !== null) window.clearTimeout(toastTimer.current)
+    // Show the toast 1s after the last card lands: max deal stagger + deal animation + 1s pause.
+    // Points settle when the toast finishes hiding, never mid-animation.
+    const reducedMotion = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let maxStagger = 0
+    player.hands.forEach((hand, handIndex) => hand.cards.forEach((_, cardIndex) => {
+      maxStagger = Math.max(maxStagger, Math.min(Math.min(handIndex, 7) + cardIndex, 12) * 150)
+    }))
+    room.state.dealerHand.forEach((_, cardIndex) => {
+      maxStagger = Math.max(maxStagger, (room.state.players.length + cardIndex) * 180)
+    })
+    const revealDelay = reducedMotion ? 1000 : Math.min(maxStagger + BJ_DEAL_MS + 1000, 6000)
     toastTimer.current = window.setTimeout(() => {
       setRoundToast(nextToast)
-      toastTimer.current = window.setTimeout(() => setRoundToast(null), 3500)
-    }, 0)
-    blackjackSound(instanceId, net >= 0 ? 'win' : 'lose')
-  }, [instanceId, room.selfId, room.state])
+      blackjackSound(instanceId, net >= 0 ? 'win' : 'lose')
+      toastTimer.current = window.setTimeout(() => {
+        setRoundToast(null)
+        flushSettlement()
+      }, 3500)
+    }, revealDelay)
+  }, [instanceId, room.selfId, room.state, flushSettlement])
 
   useEffect(() => () => {
     if (toastTimer.current !== null) window.clearTimeout(toastTimer.current)
-  }, [])
+    flushSettlement()
+  }, [flushSettlement])
 
   useEffect(() => {
-    if (room.state.phase !== 'dealer' || room.state.dealerId !== 'ai' || room.selfId !== room.state.leaderId) return
-    const timer = window.setTimeout(room.finishAi, 650)
+    if (room.state.phase !== 'dealer') return
+    const timer = window.setTimeout(() => room.finishDealer(), 650)
     return () => window.clearTimeout(timer)
-  }, [room.finishAi, room.selfId, room.state.dealerId, room.state.leaderId, room.state.phase, room.state.round])
+  }, [room, room.state.phase, room.state.round])
 
   return <section className="blackjack-card" dir={lang === 'ar' ? 'rtl' : 'ltr'} aria-label={t('21 点 · 黑杰克', 'Blackjack · 21')}>
     <header className="bj-header">
@@ -146,22 +172,17 @@ export default function BlackjackGame({ instanceId, hostUserId }: GameComponentP
         <button type="button" className={`bj-sound-button${sound ? ' is-on' : ''}`} onClick={toggle} aria-pressed={sound} aria-label={sound ? t('关闭音效', 'Turn sound effects off') : t('开启音效', 'Turn sound effects on')}><SoundIcon enabled={sound} /></button>
       </div>
     </header>
-    <BlackjackTable state={room.state} selfId={room.selfId} />
+    <BlackjackTable state={room.state} />
     <BlackjackControls
       state={room.state}
       instanceId={instanceId}
       selfId={room.selfId}
       starPoints={starPoints}
-      bet={myBet}
+      bet={selectedBet}
       dir={lang === 'ar' ? 'rtl' : 'ltr'}
-      ready={room.ready}
-      onJoin={() => room.join(myBet)}
       onBetChange={changeBet}
-      onQuickPlay={() => room.quickPlay(myBet)}
-      onDealer={room.setDealer}
-      onStart={room.start}
+      onPlay={() => room.play(selectedBet)}
       onAction={playAction}
-      onFinishDealer={room.finishDealer}
       onRematch={rematch}
       onLeave={requestLeave}
     />
