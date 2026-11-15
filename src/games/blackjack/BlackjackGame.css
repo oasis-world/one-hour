@@ -63,10 +63,9 @@
 /* One raised object: the whole fan casts a single soft halo on the felt. */
 .bj-cards { filter:drop-shadow(0 8px 14px #010a0759) drop-shadow(0 0 8px #00000026) }
 .bj-card-glint { position:absolute;top:0;left:15%;width:50%;height:100%;background:linear-gradient(112deg,#fff5,transparent 38%,#fff1 60%,transparent 75%);pointer-events:none }
-.bj-seat .bj-cards { min-height:103px }
+.bj-seat .bj-cards { min-height:112px }
 .bj-seat .bj-card-stack { margin-inline-start:-30px }
 .bj-seat .bj-card-stack:first-child { margin-inline-start:0 }
-.bj-seat .bj-card { width:68px;height:95px }
 .bj-seat .bj-card>img { border-radius:4px }
 .bj-seat .bj-hand-meta { display:flex;justify-content:center;gap:4px;margin:0 auto;color:#fff0cb;font-size:13px }
 .bj-stake-chip { display:flex;align-items:center;justify-content:center;gap:6px;margin-top:6px;color:#fff1c0;font-size:11px;font-weight:850;text-shadow:0 1px 4px #03170f }
@@ -171,7 +170,6 @@ p.bj-waiting-turn,p.bj-connection,.bj-refill-note { white-space:nowrap;text-over
   .bj-seats[data-count="3"] .bj-seat:nth-child(3) { width:78% }
   .bj-seat { min-height:140px;padding:6px 3px }
   .bj-seat .bj-cards { min-height:89px }
-  .bj-seat .bj-card { width:58px;height:81px }
   .bj-seat .bj-card-stack { margin-inline-start:-26px }
   .bj-chip-stack { transform:scale(.9) }
   .bj-action { min-height:38px;padding-inline:3px;font-size:12px }
