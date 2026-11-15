@@ -2161,6 +2161,7 @@ button {
   flex-shrink: 0;
 }
 .plus-menu-item > svg { width: 19px; height: 19px; }
+.blackjack-game-menu-icon { display:grid;place-items:center;width:24px;height:24px;margin-left:-2px;color:var(--accent);font-size:27px;line-height:1; }
 
 .emoji-panel {
   --emoji-panel-bg: #181a20;
@@ -3102,4 +3103,13 @@ button {
   .msg-row:has(.match3-card) .msg-head { grid-column: 2; }
   .msg-row:has(.match3-card) .msg-body,
   .msg-row:has(.match3-card) .msg-reactions { grid-column: 1 / -1; }
+}
+
+/* Blackjack uses the full mobile message width, aligned with the sender avatar. */
+@media (max-width: 820px) {
+  .msg-row:has(.blackjack-card) { grid-template-columns: 39px minmax(0, 1fr); padding-inline: 8px; }
+  .msg-row:has(.blackjack-card) .msg-main { display: contents; }
+  .msg-row:has(.blackjack-card) .msg-head { grid-column: 2; }
+  .msg-row:has(.blackjack-card) .msg-body,
+  .msg-row:has(.blackjack-card) .msg-reactions { grid-column: 1 / -1; }
 }

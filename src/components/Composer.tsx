@@ -557,7 +557,8 @@ export default function Composer({ onSend, replyTo, onClearReply, editing, onCle
                             onStartGame(game.id)
                           }}
                         >
-                          {game.id === 'gomoku' ? <GomokuIcon size={17} /> : game.id === 'xiangqi' ? <XiangqiGeneralIcon size={17} /> : game.id === 'chess' ? <ChessCrownIcon size={17} /> : game.icon}                          {t(game.name, game.nameEn)}
+                          {game.id === 'gomoku' ? <GomokuIcon size={17} /> : game.id === 'xiangqi' ? <XiangqiGeneralIcon size={17} /> : game.id === 'chess' ? <ChessCrownIcon size={17} /> : game.id === 'blackjack' ? <span className="blackjack-game-menu-icon">{game.icon}</span> : game.icon}
+                          {t(game.name, game.nameEn)}
                         </button>
                       ))}
                     </div>

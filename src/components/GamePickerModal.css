@@ -97,6 +97,7 @@
 }
 .game-picker-item:hover .game-picker-icon { transform: scale(1.08); }
 .game-picker-emoji { font-size: 24px; line-height: 1; }
+.game-picker-emoji.is-blackjack { font-size: 38px; }
 .game-popularity-icon {
   position: relative;
   display: inline-flex;

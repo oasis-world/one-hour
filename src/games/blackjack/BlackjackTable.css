@@ -1,0 +1,29 @@
+.bj-table { position:relative;isolation:isolate;min-height:340px;margin-top:10px;padding:17px 18px 13px;overflow:hidden;border:1px solid #e7d08a9c;border-radius:24px;background:radial-gradient(ellipse 82% 94% at 50% 51%,#469956 0%,#348449 48%,#1c5d3b 100%);box-shadow:inset 0 1px #ffffff20,inset 0 0 0 5px #0a4a3040,0 9px 25px #0007 }
+.bj-table:before { position:absolute;inset:7px;z-index:-1;border:1px solid #d6e9a022;border-radius:19px;content:"";pointer-events:none }
+.bj-dealer-zone { position:relative;z-index:1;text-align:center }
+.bj-dealer-card { display:grid;grid-template-columns:60px minmax(0,1fr);align-items:center;gap:12px;max-width:470px;margin:auto;padding:0;border:0;background:transparent }
+.bj-dealer-heading { grid-column:1;grid-row:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center }
+.bj-dealer-avatar { flex:0 0 auto;border:1px solid #e2c77f70;border-radius:50%;box-shadow:0 0 14px #e1c57b19 }
+.bj-dealer-avatar.is-ai { filter:saturate(.65) }
+.bj-dealer-heading strong { display:block;max-width:90px;overflow:hidden;color:#fff4d2;font:700 12px Georgia,serif;text-overflow:ellipsis;white-space:nowrap }
+.bj-dealer-hand { grid-column:2;grid-row:1;display:flex;flex-direction:column;align-items:center;gap:7px;justify-content:center;min-width:0 }
+.bj-dealer-hand .bj-cards { min-height:83px }
+.bj-dealer-shoe { position:absolute;top:15px;right:18px;width:42px;height:62px;opacity:.82;transform:rotate(8deg);filter:drop-shadow(0 4px 4px #02170f88) }
+.bj-dealer-shoe span { position:absolute;inset:0;border:1px solid #dfcb8b;border-radius:6px;background:#8c2731 url("/games/blackjack/card-back.png") center/cover;box-shadow:inset 0 0 0 2px #792630 }
+.bj-dealer-shoe span:nth-child(1) { transform:translate(-4px,3px) rotate(-8deg) }
+.bj-dealer-shoe span:nth-child(2) { transform:translate(-2px,1px) rotate(-4deg) }
+@keyframes bj-card-deal { from { opacity:0;transform:translate3d(var(--bj-deal-x,0),var(--bj-deal-y,-115px),0) rotate(8deg) scale(.86) } to { opacity:1;transform:translate3d(0,0,0) rotate(0) scale(1) } }
+@keyframes bj-arrow-pulse { to { transform:translateY(3px);filter:drop-shadow(0 3px 7px #ffe48bbb) } }
+.bj-hand-meta { display:flex;align-items:center;flex:0 0 auto;gap:5px;color:#f5e3a9;font:700 13px Georgia,serif }
+.bj-hand { display:flex;flex-direction:column;align-items:center;gap:7px }
+.bj-score-pill { display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:25px;padding:0 8px;border:1px solid #d9e8ce58;border-radius:9px;color:#f2f6ee;background:linear-gradient(180deg,#17251f,#0d1713);box-shadow:inset 0 1px #ffffff18,0 2px 7px #06180f66;font:800 13px/1 ui-sans-serif,system-ui,sans-serif;font-variant-numeric:tabular-nums }
+.bj-card .sol-card-art { shape-rendering:geometricPrecision;text-rendering:geometricPrecision }
+@media (max-width:480px) {
+  .bj-table { min-height:420px;padding:12px 7px 10px;border-radius:17px }
+  .bj-dealer-shoe { top:8px;right:8px;width:31px;height:46px }
+  .bj-dealer-heading strong { max-width:90px;font-size:11px }
+  .bj-dealer-avatar { width:31px!important;height:31px!important }
+  .bj-dealer-hand .bj-cards { min-height:77px }
+}
+@media (hover:none),(pointer:coarse) { .bj-seats { touch-action:pan-y;-webkit-overflow-scrolling:touch } }
+@media (prefers-reduced-motion:reduce) { .bj-card-stack,.bj-active-arrow { animation:none } }

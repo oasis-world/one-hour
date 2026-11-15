@@ -35,7 +35,7 @@ export default function GamePopularityIcon({
   return (
     <span className={`game-popularity-icon${compact ? ' is-compact' : ''}`} role="img" aria-label={label} title={label}>
       <span className="game-picker-icon" aria-hidden="true">
-        {Icon ? <Icon size={compact ? 36 : 40} /> : <span className="game-picker-emoji">{game.icon}</span>}
+        {Icon ? <Icon size={compact ? 36 : 40} /> : <span className={`game-picker-emoji${game.id === 'blackjack' ? ' is-blackjack' : ''}`}>{game.icon}</span>}
       </span>
       {rank && rank <= 3 ? (
         <span className={`game-popularity-badge is-rank rank-${rank}`} aria-label={`Rank ${rank}`}><ChampionTrophy rank={rank} /></span>

@@ -11,6 +11,7 @@ import SlotMachine from './slot-machine/SlotMachine'
 import SlotMachineIcon from './slot-machine/SlotMachineIcon'
 import Match3Game from './match3/Match3Game'
 import Match3Icon from './match3/Match3Icon'
+import BlackjackGame from './blackjack/BlackjackGame'
 
 export const GAMES: GameDefinition[] = [
   {
@@ -96,6 +97,17 @@ export const GAMES: GameDefinition[] = [
     minPlayers: 1,
     maxPlayers: 1,
     Component: Match3Game,
+  },
+  {
+    id: 'blackjack',
+    name: '21 点 / 黑杰克',
+    nameEn: 'Blackjack',
+    icon: '♠',
+    tagline: '经典牌桌 · 叫牌定胜负',
+    taglineEn: 'Classic table · play your hand',
+    minPlayers: 1,
+    maxPlayers: 5,
+    Component: BlackjackGame,
   },
 ]
 
