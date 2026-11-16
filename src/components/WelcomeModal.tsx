@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FocusEvent as ReactFocusEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type FocusEvent as ReactFocusEvent, type FormEvent as ReactFormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useLang, t } from '../lib/i18n'
 import { resetStats } from '../lib/lifetimeStats'
 import { useImeEnter } from '../lib/ime'
@@ -17,7 +17,6 @@ import {
   PROFILE_LIFETIME_MS,
   type UserProfile,
 } from '../lib/userProfile'
-import { randomAvatarSeed } from '../lib/avatar'
 import { generateCompanionProfile, loadCompanionProfile, saveCompanionProfile } from '../lib/companionProfile'
 import AvatarEditor from './AvatarEditor'
 import { BriefcaseIcon, ChatBubbleIcon, HourglassIcon, ThinXIcon } from './icons'
@@ -46,9 +45,13 @@ export default function WelcomeModal({
         // so the faces behind and inside the modal match from the start.
         preWelcomeProfile(),
   )
-  const ime = useImeEnter()
+  // One hook per field: a lost IME composition in one must never swallow
+  // Enter in the other.
+  const nickIme = useImeEnter()
+  const roleIme = useImeEnter()
   const nicknameRef = useRef<HTMLInputElement>(null)
   const roleRef = useRef<HTMLInputElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
   const [error, setError] = useState<string | null>(null)
 
   // Edit mode is dismissable; the first-visit gate is not.
@@ -110,17 +113,6 @@ export default function WelcomeModal({
     setDraft((prev) => randomProfile(prev, lang))
   }
 
-  /** Adopt a style from the catalog; the row button also rolls a new seed. */
-  const pickStyle = (style: string, rerollSeed: boolean) => {
-    setDraft((prev) => ({
-      ...prev,
-      style,
-      seed: rerollSeed ? randomAvatarSeed() : prev.seed,
-      // Choosing a generated look drops any custom photo.
-      avatarUrl: null,
-    }))
-  }
-
   const confirm = () => {
     const nickname = cleanNickname(draft.nickname)
     const role = cleanRole(draft.role ?? '')
@@ -162,19 +154,27 @@ export default function WelcomeModal({
     onClose?.()
   }
 
-  const onNickEnter = (e: ReactKeyboardEvent<HTMLInputElement>) => {
-    // An IME's Enter commits the candidates — never our business logic.
-    if (ime.imeConsumesEnter(e)) return
-    if (e.key !== 'Enter') return
+  const handleSubmit = (e: ReactFormEvent<HTMLFormElement>) => {
     e.preventDefault()
     confirm()
   }
 
+  const onNickEnter = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (nickIme.imeConsumesEnter(e)) return
+    if (e.key !== 'Enter') return
+    e.preventDefault() // advancing must not submit the form
+    // First Enter advances to the role field; a second one confirms.
+    roleRef.current?.focus()
+  }
+
   const onRoleEnter = (e: ReactKeyboardEvent<HTMLInputElement>) => {
-    if (ime.imeConsumesEnter(e)) return
+    if (roleIme.imeConsumesEnter(e)) return
     if (e.key !== 'Enter') return
     e.preventDefault()
-    confirm()
+    // Desktop/Android: request submit. iOS: the Go key submits the form
+    // directly via handleSubmit without ever firing this keydown.
+    if (typeof formRef.current?.requestSubmit === 'function') formRef.current.requestSubmit()
+    else confirm()
   }
 
   return (
@@ -216,100 +216,106 @@ export default function WelcomeModal({
           size={106}
           allowUpload
           rerollLabel={t('换一个头像和昵称', 'Reroll avatar and nickname')}
+          allowPickStyle={false}
           onReroll={reroll}
-          onPickStyle={pickStyle}
           onUploaded={(url) => setDraft((prev) => ({ ...prev, avatarUrl: url }))}
         />
 
-        <div className="welcome-fields">
-          <label className="field welcome-field">
-            <span className="field-input-wrap">
-              <span className="field-icon" aria-hidden="true">
-                <ChatBubbleIcon size={15} />
-              </span>
-              <input
-                ref={nicknameRef}
-                type="text"
-                value={draft.nickname}
-                maxLength={NICKNAME_MAX}
-                placeholder={t('昵称', 'Nickname')}
-                spellCheck={false}
-                autoComplete="off"
-                autoFocus={typeof window !== 'undefined' && !window.matchMedia('(pointer: coarse)').matches}
-                onChange={(e) => {
-                  setDraft({ ...draft, nickname: e.target.value })
-                  setError(null)
-                }}
-                onFocus={onFieldFocus}
-                onKeyDown={onNickEnter}
-                {...ime.imeProps}
-              />
-              {draft.nickname && (
-                <button
-                  type="button"
-                  className="field-clear"
-                  aria-label={t('清空', 'Clear')}
-                  tabIndex={-1}
-                  onPointerDown={(e) => { e.preventDefault(); e.stopPropagation() }}
-                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }}
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    setDraft((prev) => ({ ...prev, nickname: '' }))
+        <form ref={formRef} className="welcome-form" onSubmit={handleSubmit}>
+          <div className="welcome-fields">
+            <label className="field welcome-field">
+              <span className="field-input-wrap">
+                <span className="field-icon" aria-hidden="true">
+                  <ChatBubbleIcon size={15} />
+                </span>
+                <input
+                  ref={nicknameRef}
+                  type="text"
+                  value={draft.nickname}
+                  maxLength={NICKNAME_MAX}
+                  placeholder={t('昵称', 'Nickname')}
+                  spellCheck={false}
+                  autoComplete="off"
+                  enterKeyHint="next"
+                  autoFocus={typeof window !== 'undefined' && !window.matchMedia('(pointer: coarse)').matches}
+                  onChange={(e) => {
+                    setDraft({ ...draft, nickname: e.target.value })
+                    setError(null)
                   }}
-                >
-                  ×
-                </button>
-              )}
-            </span>
-          </label>
-
-          <label className="field welcome-field">
-            <span className="field-input-wrap">
-              <span className="field-icon" aria-hidden="true">
-                <BriefcaseIcon size={15} />
+                  onFocus={onFieldFocus}
+                  onBlur={nickIme.resetIme}
+                  onKeyDown={onNickEnter}
+                  {...nickIme.imeProps}
+                />
+                {draft.nickname && (
+                  <button
+                    type="button"
+                    className="field-clear"
+                    aria-label={t('清空', 'Clear')}
+                    tabIndex={-1}
+                    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation() }}
+                    onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setDraft((prev) => ({ ...prev, nickname: '' }))
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
               </span>
-              <input
-                ref={roleRef}
-                type="text"
-                value={draft.role ?? ''}
-                maxLength={ROLE_MAX}
-                placeholder={t('角色', 'Role')}
-                spellCheck={false}
-                autoComplete="off"
-                onChange={(e) => {
-                  setDraft({ ...draft, role: e.target.value })
-                  setError(null)
-                }}
-                onFocus={onFieldFocus}
-                onKeyDown={onRoleEnter}
-                {...ime.imeProps}
-              />
-              {draft.role && (
-                <button
-                  type="button"
-                  className="field-clear"
-                  aria-label={t('清空', 'Clear')}
-                  tabIndex={-1}
-                  onPointerDown={(e) => { e.preventDefault(); e.stopPropagation() }}
-                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }}
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    setDraft((prev) => ({ ...prev, role: '' }))
-                  }}
-                >
-                  ×
-                </button>
-              )}
-            </span>
-          </label>
-        </div>
+            </label>
 
-        {error && <p className="welcome-error" role="alert">{error}</p>}
-        <button type="button" className="btn-accent welcome-confirm" onClick={confirm}>
-          {editing ? (t('保存', 'Save')) : t('开始聊天', 'Enter the room')}
-        </button>
+            <label className="field welcome-field">
+              <span className="field-input-wrap">
+                <span className="field-icon" aria-hidden="true">
+                  <BriefcaseIcon size={15} />
+                </span>
+                <input
+                  ref={roleRef}
+                  type="text"
+                  value={draft.role ?? ''}
+                  maxLength={ROLE_MAX}
+                  placeholder={t('角色', 'Role')}
+                  spellCheck={false}
+                  autoComplete="off"
+                  enterKeyHint={editing ? 'done' : 'go'}
+                  onChange={(e) => {
+                    setDraft({ ...draft, role: e.target.value })
+                    setError(null)
+                  }}
+                  onFocus={onFieldFocus}
+                  onBlur={roleIme.resetIme}
+                  onKeyDown={onRoleEnter}
+                  {...roleIme.imeProps}
+                />
+                {draft.role && (
+                  <button
+                    type="button"
+                    className="field-clear"
+                    aria-label={t('清空', 'Clear')}
+                    tabIndex={-1}
+                    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation() }}
+                    onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setDraft((prev) => ({ ...prev, role: '' }))
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            </label>
+          </div>
+
+          {error && <p className="welcome-error" role="alert">{error}</p>}
+          <button type="submit" className="btn-accent welcome-confirm">
+            {editing ? (t('保存', 'Save')) : t('开始聊天', 'Enter the room')}
+          </button>
+        </form>
 
         {editing && onClose && (
           <button

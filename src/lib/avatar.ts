@@ -1,11 +1,22 @@
 import { Avatar, Style, type StyleOptions } from '@dicebear/core'
-import { STYLE_IDS, getStyleDefinition, isKnownStyle } from './avatarStyles'
+import {
+  STYLE_IDS as DICEBEAR_STYLE_IDS,
+  getStyleDefinition,
+  isKnownStyle as isDicebearStyle,
+  styleTitle as dicebearStyleTitle,
+} from './avatarStyles'
+import {
+  EXTRA_STYLE_IDS,
+  extraStyleTitle,
+  isExtraStyle,
+  renderExtraStyle,
+} from './avatarProviders'
 
 /**
- * DiceBear rendering (dicebear.com, offline via @dicebear): a look is a
- * style id + seed pair. Random looks roll across the whole catalog; the
- * definition chunks load on demand (see avatarStyles.ts), so callers
- * render `avatarDataUri()` and fall back while it returns null.
+ * Avatar rendering: a look is a style id + seed pair. The 60+ DiceBear
+ * styles are the original catalog; Boring Avatars, Multiavatar and
+ * Jdenticon add ten deterministic families on top (see avatarProviders.ts).
+ * Random looks roll across all of them, so the space is style × seed.
  */
 
 export interface AvatarLook {
@@ -23,24 +34,39 @@ const BACKGROUNDS = ['#b6e3f4', '#c0aede', '#d1d4f9', '#ffd5dc', '#ffdfbf']
 const uriCache = new Map<string, string>()
 const URI_CACHE_MAX = 160
 
-export { STYLE_IDS, ensureStyleLoaded, isKnownStyle, styleTitle } from './avatarStyles'
+/** Every style the picker and the randomizer can produce. */
+export const STYLE_IDS: readonly string[] = [...DICEBEAR_STYLE_IDS, ...EXTRA_STYLE_IDS]
 
-export function randomAvatarSeed(): string {
-  return Math.random().toString(36).slice(2, 10)
+export { ensureStyleLoaded } from './avatarStyles'
+
+export function isKnownStyle(id: unknown): id is string {
+  return isDicebearStyle(id) || isExtraStyle(id)
 }
 
-/** A fresh look across the full catalog, never an exact repeat. */
+export function styleTitle(id: string): string {
+  return isExtraStyle(id) ? extraStyleTitle(id) : dicebearStyleTitle(id)
+}
+
+export function randomAvatarSeed(): string {
+  return Math.random().toString(36).slice(2, 14)
+}
+
+/** A fresh look across every family, never an exact style+seed repeat. */
 export function randomAvatarLook(previous?: AvatarLook | null): AvatarLook {
-  const style = STYLE_IDS[Math.floor(Math.random() * STYLE_IDS.length)]
-  let seed = randomAvatarSeed()
-  while (previous && previous.seed === seed) seed = randomAvatarSeed()
-  return { style, seed }
+  let look: AvatarLook
+  do {
+    look = {
+      style: STYLE_IDS[Math.floor(Math.random() * STYLE_IDS.length)]!,
+      seed: randomAvatarSeed(),
+    }
+  } while (previous && previous.style === look.style && previous.seed === look.seed)
+  return look
 }
 
 /**
- * `<img src>` data URI. Null while that style's chunk is still loading
- * (callers show a placeholder and retry via ensureStyleLoaded); unknown
- * style ids fall back to lorelei.
+ * `<img src>` data URI. Null while a DiceBear chunk is still loading
+ * (callers show a placeholder and retry via ensureStyleLoaded); the extra
+ * families render synchronously. Unknown style ids fall back to lorelei.
  */
 export function avatarDataUri(
   look: AvatarLook | null | undefined,
@@ -50,9 +76,8 @@ export function avatarDataUri(
   const key = `${style}:${look.seed}`
   const hit = uriCache.get(key)
   if (hit) return hit
-  const definition = getStyleDefinition(style)
-  if (!definition) return null
   const uri = render(style, look.seed)
+  if (!uri) return null
   if (uriCache.size >= URI_CACHE_MAX) uriCache.clear()
   uriCache.set(key, uri)
   return uri
@@ -62,7 +87,10 @@ export function avatarDataUri(
 function fallbackGlyphUri(): string {
   const cached = uriCache.get('fallback')
   if (cached) return cached
-  const uri = render('lorelei', 'one-hour')
+  const uri = new Avatar(
+    new Style(getStyleDefinition('lorelei')!),
+    avatarOptions('one-hour'),
+  ).toDataUri()
   uriCache.set('fallback', uri)
   return uri
 }
@@ -83,7 +111,16 @@ const avatarOptions = (seed: string): AvatarOptions & StyleOptions => ({
   backgroundColor: BACKGROUNDS,
 })
 
-function render(style: string, seed: string): string {
-  const definition = getStyleDefinition(style) ?? getStyleDefinition('lorelei')!
+function render(style: string, seed: string): string | null {
+  if (isExtraStyle(style)) {
+    // A failed extra-family render falls back to the bundled face rather
+    // than leaving an empty slot waiting on a chunk that never loads.
+    return renderExtraStyle(style, seed)
+      ?? new Avatar(new Style(getStyleDefinition('lorelei')!), avatarOptions(seed)).toDataUri()
+  }
+  // Null while a lazy DiceBear chunk is in flight: AvatarBadge waits and
+  // retries via ensureStyleLoaded instead of showing the wrong face.
+  const definition = getStyleDefinition(style)
+  if (!definition) return null
   return new Avatar(new Style(definition), avatarOptions(seed)).toDataUri()
 }

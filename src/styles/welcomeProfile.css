@@ -323,6 +323,15 @@
   font-weight: 700;
 }
 
+/* Form wrapper: Enter on desktop and the mobile keyboard's Go key both
+   submit through the same path, while nickname Enter advances first. */
+.welcome-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
 .welcome-fields {
   width: 100%;
   display: flex;

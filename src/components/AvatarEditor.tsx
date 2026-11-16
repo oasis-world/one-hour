@@ -19,6 +19,7 @@ export default function AvatarEditor({
   avatarClassName,
   rerollLabel,
   allowUpload = false,
+  allowPickStyle = true,
   onReroll,
   onPickStyle,
   onUploaded,
@@ -29,8 +30,10 @@ export default function AvatarEditor({
   rerollLabel?: string
   /** Custom-photo upload is a signed-in privilege, profile page only. */
   allowUpload?: boolean
+  /** The welcome gate hides the style catalog; reroll still rolls all styles. */
+  allowPickStyle?: boolean
   onReroll: () => void
-  onPickStyle: (style: string, rerollSeed: boolean) => void
+  onPickStyle?: (style: string, rerollSeed: boolean) => void
   onUploaded: (url: string) => void
 }) {
   useLang()
@@ -69,18 +72,20 @@ export default function AvatarEditor({
           >
             <RefreshIcon size={15} />
           </button>
-          <button
-            type="button"
-            className={`welcome-custom${pickerOpen ? ' is-open' : ''}`}
-            onMouseDown={keepFocus}
-            onPointerDown={keepFocus}
-            onClick={() => setPickerOpen((v) => !v)}
-            aria-label={t('选择风格', 'Choose a style')}
-            title={t('选择风格', 'Styles')}
-            aria-expanded={pickerOpen}
-          >
-            <GridIcon size={15} />
-          </button>
+          {allowPickStyle && (
+            <button
+              type="button"
+              className={`welcome-custom${pickerOpen ? ' is-open' : ''}`}
+              onMouseDown={keepFocus}
+              onPointerDown={keepFocus}
+              onClick={() => setPickerOpen((v) => !v)}
+              aria-label={t('选择风格', 'Choose a style')}
+              title={t('选择风格', 'Styles')}
+              aria-expanded={pickerOpen}
+            >
+              <GridIcon size={15} />
+            </button>
+          )}
           {allowUpload && (
             <button
               type="button"
@@ -98,7 +103,7 @@ export default function AvatarEditor({
         </div>
       </div>
 
-      {pickerOpen && (
+      {allowPickStyle && pickerOpen && onPickStyle && (
         <StylePicker seed={look.seed} currentStyle={look.style} onPick={onPickStyle} />
       )}
 

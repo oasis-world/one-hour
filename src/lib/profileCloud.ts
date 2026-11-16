@@ -3,7 +3,9 @@ import { getSupabaseClient } from './supabaseClient'
 import {
   getProfileExpiresAt,
   loadUserProfile,
+  NICKNAME_MAX,
   randomProfile,
+  ROLE_MAX,
   saveUserProfile,
   setProfileExpiresAt,
 } from './userProfile'
@@ -93,8 +95,8 @@ export async function pullCloudProfile(): Promise<boolean> {
       return false
     }
     const cloud: UserProfile = {
-      nickname: row.nickname.slice(0, 20),
-      role: row.role ?? loadUserProfile()?.role ?? '',
+      nickname: row.nickname.slice(0, NICKNAME_MAX),
+      role: (row.role ?? loadUserProfile()?.role ?? '').slice(0, ROLE_MAX),
       style: row.avatar_style,
       seed: row.avatar_seed,
       avatarUrl: row.avatar_url ?? null,
