@@ -163,3 +163,11 @@
 @media(hover:hover) and (pointer:fine){.slot-bet-trigger:not(:disabled):hover{border-color:#f2d98f;color:#fff8df}.slot-bet-option:not(.is-selected):hover{background:#f5d78720}}
 @media(hover:none),(pointer:coarse){.slot-bet-option:hover{background:#ffffff08}.slot-bet-options{touch-action:pan-y;-webkit-overflow-scrolling:touch}}
 @media(max-width:520px){.slot-bet-selector{gap:6px}.slot-bet-trigger{min-width:54px;height:36px;padding:0 7px}.slot-bet-options{max-height:min(55dvh,200px)}.slot-bet-option{min-height:42px;font-size:16px}}
+
+/* Bet control: mirror the blackjack card's bottom-left wager button (label inside). */
+.slot-controls .slot-bet-selector{margin-inline-end:0;gap:4px}
+.slot-controls .slot-bet-inline-label{color:#ead9b2;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.slot-controls .slot-bet-trigger{width:104px;min-width:104px;height:40px;padding:0 12px;border-radius:9px;color:#fff1c9;background:linear-gradient(145deg,#604331,#392932);font-size:13px;gap:10px}
+.slot-controls .slot-bet-chevron{width:10px;height:10px}
+.slot-controls .slot-bet-chevron svg{width:10px;height:10px}
+@media(max-width:520px){.slot-controls .slot-bet-trigger{width:100px;min-width:100px;height:38px;padding:0 10px;font-size:12px}}

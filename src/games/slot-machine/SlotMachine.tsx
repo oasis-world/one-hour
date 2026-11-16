@@ -6,21 +6,17 @@ import { setPopoverOpen, suppressNextClick } from '../../lib/popoverGuard'
 import { adjustStarPoints, readStarPoints, subscribeStarPoints } from '../../lib/starPoints'
 import { recordGamePlayed, recordGamePoints } from '../../lib/lifetimeStats'
 import { PAYLINES, PAYOUTS, randomGrid, readSave, scoreGrid, SYMBOLS, type ReelGrid, type SlotSave, type SymbolId } from './model'
+import { SLOT_THEMES, themeAt, type ThemeArt } from './themes'
 import SlotBetSelector from './SlotBetSelector'
 import { slotText as s } from './slotText'
 import './SlotMachine.css'
 
 const STORAGE = (id: string) => `slot-machine:${id}`
-const ART: Record<SymbolId, string> = { cherry: '🍒', lemon: '🍋', orange: '🍊', grapes: '🍇', bell: '🔔', star: '⭐', diamond: '💎', wild: '' }
 const SEVEN_IMAGE = '/games/slot-machine/lucky-seven.png'
 const WIN_SOUND = '/games/slot-machine/magical-coin-win.mp3'
 const SPIN_SYMBOLS: SymbolId[] = ['cherry', 'lemon', 'orange', 'grapes', 'bell', 'star', 'diamond', 'wild']
 interface SpinResult { payout: number; net: number; wager: number }
 let soundContext: AudioContext | null = null
-const LABELS: Record<SymbolId, [string, string]> = {
-  cherry: ['樱桃', 'Cherry'], lemon: ['柠檬', 'Lemon'], orange: ['橘子', 'Orange'], grapes: ['葡萄', 'Grapes'],
-  bell: ['铃铛', 'Bell'], star: ['星星', 'Star'], diamond: ['钻石', 'Diamond'], wild: ['百搭', 'WILD'],
-}
 
 function getSoundContext(): AudioContext | null {
   try {
@@ -95,15 +91,21 @@ function JoystickIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v8" /><circle cx="12" cy="4.2" r="2.4" /><path d="M8 13h8l3.2 2.4a2.2 2.2 0 0 1-1.3 4H6.1a2.2 2.2 0 0 1-1.3-4L8 13Z" /><path d="M8 16.5h.1m7.8 0h.1" /></svg>
 }
 
-function SymbolArt({ symbol, className }: { symbol: SymbolId; className: string }) {
+function ShuffleIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h3.2c1.4 0 2.1.7 3 2l5.6 7c.7 1 1.4 1.6 2.8 1.6H21" /><path d="M3 17h3.2c1.4 0 2.1-.7 3-2l.8-1.1" /><path d="M14.5 9.2 15 8.6c.9-1.3 1.6-2 3-2H21" /><path d="m18 4 3 3-3 3M18 14l3 3-3 3" /></svg>
+}
+
+function SymbolArt({ symbol, className, art }: { symbol: SymbolId; className: string; art: ThemeArt }) {
   return symbol === 'wild'
     ? <img className={`${className} slot-seven`} src={SEVEN_IMAGE} alt="" aria-hidden="true" />
-    : <span className={className} aria-hidden="true">{ART[symbol]}</span>
+    : <span className={className} aria-hidden="true">{art[symbol]}</span>
 }
 
 export default function SlotMachine({ instanceId }: GameComponentProps) {
   const lang = useLang()
   const [save, setSave] = useState<SlotSave>(() => readSave(STORAGE(instanceId)))
+  const theme = themeAt(save.theme)
+  const cycleTheme = () => setSave((current) => ({ ...current, theme: (current.theme + 1) % SLOT_THEMES.length }))
   const [balance, setBalance] = useState(readStarPoints)
   const [reels, setReels] = useState<ReelGrid>(() => randomGrid())
   const [rolling, setRolling] = useState([false, false, false, false, false])
@@ -181,13 +183,14 @@ export default function SlotMachine({ instanceId }: GameComponentProps) {
 
   const busy = rolling.some(Boolean)
   const totalWager = save.bet * PAYLINES.length
-  const symbolName = (symbol: SymbolId) => s(...LABELS[symbol])
+  const symbolName = (symbol: SymbolId) => s(...theme.labels[symbol])
 
   return <section className={`slot-card${helpOpen ? ' has-help-open' : ''}`} dir={lang === 'ar' ? 'rtl' : 'ltr'} aria-label={s('老虎机游戏', 'Slot Machine')}>
     <header className="slot-header">
-      <div className="slot-brand"><span className="slot-logo"><img src={SEVEN_IMAGE} alt="" aria-hidden="true" /></span><span><strong>{s('老虎机', 'Slot Machine')}</strong><small>{s('经典水果 · 五轴', 'CLASSIC FRUIT · 5 REELS')}</small></span></div>
+      <div className="slot-brand"><span className="slot-logo"><img src={SEVEN_IMAGE} alt="" aria-hidden="true" /></span><span><strong>{s('老虎机', 'Slot Machine')}</strong><small>{s(...theme.name)} · {s('五轴', '5 REELS')}</small></span></div>
       <div className="slot-tools">
         <button type="button" className={`slot-icon-btn slot-sound${sound ? ' is-on' : ''}`} aria-pressed={sound} aria-label={sound ? s('关闭音效', 'Sound off') : s('开启音效', 'Sound on')} onClick={() => setSound((value) => !value)}><SoundIcon enabled={sound} /></button>
+        <button type="button" className="slot-icon-btn slot-theme" aria-label={s('切换图案', 'Switch symbols')} title={`${s('切换图案', 'Switch symbols')}: ${s(...theme.name)}`} onClick={cycleTheme}><ShuffleIcon /></button>
         <div className="slot-help-anchor" ref={helpRef}>
           <button type="button" className={`slot-icon-btn slot-help-trigger${helpOpen ? ' is-active' : ''}`} aria-label={s('游戏说明', 'How to play')} aria-haspopup="dialog" aria-expanded={helpOpen} onClick={() => setHelpOpen((open) => !open)}><HelpIcon /></button>
           {helpOpen && createPortal(<div className="slot-help-backdrop" role="presentation">
@@ -200,7 +203,7 @@ export default function SlotMachine({ instanceId }: GameComponentProps) {
               <div className="slot-paytable">
                 <b>{s('赔付表', 'Pay table')}</b>
                 <div className="slot-pay-head"><span /><span>{s('连续 3 个', '3 in a row')}</span><span>{s('连续 4 个', '4 in a row')}</span><span>{s('连续 5 个', '5 in a row')}</span></div>
-                {SYMBOLS.map((symbol) => <div className="slot-pay-row" key={symbol}><span><i className="slot-pay-icon">{symbol === 'wild' ? <img src={SEVEN_IMAGE} alt="" /> : ART[symbol]}</i>{symbolName(symbol)}</span>{PAYOUTS[symbol].map((multiplier, index) => <b key={index}>{multiplier}×</b>)}</div>)}
+                {SYMBOLS.map((symbol) => <div className="slot-pay-row" key={symbol}><span><i className="slot-pay-icon">{symbol === 'wild' ? <img src={SEVEN_IMAGE} alt="" /> : theme.art[symbol]}</i>{symbolName(symbol)}</span>{PAYOUTS[symbol].map((multiplier, index) => <b key={index}>{multiplier}×</b>)}</div>)}
                 <small>{s('每条线奖金 = 单线下注 × 倍数', 'Payout per line = bet × multiplier')}</small>
               </div>
             </section>
@@ -223,11 +226,11 @@ export default function SlotMachine({ instanceId }: GameComponentProps) {
           {reel.map((symbol, row) => {
             const cell = column * 3 + row
             return <div className={`slot-cell${wins.includes(cell) ? ' is-winning' : ''}${symbol === 'wild' ? ' is-wild' : ''}`} key={row} role="img" aria-label={symbolName(symbol)}>
-              <SymbolArt symbol={symbol} className="slot-symbol" />
+              <SymbolArt symbol={symbol} className="slot-symbol" art={theme.art} />
             </div>
           })}
           {rolling[column] && <div className="slot-spin-strip" aria-hidden="true"><div className="slot-spin-strip-track" style={{ animationDelay: `${-column * 0.045}s`, animationDuration: '.28s' }}>
-            {Array.from({ length: 12 }, (_, index) => <SymbolArt key={index} symbol={SPIN_SYMBOLS[(index + column * 2) % SPIN_SYMBOLS.length]} className="slot-symbol" />)}
+            {Array.from({ length: 12 }, (_, index) => <SymbolArt key={index} symbol={SPIN_SYMBOLS[(index + column * 2) % SPIN_SYMBOLS.length]} className="slot-symbol" art={theme.art} />)}
           </div></div>}
         </div>)}
         {toast !== null && <div className={`slot-win-toast${toast.net > 0 ? ' is-profit' : ''}`} role="status" aria-live="polite">
@@ -241,7 +244,7 @@ export default function SlotMachine({ instanceId }: GameComponentProps) {
     </div>
 
     <div className="slot-controls">
-      <SlotBetSelector id={`slot-bet-${instanceId}`} label={s('下注', 'Bet')} dir={lang === 'ar' ? 'rtl' : 'ltr'} value={save.bet} disabled={busy} onChange={(bet) => setSave((current) => ({ ...current, bet }))} />
+      <SlotBetSelector id={`slot-bet-${instanceId}`} label={s('下注', 'Bet')} dir={lang === 'ar' ? 'rtl' : 'ltr'} value={save.bet} disabled={busy} onChange={(bet) => setSave((current) => ({ ...current, bet }))} labelInside />
       <button type="button" className="slot-spin" onClick={spin} disabled={busy || balance < totalWager}>
         <span className={`slot-joystick${busy ? ' is-moving' : ''}`}><JoystickIcon /></span>{busy ? s('旋转中', 'SPINNING') : s('旋转', 'SPIN')}
       </button>
