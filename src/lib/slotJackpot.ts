@@ -9,6 +9,8 @@ export interface SlotJackpotRecipient {
 export interface SlotJackpotState {
   pool: number
   version: number
+  /** Epoch ms of the next draw; null when the pool is empty. Shared by all clients. */
+  drawAt: number | null
   lastPayout: {
     payoutId: string
     total: number
@@ -22,11 +24,17 @@ export interface SlotPayoutResult {
   reason?: string
 }
 
-const EMPTY: SlotJackpotState = { pool: 0, version: 0, lastPayout: null }
+const EMPTY: SlotJackpotState = { pool: 0, version: 0, drawAt: null, lastPayout: null }
 const TABLE = 'slot_jackpots'
 
 function readNumber(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+function readTimestamp(value: unknown): number | null {
+  if (typeof value !== 'string') return null
+  const time = Date.parse(value)
+  return Number.isFinite(time) ? time : null
 }
 
 function parseRow(row: Record<string, unknown> | null): SlotJackpotState {
@@ -42,6 +50,7 @@ function parseRow(row: Record<string, unknown> | null): SlotJackpotState {
   return {
     pool: Math.max(0, readNumber(row.pool)),
     version: readNumber(row.version),
+    drawAt: readTimestamp(row.draw_at),
     lastPayout: raw && typeof raw.payoutId === 'string'
       ? { payoutId: raw.payoutId, total: readNumber(raw.total), recipients }
       : null,
@@ -53,7 +62,7 @@ export async function readSlotJackpot(instanceId: string): Promise<SlotJackpotSt
   if (!isSupabaseConfigured()) return null
   try {
     const client = await getSupabaseClient()
-    const { data, error } = await client.from(TABLE).select('pool,version,last_payout').eq('instance_id', instanceId).maybeSingle()
+    const { data, error } = await client.from(TABLE).select('pool,version,draw_at,last_payout').eq('instance_id', instanceId).maybeSingle()
     if (error) return null
     return parseRow(data as Record<string, unknown> | null)
   } catch {

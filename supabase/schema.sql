@@ -473,6 +473,7 @@ begin
   delete from public.chess_states where expires_at <= now();
   -- Slot jackpots follow their card's one-hour life, just like game states.
   delete from public.slot_jackpots where expires_at <= now();
+  delete from public.slot_leaderboard where expires_at <= now();
   delete from public.slot_jackpot_contributions sc
    where not exists (select 1 from public.slot_jackpots sj where sj.instance_id = sc.instance_id);
   delete from public.slot_jackpot_payouts sp
@@ -753,10 +754,17 @@ create table if not exists public.slot_jackpots (
   instance_id text primary key,
   pool integer not null default 0 check (pool >= 0),
   version integer not null default 0,
+  -- When the current draw fires. Set to now + 5 min on the first contribution
+  -- into an empty pool, cleared on payout. All clients show this same deadline.
+  draw_at timestamptz,
   last_payout jsonb,
   updated_at timestamptz not null default now(),
   expires_at timestamptz not null default (now() + interval '1 hour')
 );
+alter table public.slot_jackpots add column if not exists draw_at timestamptz;
+-- Rounds created before this column existed still need a deadline.
+update public.slot_jackpots set draw_at = now() + interval '5 minutes'
+ where pool > 0 and draw_at is null;
 create index if not exists slot_jackpots_expiry on public.slot_jackpots (expires_at);
 alter table public.slot_jackpots replica identity full;
 alter table public.slot_jackpots enable row level security;
@@ -816,6 +824,9 @@ begin
     on conflict (instance_id) do update set expires_at = excluded.expires_at;
   update public.slot_jackpots
      set pool = pool + p_amount, version = version + 1,
+         -- A fresh round starts whenever the pool was empty / its draw has passed.
+         draw_at = case when draw_at is null or draw_at <= now()
+                        then now() + interval '5 minutes' else draw_at end,
          updated_at = now(), expires_at = now() + interval '1 hour'
    where instance_id = p_instance_id
    returning pool into result;
@@ -865,6 +876,8 @@ begin
   update public.slot_jackpots
      set pool = pool - credit_sum,
          version = version + 1,
+         -- End the round: the next contribution starts a brand new countdown.
+         draw_at = null,
          last_payout = jsonb_build_object(
            'payoutId', p_payout_id, 'total', credit_sum, 'recipients', p_recipients),
          updated_at = now()
@@ -880,5 +893,49 @@ grant execute on function public.slot_jackpot_payout(text, text, jsonb) to authe
 do $$
 begin
   alter publication supabase_realtime add table public.slot_jackpots;
+exception when duplicate_object then null;
+end $$;
+
+-- ── Slot leaderboard rows ──────────────────────────────────────────────────
+-- One row per open card page, keyed by (instance, player key). Presence
+-- channels proved unreliable across tabs sharing an anonymous session, so the
+-- board is backed by this table + Realtime instead. `updated_at` doubles as a
+-- heartbeat (stale rows are ignored), `expires_at` drops players after an hour.
+
+create table if not exists public.slot_leaderboard (
+  instance_id text not null,
+  player_key text not null,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  name text not null,
+  score integer not null default 0,
+  spins integer not null default 0,
+  avatar_style text,
+  avatar_seed text,
+  avatar_url text,
+  expires_at timestamptz not null,
+  updated_at timestamptz not null default now(),
+  primary key (instance_id, player_key)
+);
+create index if not exists slot_leaderboard_expiry on public.slot_leaderboard (expires_at);
+alter table public.slot_leaderboard replica identity full;
+alter table public.slot_leaderboard enable row level security;
+drop policy if exists "slot leaderboard is readable by signed-in players" on public.slot_leaderboard;
+create policy "slot leaderboard is readable by signed-in players"
+  on public.slot_leaderboard for select using (auth.uid() is not null);
+drop policy if exists "players may write their own leaderboard row" on public.slot_leaderboard;
+create policy "players may write their own leaderboard row"
+  on public.slot_leaderboard for insert with check (auth.uid() = user_id);
+drop policy if exists "players may update their own leaderboard row" on public.slot_leaderboard;
+create policy "players may update their own leaderboard row"
+  on public.slot_leaderboard for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "players may delete their own leaderboard row" on public.slot_leaderboard;
+create policy "players may delete their own leaderboard row"
+  on public.slot_leaderboard for delete using (auth.uid() = user_id);
+grant select, insert, update, delete on public.slot_leaderboard to authenticated;
+revoke all on public.slot_leaderboard from anon;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.slot_leaderboard;
 exception when duplicate_object then null;
 end $$;

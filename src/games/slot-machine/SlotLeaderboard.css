@@ -12,6 +12,12 @@
 .slot-jackpot-text small{color:#f0d492;font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
 .slot-jackpot-text strong{color:#ffe6a1;font-size:23px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.1;text-shadow:0 1px 0 #a46a12,0 0 12px #ffcf5e77}
 .slot-jackpot-text strong.is-bumping{animation:slot-jackpot-pop .6s cubic-bezier(.2,.8,.3,1.4)}
+.slot-jackpot-timer{position:relative;display:flex;flex-direction:column;align-items:flex-end;gap:1px;margin-left:auto;flex:none;padding-left:10px}
+.slot-jackpot-timer b{color:#fff3c4;font-size:20px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.1;text-shadow:0 0 10px #ffcf5e88}
+.slot-jackpot-timer small{color:#f0d492;font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.slot-jackpot.is-counting .slot-jackpot-timer b{animation:slot-jackpot-tick 1s ease-in-out infinite}
+.slot-jackpot-progress{position:absolute;left:0;right:0;bottom:0;height:3px;background:#ffe9a826}
+.slot-jackpot-progress i{display:block;height:100%;border-radius:0 3px 3px 0;background:linear-gradient(90deg,#e8b13f,#fff3c4);box-shadow:0 0 8px #ffd66b;transition:width 1s linear}
 .slot-jackpot-sparks{position:absolute;inset:0;pointer-events:none}
 .slot-jackpot-sparks i{position:absolute;width:5px;height:5px;border-radius:50%;background:#fff3c4;box-shadow:0 0 8px #ffd66b;opacity:0;animation:slot-jackpot-spark 2.8s ease-out infinite}
 .slot-jackpot-sparks i:nth-child(1){left:22%;top:60%;animation-delay:.2s}
@@ -23,6 +29,7 @@
 @keyframes slot-jackpot-pop{0%{transform:scale(1)}40%{transform:scale(1.28);color:#fff8dc}100%{transform:scale(1)}}
 @keyframes slot-jackpot-spark{0%{opacity:0;transform:translateY(4px) scale(.4)}25%{opacity:1}100%{opacity:0;transform:translateY(-20px) scale(1.3)}}
 @keyframes slot-jackpot-paid{0%{box-shadow:0 0 0 0 #ffd66b00,inset 0 1px #ffe9a83d}30%{box-shadow:0 0 28px 6px #ffd66bcc,inset 0 0 22px #ffe9a855}100%{box-shadow:0 4px 16px #0005,inset 0 1px #ffe9a83d}}
+@keyframes slot-jackpot-tick{0%,100%{opacity:1}50%{opacity:.65}}
 
 .slot-lb-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed #93a5c855}
 .slot-lb-title{display:flex;align-items:center;gap:6px;color:#dde5f4;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
@@ -52,5 +59,5 @@
 @keyframes slot-lb-pop{40%{transform:scale(1.25)}}
 .slot-lb[dir=rtl] .slot-lb-balance-wrap{flex-direction:row-reverse}
 @media(max-width:820px){.slot-lb{max-width:none}}
-@media(max-width:520px){.slot-lb{margin-top:8px;padding:9px 10px 10px;border-radius:14px}.slot-lb-title{font-size:10px}.slot-jackpot-text strong{font-size:20px}.slot-lb-row{min-height:36px}.slot-lb-name{font-size:11px}.slot-lb-score{font-size:12px}}
-@media(prefers-reduced-motion:reduce){.slot-lb-score.is-changing,.slot-jackpot::before,.slot-jackpot-coin,.slot-jackpot-text strong.is-bumping,.slot-jackpot-sparks i,.slot-jackpot.is-paid{animation:none}}
+@media(max-width:520px){.slot-lb{margin-top:8px;padding:9px 10px 10px;border-radius:14px}.slot-lb-title{font-size:10px}.slot-jackpot-text strong{font-size:20px}.slot-jackpot-timer b{font-size:17px}.slot-lb-row{min-height:36px}.slot-lb-name{font-size:11px}.slot-lb-score{font-size:12px}}
+@media(prefers-reduced-motion:reduce){.slot-lb-score.is-changing,.slot-jackpot::before,.slot-jackpot-coin,.slot-jackpot-text strong.is-bumping,.slot-jackpot-sparks i,.slot-jackpot.is-paid,.slot-jackpot.is-counting .slot-jackpot-timer b{animation:none}.slot-jackpot-progress i{transition:none}}

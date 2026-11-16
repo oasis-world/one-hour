@@ -13,8 +13,7 @@ import { sendGameNotice } from '../../lib/gameNotice'
 import { flashStarPointsDelta } from '../../lib/starPoints'
 import { MESSAGE_TTL_MS } from '../../lib/expiry'
 
-const PAYOUT_INTERVAL_MS = 5 * 60 * 1000
-const EMPTY: SlotJackpotState = { pool: 0, version: 0, lastPayout: null }
+const EMPTY: SlotJackpotState = { pool: 0, version: 0, drawAt: null, lastPayout: null }
 
 export interface SlotJackpotView {
   state: SlotJackpotState
@@ -40,12 +39,12 @@ function randomSplit(pool: number, count: number): number[] {
 }
 
 /**
- * Shared prize pool for one slot card. Contributions are atomic RPC calls.
- * Every player on the board runs the five-minute payout check: the RPC takes a
- * row lock and an idempotency key, so whichever client gets there first pays
- * out and posts the single public notice; the rest see an empty pool and do
- * nothing. That way the draw keeps running even after the card's sender has
- * expired out of the room. All clients watch the same table for the balance.
+ * Shared prize pool for one slot card. Contributions are atomic RPC calls and
+ * the first one into an empty pool stamps a shared `draw_at` deadline (now +
+ * 5 min). Every player on the board watches that deadline and races to pay out
+ * when it arrives: a row lock + idempotency key ensure exactly one pays and
+ * posts the single public notice. This keeps the draw — and its countdown —
+ * running even after the card's sender has expired out of the room.
  */
 export function useSlotJackpot(
   instanceId: string,
@@ -97,6 +96,14 @@ export function useSlotJackpot(
     const next = { ...stateRef.current, pool }
     stateRef.current = next
     setState(next)
+    // Pick up the shared draw deadline the server stamped for this new round.
+    void readSlotJackpot(instanceId).then((fresh) => {
+      if (fresh && stateRef.current.version <= fresh.version) {
+        const merged = { ...fresh, pool: Math.max(fresh.pool, pool) }
+        stateRef.current = merged
+        setState(merged)
+      }
+    })
     return true
   }, [instanceId])
 
@@ -132,13 +139,21 @@ export function useSlotJackpot(
   }, [instanceId])
 
   useEffect(() => {
-    if (!canPayout) return
-    // A little jitter spreads simultaneous draws from many open tabs; the RPC
-    // lock still guarantees exactly one of them actually pays and announces.
-    const jitter = Math.floor(Math.random() * 2500)
-    const timer = window.setInterval(() => { void runPayout() }, PAYOUT_INTERVAL_MS + jitter)
-    return () => window.clearInterval(timer)
-  }, [canPayout, runPayout])
+    if (!canPayout || !state.drawAt || state.pool <= 0) return
+    // Fire at the shared deadline. Small jitter spreads simultaneous tabs; the
+    // RPC row lock still guarantees only one actually pays and announces.
+    const delay = Math.max(0, state.drawAt - Date.now()) + Math.floor(Math.random() * 800)
+    const fire = window.setTimeout(() => { void runPayout() }, delay)
+    // Safety net: if a single timer is missed or the RPC fails once, keep
+    // retrying until the pool is paid (a payout resets pool → 0 for everyone).
+    const retry = window.setInterval(() => {
+      if (state.drawAt && state.drawAt <= Date.now()) void runPayout()
+    }, 10_000)
+    return () => {
+      window.clearTimeout(fire)
+      window.clearInterval(retry)
+    }
+  }, [canPayout, state.drawAt, state.pool, runPayout])
 
   return { state, gainFlash, payoutFlash, contribute }
 }

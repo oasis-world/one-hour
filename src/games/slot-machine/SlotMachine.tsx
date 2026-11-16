@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { GameComponentProps } from '../types'
 import { useLang } from '../../lib/i18n'
-import { setPopoverOpen, suppressNextClick } from '../../lib/popoverGuard'
 import { useAccount } from '../../lib/useAccount'
 import { resolveChatIdentity } from '../../lib/identity'
 import { loadUserProfile } from '../../lib/userProfile'
@@ -14,6 +13,7 @@ import SlotLeaderboard from './SlotLeaderboard'
 import SlotHelp from './SlotHelp'
 import { useSlotLeaderboard } from './useSlotLeaderboard'
 import { useSlotJackpot } from './useSlotJackpot'
+import { useSlotHelp } from './useSlotHelp'
 import { slotText as s } from './slotText'
 import { HelpIcon, JoystickIcon, ShuffleIcon, SoundIcon, SymbolArt } from './slotExtras'
 import { playReelStopSound, playSmallPayoutSound, playSpinSound, playWinSound, SEVEN_IMAGE } from './slotSound'
@@ -23,7 +23,7 @@ const STORAGE = (id: string) => `slot-machine:${id}`
 const SPIN_SYMBOLS: SymbolId[] = ['cherry', 'lemon', 'orange', 'grapes', 'bell', 'star', 'diamond', 'wild']
 interface SpinResult { payout: number; net: number; wager: number; contribution: number }
 
-export default function SlotMachine({ instanceId, onlineMembers = [] }: GameComponentProps) {
+export default function SlotMachine({ instanceId }: GameComponentProps) {
   const lang = useLang()
   const [save, setSave] = useState<SlotSave>(() => readSave(STORAGE(instanceId)))
   const theme = themeAt(save.theme)
@@ -33,7 +33,8 @@ export default function SlotMachine({ instanceId, onlineMembers = [] }: GameComp
   const identity = resolveChatIdentity(account)
   const profile = loadUserProfile()
   const selfId = identity?.userId ?? null
-  const lbPresentIds = useMemo(() => onlineMembers.map((member) => member.userId), [onlineMembers])
+  // The board is self-contained in the slot channel; each player's 1-hour
+  // expiry rides in that same presence meta (no global-room dependency).
   const { players: lbPlayers, total: lbTotal, flashes: lbFlashes } = useSlotLeaderboard(instanceId, {
     userId: selfId,
     name: profile?.nickname ?? identity?.displayName ?? 'Player',
@@ -42,7 +43,8 @@ export default function SlotMachine({ instanceId, onlineMembers = [] }: GameComp
     avatarStyle: profile?.style ?? identity?.avatar?.style ?? null,
     avatarSeed: profile?.seed ?? identity?.avatar?.seed ?? null,
     avatarUrl: profile?.avatarUrl ?? identity?.avatarUrl ?? null,
-  }, lbPresentIds)
+    expiresAt: identity?.profileExpiresAt ?? null,
+  })
   // Any player listed on this card can run the draw, so the jackpot keeps
   // paying out even after the card's sender has expired out of the room.
   const canRunDraw = lbPlayers.some((player) => player.isSelf)
@@ -53,9 +55,7 @@ export default function SlotMachine({ instanceId, onlineMembers = [] }: GameComp
   const [lastWin, setLastWin] = useState(0)
   const [toast, setToast] = useState<SpinResult | null>(null)
   const [sound, setSound] = useState(false)
-  const [helpOpen, setHelpOpen] = useState(false)
-  const helpRef = useRef<HTMLDivElement>(null)
-  const helpPanelRef = useRef<HTMLElement>(null)
+  const { helpOpen, setHelpOpen, helpRef, helpPanelRef } = useSlotHelp()
   const rollingRef = useRef([false, false, false, false, false])
   const timers = useRef<number[]>([])
   const toastTimer = useRef<number | null>(null)
@@ -68,24 +68,6 @@ export default function SlotMachine({ instanceId, onlineMembers = [] }: GameComp
     timers.current.forEach(window.clearTimeout)
     if (toastTimer.current !== null) window.clearTimeout(toastTimer.current)
   }, [])
-  useEffect(() => {
-    if (!helpOpen) return
-    setPopoverOpen(true)
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node
-      if (helpRef.current?.contains(target) || helpPanelRef.current?.contains(target)) return
-      suppressNextClick()
-      setHelpOpen(false)
-    }
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') setHelpOpen(false) }
-    document.addEventListener('pointerdown', onPointerDown, true)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown, true)
-      document.removeEventListener('keydown', onKeyDown)
-      setPopoverOpen(false)
-    }
-  }, [helpOpen])
 
   const spin = () => {
     const totalWager = save.bet * PAYLINES.length
@@ -191,6 +173,6 @@ export default function SlotMachine({ instanceId, onlineMembers = [] }: GameComp
     {balance < totalWager && !busy && <p className="slot-refill-note">{s('请发送消息、图片、玩其它游戏来赚取积分', 'Send messages, photos, or play other games to earn points')}</p>}
     </section>
 
-    <SlotLeaderboard players={lbPlayers} total={lbTotal} flashes={lbFlashes} dir={lang === 'ar' ? 'rtl' : 'ltr'} jackpot={{ pool: jackpot.state.pool, gainFlash: jackpot.gainFlash, payoutFlash: jackpot.payoutFlash }} />
+    <SlotLeaderboard players={lbPlayers} total={lbTotal} flashes={lbFlashes} dir={lang === 'ar' ? 'rtl' : 'ltr'} jackpot={{ pool: jackpot.state.pool, gainFlash: jackpot.gainFlash, payoutFlash: jackpot.payoutFlash, drawAt: jackpot.state.drawAt }} />
   </>
 }
