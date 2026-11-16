@@ -21,7 +21,9 @@ export default function BlackjackPoints({ points }: { points: number }) {
   }, [])
 
   return <div className={`bj-points${delta !== null ? ' is-changing' : ''}`} aria-label={`${t('星星积分', 'STAR POINTS')}: ${points.toLocaleString()}`}>
-    <span className="bj-points-star" aria-hidden="true">✦</span>
+    <span className="bj-points-star" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="m12 2.8 2.85 5.78 6.38.93-4.62 4.5 1.09 6.35L12 17.36l-5.7 3 1.09-6.35-4.62-4.5 6.38-.93L12 2.8Z" /></svg>
+    </span>
     <span className="bj-points-copy"><strong>{points.toLocaleString()}</strong></span>
     {delta !== null && <span className={`bj-points-delta${delta < 0 ? ' is-negative' : ''}`} key={`${delta}-${points}`}>{delta > 0 ? '+' : '−'}{Math.abs(delta).toLocaleString()}</span>}
   </div>

@@ -1,13 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { GameComponentProps } from '../types'
 import { t, useLang } from '../../lib/i18n'
 import { setPopoverOpen, suppressNextClick } from '../../lib/popoverGuard'
+import { useAccount } from '../../lib/useAccount'
+import { resolveChatIdentity } from '../../lib/identity'
+import { loadUserProfile } from '../../lib/userProfile'
 import { adjustStarPoints, readStarPoints, subscribeStarPoints } from '../../lib/starPoints'
 import { recordGamePlayed, recordGamePoints } from '../../lib/lifetimeStats'
 import { PAYLINES, PAYOUTS, randomGrid, readSave, scoreGrid, SYMBOLS, type ReelGrid, type SlotSave, type SymbolId } from './model'
 import { SLOT_THEMES, themeAt, type ThemeArt } from './themes'
 import SlotBetSelector from './SlotBetSelector'
+import SlotLeaderboard from './SlotLeaderboard'
+import { useSlotLeaderboard } from './useSlotLeaderboard'
 import { slotText as s } from './slotText'
 import './SlotMachine.css'
 
@@ -101,12 +106,28 @@ function SymbolArt({ symbol, className, art }: { symbol: SymbolId; className: st
     : <span className={className} aria-hidden="true">{art[symbol]}</span>
 }
 
-export default function SlotMachine({ instanceId }: GameComponentProps) {
+export default function SlotMachine({ instanceId, onlineMembers = [] }: GameComponentProps) {
   const lang = useLang()
   const [save, setSave] = useState<SlotSave>(() => readSave(STORAGE(instanceId)))
   const theme = themeAt(save.theme)
   const cycleTheme = () => setSave((current) => ({ ...current, theme: (current.theme + 1) % SLOT_THEMES.length }))
   const [balance, setBalance] = useState(readStarPoints)
+  const account = useAccount()
+  const identity = resolveChatIdentity(account)
+  const profile = loadUserProfile()
+  const lbSelfId = identity?.userId ?? null
+  // Live room roster: anyone who expired out of the room (1-hour limit) or
+  // closed the tab must also vanish from this card's board.
+  const lbPresentIds = useMemo(() => onlineMembers.map((member) => member.userId), [onlineMembers])
+  const { players: lbPlayers, total: lbTotal, flashes: lbFlashes } = useSlotLeaderboard(instanceId, {
+    userId: lbSelfId,
+    name: profile?.nickname ?? identity?.displayName ?? 'Player',
+    balance,
+    spins: save.spins,
+    avatarStyle: profile?.style ?? identity?.avatar?.style ?? null,
+    avatarSeed: profile?.seed ?? identity?.avatar?.seed ?? null,
+    avatarUrl: profile?.avatarUrl ?? identity?.avatarUrl ?? null,
+  }, lbPresentIds)
   const [reels, setReels] = useState<ReelGrid>(() => randomGrid())
   const [rolling, setRolling] = useState([false, false, false, false, false])
   const [wins, setWins] = useState<number[]>([])
@@ -185,7 +206,7 @@ export default function SlotMachine({ instanceId }: GameComponentProps) {
   const totalWager = save.bet * PAYLINES.length
   const symbolName = (symbol: SymbolId) => s(...theme.labels[symbol])
 
-  return <section className={`slot-card${helpOpen ? ' has-help-open' : ''}`} dir={lang === 'ar' ? 'rtl' : 'ltr'} aria-label={s('老虎机游戏', 'Slot Machine')}>
+  return <><section className={`slot-card${helpOpen ? ' has-help-open' : ''}`} dir={lang === 'ar' ? 'rtl' : 'ltr'} aria-label={s('老虎机游戏', 'Slot Machine')}>
     <header className="slot-header">
       <div className="slot-brand"><span className="slot-logo"><img src={SEVEN_IMAGE} alt="" aria-hidden="true" /></span><span><strong>{s('老虎机', 'Slot Machine')}</strong><small>{s(...theme.name)} · {s('五轴', '5 REELS')}</small></span></div>
       <div className="slot-tools">
@@ -251,5 +272,8 @@ export default function SlotMachine({ instanceId }: GameComponentProps) {
     </div>
 
     {balance < totalWager && !busy && <p className="slot-refill-note">{s('请发送消息、图片、玩其它游戏来赚取积分', 'Send messages, photos, or play other games to earn points')}</p>}
-  </section>
+    </section>
+
+    <SlotLeaderboard players={lbPlayers} total={lbTotal} flashes={lbFlashes} dir={lang === 'ar' ? 'rtl' : 'ltr'} />
+  </>
 }
