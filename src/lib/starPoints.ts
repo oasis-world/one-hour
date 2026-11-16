@@ -51,6 +51,17 @@ export function subscribeStarPoints(listener: (score: number) => void): () => vo
   return () => listeners.delete(listener)
 }
 
+/**
+ * Play the top-left `+N` animation for points credited by the server (e.g. a
+ * slot jackpot payout). The balance itself already arrived through the
+ * star_points realtime subscription — this only dispatches the visual event,
+ * so it must NOT call adjustStarPoints (that would credit the points twice).
+ */
+export function flashStarPointsDelta(delta: number): void {
+  if (!delta) return
+  window.dispatchEvent(new CustomEvent('one-hour:star-points-delta', { detail: { delta: Math.trunc(delta) } }))
+}
+
 export function claimStarReward(kind: 'message' | 'photo', userId = 'local'): boolean {
   const key = `one-hour-star-reward-${userId}-${kind}-at`
   const now = Date.now()

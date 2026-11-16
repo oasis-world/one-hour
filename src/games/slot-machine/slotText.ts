@@ -9,6 +9,8 @@ const TEXT: Partial<Record<Exclude<Lang, 'zh' | 'en'>, Record<string, string>>> 
     'Refill 500 credits': '補充 500 點', SOUND: '音效', 'Sound on': '開啟音效', 'Sound off': '關閉音效', 'Best win': '最高獎金', Spins: '旋轉次數', Cherry: '櫻桃', Lemon: '檸檬', Orange: '橘子', Grapes: '葡萄', Bell: '鈴鐺', Star: '星星', Diamond: '鑽石',
     'Total bet': '總押注', Net: '淨額', Payout: '派彩', 'No win this spin': '本次未中獎', 'Send messages, photos, or play other games to earn points': '請傳送訊息、照片或玩其他遊戲來賺取積分',
     LEADERBOARD: '玩家排行', PLAYERS: '玩家', 'STAR POINTS': '星星積分', YOU: '你',
+      'LUCKY JACKPOT · DRAWS EVERY 5 MIN': '幸運獎池 · 每 5 分鐘開獎', 'NET ON THIS CARD': '本卡淨收益', 'To jackpot': '獎池貢獻', 'You keep': '實際到手',
+      'When a spin nets over 10 points, 10% feeds the jackpot, which is randomly paid to the leaderboard every 5 minutes': '單次淨收益超過 10 積分時，10% 會進入獎池，每 5 分鐘隨機派發給排行榜玩家',
   },
   ja: {
     'Slot Machine': 'スロットマシン', 'A little luck, a classic spin': 'クラシックな運試しスピン', 'CLASSIC FRUIT · 5 REELS': 'クラシックフルーツ · 5リール', BALANCE: '残高', 'LAST WIN': '前回の勝ち', Bet: 'ベット', SPIN: 'スピン', SPINNING: '回転中', '5 fixed paylines': '固定5ライン', Reel: 'リール', 'Five reels, three rows of symbols': '5リール、3段のシンボル', 'Payout per line = bet × multiplier': 'ライン配当 = ラインベット × 倍率', 'Congratulations!': 'おめでとうございます！',
@@ -18,6 +20,8 @@ const TEXT: Partial<Record<Exclude<Lang, 'zh' | 'en'>, Record<string, string>>> 
     'Refill 500 credits': '500クレジット補充', SOUND: 'サウンド', 'Sound on': 'サウンドオン', 'Sound off': 'サウンドオフ', 'Best win': '最高配当', Spins: 'スピン回数', Cherry: 'チェリー', Lemon: 'レモン', Orange: 'オレンジ', Grapes: 'ぶどう', Bell: 'ベル', Star: 'スター', Diamond: 'ダイヤ',
     'Total bet': '合計ベット', Net: '差引', Payout: '払戻', 'No win this spin': '今回は当たりなし', 'Send messages, photos, or play other games to earn points': 'メッセージや写真を送信するか、ほかのゲームをプレイしてポイントを獲得しましょう',
     LEADERBOARD: 'ランキング', PLAYERS: 'プレイヤー', 'STAR POINTS': 'スターポイント', YOU: 'あなた',
+      'LUCKY JACKPOT · DRAWS EVERY 5 MIN': 'ラッキージャックポット · 5分ごとに抽選', 'NET ON THIS CARD': 'このカードの純益', 'To jackpot': 'ジャックポットへ', 'You keep': '獲得',
+      'When a spin nets over 10 points, 10% feeds the jackpot, which is randomly paid to the leaderboard every 5 minutes': '1回のスピンで純益が10ポイントを超えると10%がジャックポットに送られ、5分ごとにランキングのプレイヤーへランダムに配られます',
   },
   fr: {
     'Slot Machine': 'Machine à sous', 'A little luck, a classic spin': 'Un tour classique, un brin de chance', 'CLASSIC FRUIT · 5 REELS': 'FRUITS CLASSIQUES · 5 ROULEAUX', BALANCE: 'CRÉDITS', 'LAST WIN': 'DERNIER GAIN', Bet: 'Mise', SPIN: 'JOUER', SPINNING: 'EN COURS', '5 fixed paylines': '5 lignes fixes', Reel: 'Rouleau', 'Five reels, three rows of symbols': 'Cinq rouleaux, trois rangées de symboles', 'Payout per line = bet × multiplier': 'Gain par ligne = mise × multiplicateur', 'Congratulations!': 'Félicitations !',
@@ -27,6 +31,8 @@ const TEXT: Partial<Record<Exclude<Lang, 'zh' | 'en'>, Record<string, string>>> 
     'Refill 500 credits': 'Ajouter 500 crédits', SOUND: 'SON', 'Sound on': 'Son activé', 'Sound off': 'Son coupé', 'Best win': 'Meilleur gain', Spins: 'Tours', Cherry: 'Cerise', Lemon: 'Citron', Orange: 'Orange', Grapes: 'Raisin', Bell: 'Cloche', Star: 'Étoile', Diamond: 'Diamant',
     'Total bet': 'Mise totale', Net: 'Net', Payout: 'Gain', 'No win this spin': 'Pas de gain cette fois', 'Send messages, photos, or play other games to earn points': 'Envoyez des messages ou des photos, ou jouez à d’autres jeux pour gagner des points',
     LEADERBOARD: 'CLASSEMENT', PLAYERS: 'JOUEURS', 'STAR POINTS': 'POINTS ÉTOILE', YOU: 'VOUS',
+      'LUCKY JACKPOT · DRAWS EVERY 5 MIN': 'JACKPOT PORTE-BONHEUR · TIRAGE TOUTES LES 5 MIN', 'NET ON THIS CARD': 'NET SUR CETTE CARTE', 'To jackpot': 'Au jackpot', 'You keep': 'Vous gardez',
+      'When a spin nets over 10 points, 10% feeds the jackpot, which is randomly paid to the leaderboard every 5 minutes': 'Quand un tour rapporte plus de 10 points nets, 10% alimentent le jackpot, redistribué au hasard au classement toutes les 5 minutes',
   },
   es: {
     'Slot Machine': 'Tragaperras', 'A little luck, a classic spin': 'Un giro clásico con un poco de suerte', 'CLASSIC FRUIT · 5 REELS': 'FRUTAS CLÁSICAS · 5 RODILLOS', BALANCE: 'CRÉDITOS', 'LAST WIN': 'ÚLTIMO PREMIO', Bet: 'Apuesta', SPIN: 'GIRAR', SPINNING: 'GIRANDO', '5 fixed paylines': '5 líneas fijas', Reel: 'Rodillo', 'Five reels, three rows of symbols': 'Cinco rodillos, tres filas de símbolos', 'Payout per line = bet × multiplier': 'Premio por línea = apuesta × multiplicador', 'Congratulations!': '¡Felicidades!',
@@ -36,6 +42,8 @@ const TEXT: Partial<Record<Exclude<Lang, 'zh' | 'en'>, Record<string, string>>> 
     'Refill 500 credits': 'Añadir 500 créditos', SOUND: 'SONIDO', 'Sound on': 'Sonido activado', 'Sound off': 'Sonido desactivado', 'Best win': 'Mejor premio', Spins: 'Giros', Cherry: 'Cereza', Lemon: 'Limón', Orange: 'Naranja', Grapes: 'Uvas', Bell: 'Campana', Star: 'Estrella', Diamond: 'Diamante',
     'Total bet': 'Apuesta total', Net: 'Neto', Payout: 'Premio', 'No win this spin': 'Sin premio esta vez', 'Send messages, photos, or play other games to earn points': 'Envía mensajes o fotos, o juega a otros juegos para ganar puntos',
     LEADERBOARD: 'CLASIFICACIÓN', PLAYERS: 'JUGADORES', 'STAR POINTS': 'PUNTOS ESTRELLA', YOU: 'TÚ',
+      'LUCKY JACKPOT · DRAWS EVERY 5 MIN': 'BOTE DE LA SUERTE · SORTEO CADA 5 MIN', 'NET ON THIS CARD': 'NETO EN ESTA CARTA', 'To jackpot': 'Al bote', 'You keep': 'Te llevas',
+      'When a spin nets over 10 points, 10% feeds the jackpot, which is randomly paid to the leaderboard every 5 minutes': 'Cuando un giro deja más de 10 puntos netos, el 10% va al bote y se reparte al azar entre la clasificación cada 5 minutos',
   },
   de: {
     'Slot Machine': 'Spielautomat', 'A little luck, a classic spin': 'Klassischer Dreh mit etwas Glück', 'CLASSIC FRUIT · 5 REELS': 'KLASSISCHE FRÜCHTE · 5 WALZEN', BALANCE: 'GUTHABEN', 'LAST WIN': 'LETZTER GEWINN', Bet: 'Einsatz', SPIN: 'DREHEN', SPINNING: 'DREHT', '5 fixed paylines': '5 feste Gewinnlinien', Reel: 'Walze', 'Five reels, three rows of symbols': 'Fünf Walzen, drei Symbolreihen', 'Payout per line = bet × multiplier': 'Gewinn pro Linie = Einsatz × Multiplikator', 'Congratulations!': 'Glückwunsch!',
@@ -45,6 +53,8 @@ const TEXT: Partial<Record<Exclude<Lang, 'zh' | 'en'>, Record<string, string>>> 
     'Refill 500 credits': '500 Punkte auffüllen', SOUND: 'TON', 'Sound on': 'Ton an', 'Sound off': 'Ton aus', 'Best win': 'Höchstgewinn', Spins: 'Drehungen', Cherry: 'Kirsche', Lemon: 'Zitrone', Orange: 'Orange', Grapes: 'Trauben', Bell: 'Glocke', Star: 'Stern', Diamond: 'Diamant',
     'Total bet': 'Gesamteinsatz', Net: 'Netto', Payout: 'Auszahlung', 'No win this spin': 'Diesmal kein Gewinn', 'Send messages, photos, or play other games to earn points': 'Sende Nachrichten oder Fotos oder spiele andere Spiele, um Punkte zu verdienen',
     LEADERBOARD: 'RANGLISTE', PLAYERS: 'SPIELER', 'STAR POINTS': 'STERNPUNKTE', YOU: 'DU',
+      'LUCKY JACKPOT · DRAWS EVERY 5 MIN': 'GLÜCKS-JACKPOT · JE 5 MIN AUSZAHLUNG', 'NET ON THIS CARD': 'NETTO AUF DIESER KARTE', 'To jackpot': 'In den Jackpot', 'You keep': 'Du behältst',
+      'When a spin nets over 10 points, 10% feeds the jackpot, which is randomly paid to the leaderboard every 5 minutes': 'Wenn ein Dreh mehr als 10 Nettopunkte bringt, fließen 10% in den Jackpot, der alle 5 Minuten zufällig an die Rangliste verteilt wird',
   },
   ko: {
     'Slot Machine': '슬롯머신', 'A little luck, a classic spin': '행운을 시험하는 클래식 슬롯', 'CLASSIC FRUIT · 5 REELS': '클래식 과일 · 5릴', BALANCE: '잔액', 'LAST WIN': '최근 당첨', Bet: '베팅', SPIN: '돌리기', SPINNING: '회전 중', '5 fixed paylines': '고정 페이라인 5개', Reel: '릴', 'Five reels, three rows of symbols': '5개 릴, 3줄 심볼', 'Payout per line = bet × multiplier': '라인별 당첨 = 베팅액 × 배수', 'Congratulations!': '축하합니다!',
@@ -54,6 +64,8 @@ const TEXT: Partial<Record<Exclude<Lang, 'zh' | 'en'>, Record<string, string>>> 
     'Refill 500 credits': '크레딧 500 충전', SOUND: '사운드', 'Sound on': '사운드 켜기', 'Sound off': '사운드 끄기', 'Best win': '최고 당첨', Spins: '회전 횟수', Cherry: '체리', Lemon: '레몬', Orange: '오렌지', Grapes: '포도', Bell: '종', Star: '별', Diamond: '다이아몬드',
     'Total bet': '총 베팅', Net: '순액', Payout: '당첨금', 'No win this spin': '이번 회차는 미당첨', 'Send messages, photos, or play other games to earn points': '메시지나 사진을 보내거나 다른 게임을 플레이해 포인트를 획득하세요',
     LEADERBOARD: '랭킹', PLAYERS: '플레이어', 'STAR POINTS': '별 포인트', YOU: '나',
+      'LUCKY JACKPOT · DRAWS EVERY 5 MIN': '럭키 잭팟 · 5분마다 추첨', 'NET ON THIS CARD': '이 카드의 순이익', 'To jackpot': '잭팟 기여', 'You keep': '실제 획득',
+      'When a spin nets over 10 points, 10% feeds the jackpot, which is randomly paid to the leaderboard every 5 minutes': '한 스핀의 순이익이 10포인트를 넘으면 10%가 잭팟에 들어가며, 5분마다 랭킹 플레이어들에게 무작위로 나눠집니다',
   },
   it: {
     'Slot Machine': 'Slot Machine', 'A little luck, a classic spin': 'Un classico giro fortunato', 'CLASSIC FRUIT · 5 REELS': 'FRUTTA CLASSICA · 5 RULLI', BALANCE: 'CREDITI', 'LAST WIN': 'ULTIMA VINCITA', Bet: 'Puntata', SPIN: 'GIRA', SPINNING: 'IN CORSO', '5 fixed paylines': '5 linee fisse', Reel: 'Rullo', 'Five reels, three rows of symbols': 'Cinque rulli, tre file di simboli', 'Payout per line = bet × multiplier': 'Vincita per linea = puntata × moltiplicatore', 'Congratulations!': 'Congratulazioni!',
@@ -63,6 +75,8 @@ const TEXT: Partial<Record<Exclude<Lang, 'zh' | 'en'>, Record<string, string>>> 
     'Refill 500 credits': 'Aggiungi 500 crediti', SOUND: 'AUDIO', 'Sound on': 'Audio attivo', 'Sound off': 'Audio disattivato', 'Best win': 'Vincita record', Spins: 'Giri', Cherry: 'Ciliegia', Lemon: 'Limone', Orange: 'Arancia', Grapes: 'Uva', Bell: 'Campana', Star: 'Stella', Diamond: 'Diamante',
     'Total bet': 'Puntata totale', Net: 'Netto', Payout: 'Vincita', 'No win this spin': 'Nessuna vincita questa volta', 'Send messages, photos, or play other games to earn points': 'Invia messaggi o foto, oppure gioca ad altri giochi per guadagnare punti',
     LEADERBOARD: 'CLASSIFICA', PLAYERS: 'GIOCATORI', 'STAR POINTS': 'PUNTI STELLA', YOU: 'TU',
+      'LUCKY JACKPOT · DRAWS EVERY 5 MIN': 'JACKPOT DELLA FORTUNA · ESTRAZIONE OGNI 5 MIN', 'NET ON THIS CARD': 'NETTO SU QUESTA CARTA', 'To jackpot': 'Al jackpot', 'You keep': 'Ti spettano',
+      'When a spin nets over 10 points, 10% feeds the jackpot, which is randomly paid to the leaderboard every 5 minutes': 'Quando una girata supera i 10 punti netti, il 10% va nel jackpot, distribuito a caso in classifica ogni 5 minuti',
   },
   ar: {
     'Slot Machine': 'ماكينة الحظ', 'A little luck, a classic spin': 'دورة كلاسيكية مع قليل من الحظ', 'CLASSIC FRUIT · 5 REELS': 'فواكه كلاسيكية · 5 بكرات', BALANCE: 'الرصيد', 'LAST WIN': 'آخر ربح', Bet: 'الرهان', SPIN: 'دوّر', SPINNING: 'يدور', '5 fixed paylines': '5 خطوط ثابتة', Reel: 'بكرة', 'Five reels, three rows of symbols': 'خمس بكرات وثلاثة صفوف من الرموز', 'Payout per line = bet × multiplier': 'الجائزة لكل خط = الرهان × المضاعف', 'Congratulations!': 'تهانينا!',
@@ -72,6 +86,8 @@ const TEXT: Partial<Record<Exclude<Lang, 'zh' | 'en'>, Record<string, string>>> 
     'Refill 500 credits': 'أضف 500 رصيد', SOUND: 'الصوت', 'Sound on': 'تشغيل الصوت', 'Sound off': 'كتم الصوت', 'Best win': 'أفضل ربح', Spins: 'عدد اللفات', Cherry: 'كرز', Lemon: 'ليمون', Orange: 'برتقال', Grapes: 'عنب', Bell: 'جرس', Star: 'نجمة', Diamond: 'ألماس',
     'Total bet': 'إجمالي الرهان', Net: 'الصافي', Payout: 'العائد', 'No win this spin': 'لا فوز في هذه الجولة', 'Send messages, photos, or play other games to earn points': 'أرسل رسائل أو صورًا، أو العب ألعابًا أخرى لكسب النقاط',
     LEADERBOARD: 'الترتيب', PLAYERS: 'لاعبون', 'STAR POINTS': 'نقاط النجوم', YOU: 'أنت',
+      'LUCKY JACKPOT · DRAWS EVERY 5 MIN': 'جائزة الحظ · سحب كل 5 دقائق', 'NET ON THIS CARD': 'الصافي على هذه البطاقة', 'To jackpot': 'إلى الجائزة', 'You keep': 'تحصل على',
+      'When a spin nets over 10 points, 10% feeds the jackpot, which is randomly paid to the leaderboard every 5 minutes': 'عندما تتجاوز أرباح اللفة 10 نقاط، يُضاف 10% إلى الجائزة، وتُوزع عشوائيًا على اللاعبين في الترتيب كل 5 دقائق',
   },
 }
 

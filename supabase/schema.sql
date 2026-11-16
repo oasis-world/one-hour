@@ -471,6 +471,12 @@ begin
   delete from public.gomoku_states where expires_at <= now();
   delete from public.xiangqi_states where expires_at <= now();
   delete from public.chess_states where expires_at <= now();
+  -- Slot jackpots follow their card's one-hour life, just like game states.
+  delete from public.slot_jackpots where expires_at <= now();
+  delete from public.slot_jackpot_contributions sc
+   where not exists (select 1 from public.slot_jackpots sj where sj.instance_id = sc.instance_id);
+  delete from public.slot_jackpot_payouts sp
+   where not exists (select 1 from public.slot_jackpots sj where sj.instance_id = sp.instance_id);
   -- Purge expired anonymous profiles. Live chat messages remain until their
   -- own expires_at, even after the author profile expires.
   delete from public.profiles
@@ -491,6 +497,11 @@ begin
   where not exists (
     select 1 from public.chat_messages cm
     where cm.content like '%' || cs.instance_id || '%'
+  );
+  delete from public.slot_jackpots sj
+  where not exists (
+    select 1 from public.chat_messages cm
+    where cm.content like '%' || sj.instance_id || '%'
   );
   -- Polls share the card message's one-hour life: expired rows go, and so
   -- do orphans whose card vanished (author delete / edit). Votes cascade.
@@ -730,4 +741,144 @@ begin
   );
 exception
   when others then null; -- pg_net absent or vault secrets not set up yet
+end $$;
+
+-- ── Slot machine jackpot ────────────────────────────────────────────────────
+-- One shared prize pool per slot card instance. 10% of a big win feeds it;
+-- every five minutes it is split among the board. Both writes go through
+-- SECURITY DEFINER RPCs with idempotency keys, so several open clients can
+-- never double-count a contribution or pay the same pool twice.
+
+create table if not exists public.slot_jackpots (
+  instance_id text primary key,
+  pool integer not null default 0 check (pool >= 0),
+  version integer not null default 0,
+  last_payout jsonb,
+  updated_at timestamptz not null default now(),
+  expires_at timestamptz not null default (now() + interval '1 hour')
+);
+create index if not exists slot_jackpots_expiry on public.slot_jackpots (expires_at);
+alter table public.slot_jackpots replica identity full;
+alter table public.slot_jackpots enable row level security;
+drop policy if exists "slot jackpots are readable by signed-in players" on public.slot_jackpots;
+create policy "slot jackpots are readable by signed-in players"
+  on public.slot_jackpots for select using (auth.uid() is not null);
+grant select on public.slot_jackpots to authenticated;
+revoke insert, update, delete on public.slot_jackpots from anon, authenticated;
+
+-- Append-only ledgers: one row per spin contribution / per payout generation.
+create table if not exists public.slot_jackpot_contributions (
+  instance_id text not null,
+  contribution_id text not null,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  amount integer not null check (amount > 0),
+  created_at timestamptz not null default now(),
+  primary key (instance_id, contribution_id)
+);
+create table if not exists public.slot_jackpot_payouts (
+  instance_id text not null,
+  payout_id text not null,
+  by_user_id uuid not null references auth.users (id) on delete cascade,
+  total integer not null check (total > 0),
+  created_at timestamptz not null default now(),
+  primary key (instance_id, payout_id)
+);
+alter table public.slot_jackpot_contributions enable row level security;
+alter table public.slot_jackpot_payouts enable row level security;
+revoke all on public.slot_jackpot_contributions from anon, authenticated;
+revoke all on public.slot_jackpot_payouts from anon, authenticated;
+
+create or replace function public.slot_jackpot_contribute(
+  p_instance_id text,
+  p_contribution_id text,
+  p_amount integer
+) returns integer language plpgsql security definer set search_path = public as $$
+declare
+  uid uuid := auth.uid();
+  result integer;
+begin
+  if uid is null then raise exception 'authentication required'; end if;
+  if p_instance_id is null or char_length(p_instance_id) not between 1 and 200
+     or p_contribution_id is null or char_length(p_contribution_id) not between 1 and 200
+     or p_amount is null or p_amount <= 0 or p_amount > 1000000 then
+    raise exception 'invalid contribution';
+  end if;
+  insert into public.slot_jackpot_contributions (instance_id, contribution_id, user_id, amount)
+    values (p_instance_id, p_contribution_id, uid, p_amount)
+    on conflict (instance_id, contribution_id) do nothing;
+  if not found then
+    -- Already counted (retry / second tab): return the current pool unchanged.
+    select pool into result from public.slot_jackpots where instance_id = p_instance_id;
+    return coalesce(result, 0);
+  end if;
+  insert into public.slot_jackpots (instance_id, expires_at)
+    values (p_instance_id, now() + interval '1 hour')
+    on conflict (instance_id) do update set expires_at = excluded.expires_at;
+  update public.slot_jackpots
+     set pool = pool + p_amount, version = version + 1,
+         updated_at = now(), expires_at = now() + interval '1 hour'
+   where instance_id = p_instance_id
+   returning pool into result;
+  return result;
+end; $$;
+
+create or replace function public.slot_jackpot_payout(
+  p_instance_id text,
+  p_payout_id text,
+  p_recipients jsonb
+) returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  uid uuid := auth.uid();
+  pool_now integer;
+  credit_sum integer;
+  item jsonb;
+begin
+  if uid is null then raise exception 'authentication required'; end if;
+  if p_instance_id is null or char_length(p_instance_id) not between 1 and 200
+     or p_payout_id is null or char_length(p_payout_id) not between 1 and 200
+     or jsonb_typeof(p_recipients) <> 'array' then
+    raise exception 'invalid payout';
+  end if;
+  select coalesce(sum((value->>'amount')::integer), 0) into credit_sum
+    from jsonb_array_elements(p_recipients);
+  select pool into pool_now from public.slot_jackpots
+   where instance_id = p_instance_id for update;
+  if pool_now is null or pool_now <= 0 then
+    return jsonb_build_object('paid', false, 'reason', 'empty');
+  end if;
+  if credit_sum <= 0 or credit_sum > pool_now then
+    raise exception 'invalid payout amount';
+  end if;
+  insert into public.slot_jackpot_payouts (instance_id, payout_id, by_user_id, total)
+    values (p_instance_id, p_payout_id, uid, credit_sum)
+    on conflict (instance_id, payout_id) do nothing;
+  if not found then
+    return jsonb_build_object('paid', false, 'reason', 'duplicate');
+  end if;
+  for item in select * from jsonb_array_elements(p_recipients) loop
+    insert into public.star_points (user_id) values ((item->>'userId')::uuid)
+      on conflict (user_id) do nothing;
+    update public.star_points
+       set balance = balance + (item->>'amount')::integer, updated_at = now()
+     where user_id = (item->>'userId')::uuid;
+  end loop;
+  update public.slot_jackpots
+     set pool = pool - credit_sum,
+         version = version + 1,
+         last_payout = jsonb_build_object(
+           'payoutId', p_payout_id, 'total', credit_sum, 'recipients', p_recipients),
+         updated_at = now()
+   where instance_id = p_instance_id;
+  return jsonb_build_object('paid', true, 'total', credit_sum);
+end; $$;
+
+revoke all on function public.slot_jackpot_contribute(text, text, integer) from public, anon;
+revoke all on function public.slot_jackpot_payout(text, text, jsonb) from public, anon;
+grant execute on function public.slot_jackpot_contribute(text, text, integer) to authenticated;
+grant execute on function public.slot_jackpot_payout(text, text, jsonb) to authenticated;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.slot_jackpots;
+exception when duplicate_object then null;
 end $$;

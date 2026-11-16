@@ -62,6 +62,7 @@ import { clearLocalReactions, loadLocalReactions, pruneLocalReactions, removeLoc
 import { adjustStarPoints, claimStarReward, readStarPoints, setStarPoints, subscribeStarPoints, syncStarPoints, transferStarPoints } from './lib/starPoints'
 import { buildPointGiftMessage } from './lib/pointGiftMessage'
 import { loadGamePopularity, recordGameSelection, watchGamePopularity, type GamePopularity } from './lib/gamePopularity'
+import { registerGameNoticeSender } from './lib/gameNotice'
 
 /**
  * 一小时 / one-hour — the ephemeral chat room. Every message, text or
@@ -95,6 +96,12 @@ export default function App() {
   const profile = useUserProfile()
   const room = useChatRoom(true)
   const currentUserId = room.identity?.userId
+
+  // Game components (e.g. the slot jackpot) post notices through this bridge.
+  useEffect(() => {
+    registerGameNoticeSender(room.send)
+    return () => registerGameNoticeSender(null)
+  }, [room.send])
 
   // Backfill an expiry for profiles created before the lifetime rule existed.
   useEffect(() => {

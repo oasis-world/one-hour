@@ -1,110 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type { GameComponentProps } from '../types'
-import { t, useLang } from '../../lib/i18n'
+import { useLang } from '../../lib/i18n'
 import { setPopoverOpen, suppressNextClick } from '../../lib/popoverGuard'
 import { useAccount } from '../../lib/useAccount'
 import { resolveChatIdentity } from '../../lib/identity'
 import { loadUserProfile } from '../../lib/userProfile'
 import { adjustStarPoints, readStarPoints, subscribeStarPoints } from '../../lib/starPoints'
 import { recordGamePlayed, recordGamePoints } from '../../lib/lifetimeStats'
-import { PAYLINES, PAYOUTS, randomGrid, readSave, scoreGrid, SYMBOLS, type ReelGrid, type SlotSave, type SymbolId } from './model'
-import { SLOT_THEMES, themeAt, type ThemeArt } from './themes'
+import { jackpotContribution, PAYLINES, randomGrid, readSave, scoreGrid, type ReelGrid, type SlotSave, type SymbolId } from './model'
+import { SLOT_THEMES, themeAt } from './themes'
 import SlotBetSelector from './SlotBetSelector'
 import SlotLeaderboard from './SlotLeaderboard'
+import SlotHelp from './SlotHelp'
 import { useSlotLeaderboard } from './useSlotLeaderboard'
+import { useSlotJackpot } from './useSlotJackpot'
 import { slotText as s } from './slotText'
+import { HelpIcon, JoystickIcon, ShuffleIcon, SoundIcon, SymbolArt } from './slotExtras'
+import { playReelStopSound, playSmallPayoutSound, playSpinSound, playWinSound, SEVEN_IMAGE } from './slotSound'
 import './SlotMachine.css'
 
 const STORAGE = (id: string) => `slot-machine:${id}`
-const SEVEN_IMAGE = '/games/slot-machine/lucky-seven.png'
-const WIN_SOUND = '/games/slot-machine/magical-coin-win.mp3'
 const SPIN_SYMBOLS: SymbolId[] = ['cherry', 'lemon', 'orange', 'grapes', 'bell', 'star', 'diamond', 'wild']
-interface SpinResult { payout: number; net: number; wager: number }
-let soundContext: AudioContext | null = null
-
-function getSoundContext(): AudioContext | null {
-  try {
-    if (!soundContext || soundContext.state === 'closed') soundContext = new AudioContext()
-    if (soundContext.state === 'suspended') void soundContext.resume()
-    return soundContext
-  } catch { return null }
-}
-
-function playTone(context: AudioContext, frequency: number, start: number, duration: number, volume: number, type: OscillatorType, endFrequency?: number) {
-  try {
-    const oscillator = context.createOscillator(), gain = context.createGain()
-    oscillator.type = type
-    oscillator.frequency.setValueAtTime(frequency, start)
-    if (endFrequency) oscillator.frequency.exponentialRampToValueAtTime(endFrequency, start + duration)
-    gain.gain.setValueAtTime(.0001, start)
-    gain.gain.exponentialRampToValueAtTime(volume, start + .012)
-    gain.gain.exponentialRampToValueAtTime(.0001, start + duration)
-    oscillator.connect(gain).connect(context.destination)
-    oscillator.start(start); oscillator.stop(start + duration + .02)
-  } catch { /* Audio is an optional enhancement. */ }
-}
-
-function playSpinSound() {
-  const context = getSoundContext()
-  if (!context) return
-  const now = context.currentTime
-  playTone(context, 145, now, .34, .035, 'sawtooth', 520)
-  playTone(context, 270, now + .035, .25, .022, 'triangle', 710)
-}
-
-function playReelStopSound(index: number) {
-  const context = getSoundContext()
-  if (!context) return
-  const now = context.currentTime, frequency = 660 + index * 82
-  playTone(context, frequency, now, .075, .034, 'triangle')
-  playTone(context, frequency * 2.4, now, .055, .012, 'sine')
-}
-
-function playSmallPayoutSound() {
-  const context = getSoundContext()
-  if (!context) return
-  const now = context.currentTime
-  playTone(context, 560, now, .13, .025, 'sine')
-  playTone(context, 740, now + .11, .18, .025, 'sine')
-}
-
-function playWinFallback() {
-  const context = getSoundContext()
-  if (!context) return
-  const now = context.currentTime
-  ;[784, 988, 1175, 1568].forEach((frequency, index) => playTone(context, frequency, now + index * .11, .32, .05, 'sine'))
-}
-
-function playWinSound() {
-  try {
-    const audio = new Audio(WIN_SOUND)
-    audio.volume = .55
-    void audio.play().catch(playWinFallback)
-  } catch { playWinFallback() }
-}
-
-function HelpIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2" /><path d="M7.9 7.6a2.2 2.2 0 1 1 3.7 1.6c-.9.8-1.6 1.1-1.6 2.3" /><path d="M10 14.1v.1" /></svg>
-}
-
-function SoundIcon({ enabled }: { enabled: boolean }) {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z" />{enabled ? <><path d="M16 9a5 5 0 0 1 0 6" /><path d="M18.5 6.5a8.5 8.5 0 0 1 0 11" /></> : <path className="slot-sound-slash" d="m5 5 14 14" />}</svg>
-}
-
-function JoystickIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v8" /><circle cx="12" cy="4.2" r="2.4" /><path d="M8 13h8l3.2 2.4a2.2 2.2 0 0 1-1.3 4H6.1a2.2 2.2 0 0 1-1.3-4L8 13Z" /><path d="M8 16.5h.1m7.8 0h.1" /></svg>
-}
-
-function ShuffleIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h3.2c1.4 0 2.1.7 3 2l5.6 7c.7 1 1.4 1.6 2.8 1.6H21" /><path d="M3 17h3.2c1.4 0 2.1-.7 3-2l.8-1.1" /><path d="M14.5 9.2 15 8.6c.9-1.3 1.6-2 3-2H21" /><path d="m18 4 3 3-3 3M18 14l3 3-3 3" /></svg>
-}
-
-function SymbolArt({ symbol, className, art }: { symbol: SymbolId; className: string; art: ThemeArt }) {
-  return symbol === 'wild'
-    ? <img className={`${className} slot-seven`} src={SEVEN_IMAGE} alt="" aria-hidden="true" />
-    : <span className={className} aria-hidden="true">{art[symbol]}</span>
-}
+interface SpinResult { payout: number; net: number; wager: number; contribution: number }
 
 export default function SlotMachine({ instanceId, onlineMembers = [] }: GameComponentProps) {
   const lang = useLang()
@@ -115,19 +32,21 @@ export default function SlotMachine({ instanceId, onlineMembers = [] }: GameComp
   const account = useAccount()
   const identity = resolveChatIdentity(account)
   const profile = loadUserProfile()
-  const lbSelfId = identity?.userId ?? null
-  // Live room roster: anyone who expired out of the room (1-hour limit) or
-  // closed the tab must also vanish from this card's board.
+  const selfId = identity?.userId ?? null
   const lbPresentIds = useMemo(() => onlineMembers.map((member) => member.userId), [onlineMembers])
   const { players: lbPlayers, total: lbTotal, flashes: lbFlashes } = useSlotLeaderboard(instanceId, {
-    userId: lbSelfId,
+    userId: selfId,
     name: profile?.nickname ?? identity?.displayName ?? 'Player',
-    balance,
+    score: save.score,
     spins: save.spins,
     avatarStyle: profile?.style ?? identity?.avatar?.style ?? null,
     avatarSeed: profile?.seed ?? identity?.avatar?.seed ?? null,
     avatarUrl: profile?.avatarUrl ?? identity?.avatarUrl ?? null,
   }, lbPresentIds)
+  // Any player listed on this card can run the draw, so the jackpot keeps
+  // paying out even after the card's sender has expired out of the room.
+  const canRunDraw = lbPlayers.some((player) => player.isSelf)
+  const jackpot = useSlotJackpot(instanceId, canRunDraw, lbPlayers, selfId)
   const [reels, setReels] = useState<ReelGrid>(() => randomGrid())
   const [rolling, setRolling] = useState([false, false, false, false, false])
   const [wins, setWins] = useState<number[]>([])
@@ -171,8 +90,8 @@ export default function SlotMachine({ instanceId, onlineMembers = [] }: GameComp
   const spin = () => {
     const totalWager = save.bet * PAYLINES.length
     if (rollingRef.current.some(Boolean) || balance < totalWager) return
-    const outcome = randomGrid(), bet = save.bet
-    recordGamePlayed('slot-machine', `${instanceId}:${save.spins + 1}`)
+    const outcome = randomGrid(), bet = save.bet, spinNumber = save.spins + 1
+    recordGamePlayed('slot-machine', `${instanceId}:${spinNumber}`)
     setSave((current) => ({ ...current, spins: current.spins + 1 }))
     setLastWin(0); setWins([]); setToast(null)
     if (toastTimer.current !== null) window.clearTimeout(toastTimer.current)
@@ -187,14 +106,25 @@ export default function SlotMachine({ instanceId, onlineMembers = [] }: GameComp
         const score = scoreGrid(outcome, bet)
         setWins(score.wins.flatMap((win) => win.cells)); setLastWin(score.payout)
         const net = score.payout - totalWager
-        if (net) adjustStarPoints(net, true)
-        recordGamePoints(net)
-        setSave((current) => ({ ...current, bestWin: Math.max(current.bestWin, score.payout) }))
-        setToast({ payout: score.payout, net, wager: totalWager })
-        toastTimer.current = window.setTimeout(() => setToast(null), 3500)
-        if (net > 0) {
-          try { navigator.vibrate?.([24, 30, 55]) } catch { /* Haptics are optional. */ }
+        const contribution = jackpotContribution(net)
+        const credited = net - contribution
+        if (credited) adjustStarPoints(credited, true)
+        if (contribution > 0) {
+          void jackpot.contribute(contribution, spinNumber, selfId ?? '').then((accepted) => {
+            // If the pool is unavailable (e.g. the SQL migration was not run),
+            // give the withheld slice back instead of silently losing points.
+            if (accepted) return
+            adjustStarPoints(contribution, true)
+            recordGamePoints(contribution)
+            setSave((current) => ({ ...current, score: current.score + contribution }))
+            setToast((current) => current ? { ...current, contribution: 0 } : null)
+          })
         }
+        recordGamePoints(credited)
+        setSave((current) => ({ ...current, bestWin: Math.max(current.bestWin, score.payout), score: current.score + credited }))
+        setToast({ payout: score.payout, net, wager: totalWager, contribution })
+        toastTimer.current = window.setTimeout(() => setToast(null), 3500)
+        if (net > 0) { try { navigator.vibrate?.([24, 30, 55]) } catch { /* Haptics are optional. */ } }
         if (sound && net > 0) playWinSound()
         else if (sound && score.payout > 0) playSmallPayoutSound()
       }
@@ -214,21 +144,7 @@ export default function SlotMachine({ instanceId, onlineMembers = [] }: GameComp
         <button type="button" className="slot-icon-btn slot-theme" aria-label={s('切换图案', 'Switch symbols')} title={`${s('切换图案', 'Switch symbols')}: ${s(...theme.name)}`} onClick={cycleTheme}><ShuffleIcon /></button>
         <div className="slot-help-anchor" ref={helpRef}>
           <button type="button" className={`slot-icon-btn slot-help-trigger${helpOpen ? ' is-active' : ''}`} aria-label={s('游戏说明', 'How to play')} aria-haspopup="dialog" aria-expanded={helpOpen} onClick={() => setHelpOpen((open) => !open)}><HelpIcon /></button>
-          {helpOpen && createPortal(<div className="slot-help-backdrop" role="presentation">
-            <section ref={helpPanelRef} className="slot-help-modal" dir={lang === 'ar' ? 'rtl' : 'ltr'} role="dialog" aria-modal="true" aria-label={s('游戏说明', 'How to play')} onClick={(event) => event.stopPropagation()}>
-              <header><strong>{s('游戏说明', 'How to play')}</strong><button type="button" aria-label={t('关闭', 'Close')} onClick={() => setHelpOpen(false)}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg></button></header>
-               <p>{s('5 条固定赔付线 · 任意位置连续 3 个及以上相同符号即可中奖', '5 fixed paylines · 3+ matching symbols in a row win anywhere')}</p>
-              <p>{s('每条赔付线都使用完整下注', 'Bet applies to each of the 5 lines')}</p>
-              <p>{s('百搭可代替任何符号', 'Wild substitutes for any symbol')}</p>
-              <p className="slot-free-note">ⓘ {s('消耗星星积分 · 不涉及真钱', 'Uses your star points · no real money')}</p>
-              <div className="slot-paytable">
-                <b>{s('赔付表', 'Pay table')}</b>
-                <div className="slot-pay-head"><span /><span>{s('连续 3 个', '3 in a row')}</span><span>{s('连续 4 个', '4 in a row')}</span><span>{s('连续 5 个', '5 in a row')}</span></div>
-                {SYMBOLS.map((symbol) => <div className="slot-pay-row" key={symbol}><span><i className="slot-pay-icon">{symbol === 'wild' ? <img src={SEVEN_IMAGE} alt="" /> : theme.art[symbol]}</i>{symbolName(symbol)}</span>{PAYOUTS[symbol].map((multiplier, index) => <b key={index}>{multiplier}×</b>)}</div>)}
-                <small>{s('每条线奖金 = 单线下注 × 倍数', 'Payout per line = bet × multiplier')}</small>
-              </div>
-            </section>
-          </div>, document.body)}
+          {helpOpen && <SlotHelp dir={lang === 'ar' ? 'rtl' : 'ltr'} theme={theme} panelRef={helpPanelRef} onClose={() => setHelpOpen(false)} />}
         </div>
       </div>
     </header>
@@ -259,6 +175,7 @@ export default function SlotMachine({ instanceId, onlineMembers = [] }: GameComp
           <strong>{toast.payout === 0 ? s('本次未中奖', 'No win this spin') : toast.net > 0 ? s('恭喜中奖！', 'Congratulations!') : s('派彩', 'Payout')}</strong>
           <b>{toast.payout > 0 ? '+' : '−'}{(toast.payout > 0 ? toast.payout : toast.wager).toLocaleString()}</b>
           <small>{s('净额', 'Net')} {toast.net > 0 ? '+' : ''}{toast.net.toLocaleString()}</small>
+          {toast.contribution > 0 && <small className="slot-toast-jackpot">🎁 {s('奖池贡献', 'To jackpot')} −{toast.contribution.toLocaleString()} · {s('实际到手', 'You keep')} +{(toast.net - toast.contribution).toLocaleString()}</small>}
           {toast.net > 0 && <span className="slot-toast-spark">✦</span>}
         </div>}
       </div>
@@ -274,6 +191,6 @@ export default function SlotMachine({ instanceId, onlineMembers = [] }: GameComp
     {balance < totalWager && !busy && <p className="slot-refill-note">{s('请发送消息、图片、玩其它游戏来赚取积分', 'Send messages, photos, or play other games to earn points')}</p>}
     </section>
 
-    <SlotLeaderboard players={lbPlayers} total={lbTotal} flashes={lbFlashes} dir={lang === 'ar' ? 'rtl' : 'ltr'} />
+    <SlotLeaderboard players={lbPlayers} total={lbTotal} flashes={lbFlashes} dir={lang === 'ar' ? 'rtl' : 'ltr'} jackpot={{ pool: jackpot.state.pool, gainFlash: jackpot.gainFlash, payoutFlash: jackpot.payoutFlash }} />
   </>
 }

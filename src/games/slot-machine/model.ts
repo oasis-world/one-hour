@@ -67,8 +67,15 @@ export function scoreGrid(grid: ReelGrid, lineBet: number): SlotScore {
   return { payout: wins.reduce((sum, win) => sum + win.amount, 0), wins }
 }
 
-export interface SlotSave { bet: number; spins: number; bestWin: number; theme: number }
-export const DEFAULT_SAVE: SlotSave = { bet: 1, spins: 0, bestWin: 0, theme: 0 }
+/** A spin with a net gain above this threshold feeds 10% into the jackpot. */
+export const JACKPOT_THRESHOLD = 10
+export const JACKPOT_RATE = 0.1
+export function jackpotContribution(net: number): number {
+  return net > JACKPOT_THRESHOLD ? Math.round(net * JACKPOT_RATE) : 0
+}
+
+export interface SlotSave { bet: number; spins: number; bestWin: number; theme: number; score: number }
+export const DEFAULT_SAVE: SlotSave = { bet: 1, spins: 0, bestWin: 0, theme: 0, score: 0 }
 
 export function readSave(key: string): SlotSave {
   try {
@@ -81,6 +88,8 @@ export function readSave(key: string): SlotSave {
           spins: Math.max(0, save.spins!),
           bestWin: Math.max(0, save.bestWin!),
           theme: Number.isFinite(save.theme) ? Math.max(0, Math.floor(save.theme!)) : 0,
+          // Net win/loss earned on this exact card; old saves start at zero.
+          score: Number.isFinite(save.score) ? Math.trunc(save.score!) : 0,
         }
       }
     }

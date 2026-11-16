@@ -8,7 +8,8 @@ type SlotChannel = ReturnType<Awaited<ReturnType<typeof getSupabaseClient>>['cha
 export interface SlotLeaderboardPlayer {
   userId: string
   name: string
-  balance: number
+  /** Net win/loss earned on this exact card instance (never the star balance). */
+  score: number
   spins: number
   avatarStyle: string
   avatarSeed: string
@@ -21,7 +22,8 @@ export interface SlotBalanceFlash { id: number; delta: number }
 export interface SlotSelfInfo {
   userId: string | null
   name: string
-  balance: number
+  /** Net win/loss on this exact card instance (positive = won, negative = lost). */
+  score: number
   /** Spins on this exact card instance — only players with ≥1 show up. */
   spins: number
   avatarStyle: string | null
@@ -31,7 +33,7 @@ export interface SlotSelfInfo {
 
 interface Peer {
   name: string
-  balance: number
+  score: number
   spins: number
   avatarStyle: string
   avatarSeed: string
@@ -43,8 +45,8 @@ const readString = (value: unknown, fallback = ''): string =>
 
 /**
  * Leaderboard for one slot-machine instance. Everyone who has this exact
- * card open tracks their own star-point balance in a presence channel keyed
- * by the instance id, so each card shows a different, self-contained board.
+ * card open tracks their own net win/loss on this card in a presence channel
+ * keyed by the instance id, so each card shows a different, self-contained board.
  * Falls back to a single local row when the backend is unavailable.
  *
  * Remote rows are intersected with the live room roster (`presentUserIds`):
@@ -71,7 +73,7 @@ export function useSlotLeaderboard(instanceId: string, self: SlotSelfInfo, prese
       return {
         userId: current.userId,
         name: current.name,
-        balance: current.balance,
+        score: current.score,
         spins: current.spins,
         avatarStyle: current.avatarStyle ?? '',
         avatarSeed: current.avatarSeed ?? '',
@@ -87,21 +89,21 @@ export function useSlotLeaderboard(instanceId: string, self: SlotSelfInfo, prese
         for (const raw of metas as Array<Record<string, unknown>>) {
           const uid = raw.userId
           if (typeof uid !== 'string') continue
-          const balance = typeof raw.balance === 'number' && Number.isFinite(raw.balance)
-            ? Math.max(0, Math.floor(raw.balance))
+          const score = typeof raw.score === 'number' && Number.isFinite(raw.score)
+            ? Math.trunc(raw.score)
             : 0
           const spins = typeof raw.spins === 'number' && Number.isFinite(raw.spins)
             ? Math.max(0, Math.floor(raw.spins))
             : 0
           // One account can have several tabs/devices online at once, each with
-          // its own (possibly stale) balance and spin count. Prefer the meta
+          // its own (possibly stale) score and spin count. Prefer the meta
           // with the most spins — a tab that never spun here must not veto
-          // the tab that actually played, even if its balance looks higher.
+          // the tab that actually played, even if its score looks higher.
           const kept = next[uid]
-          if (kept && (kept.spins > spins || (kept.spins === spins && kept.balance >= balance))) continue
+          if (kept && (kept.spins > spins || (kept.spins === spins && kept.score >= score))) continue
           next[uid] = {
             name: readString(raw.name, 'Player'),
-            balance,
+            score,
             spins,
             avatarStyle: readString(raw.avatarStyle),
             avatarSeed: readString(raw.avatarSeed),
@@ -141,10 +143,10 @@ export function useSlotLeaderboard(instanceId: string, self: SlotSelfInfo, prese
     }
   }, [instanceId, self.userId])
 
-  // Publish balance/identity/spin-count changes so peers see the new amount.
+  // Publish score/identity/spin-count changes so peers see the new amount.
   useEffect(() => {
     retrackRef.current?.()
-  }, [self.balance, self.name, self.spins, self.avatarStyle, self.avatarSeed, self.avatarUrl])
+  }, [self.score, self.name, self.spins, self.avatarStyle, self.avatarSeed, self.avatarUrl])
 
   const players = useMemo<SlotLeaderboardPlayer[]>(() => {
     const present = presentUserIds.length === 0 ? null : new Set(presentUserIds)
@@ -158,7 +160,7 @@ export function useSlotLeaderboard(instanceId: string, self: SlotSelfInfo, prese
       map[self.userId] = {
         userId: self.userId,
         name: self.name,
-        balance: self.balance,
+        score: self.score,
         spins: self.spins,
         avatarStyle: self.avatarStyle ?? map[self.userId]?.avatarStyle ?? '',
         avatarSeed: self.avatarSeed ?? map[self.userId]?.avatarSeed ?? self.userId,
@@ -167,11 +169,11 @@ export function useSlotLeaderboard(instanceId: string, self: SlotSelfInfo, prese
       }
     }
     return Object.values(map)
-      .sort((a, b) => b.balance - a.balance || a.userId.localeCompare(b.userId))
+      .sort((a, b) => b.score - a.score || a.userId.localeCompare(b.userId))
       // Render well past the visible ~5 rows so the box can scroll;
       // the cap is only a DOM-size guard.
       .slice(0, 50)
-  }, [peers, presentUserIds, self.userId, self.name, self.balance, self.spins, self.avatarStyle, self.avatarSeed, self.avatarUrl])
+  }, [peers, presentUserIds, self.userId, self.name, self.score, self.spins, self.avatarStyle, self.avatarSeed, self.avatarUrl])
 
   const total = useMemo(() => {
     const present = presentUserIds.length === 0 ? null : new Set(presentUserIds)
@@ -190,20 +192,20 @@ export function useSlotLeaderboard(instanceId: string, self: SlotSelfInfo, prese
   }, [peers, presentUserIds, self.userId, self.spins])
 
   const [flashes, setFlashes] = useState<Record<string, SlotBalanceFlash>>({})
-  const prevBalances = useRef<Record<string, number>>({})
+  const prevScores = useRef<Record<string, number>>({})
   const flashSeq = useRef(0)
   useEffect(() => {
     const current: Record<string, number> = {}
     const next: Record<string, SlotBalanceFlash> = {}
     for (const player of players) {
-      current[player.userId] = player.balance
-      const previous = prevBalances.current[player.userId]
-      if (previous !== undefined && previous !== player.balance) {
+      current[player.userId] = player.score
+      const previous = prevScores.current[player.userId]
+      if (previous !== undefined && previous !== player.score) {
         flashSeq.current += 1
-        next[player.userId] = { id: flashSeq.current, delta: player.balance - previous }
+        next[player.userId] = { id: flashSeq.current, delta: player.score - previous }
       }
     }
-    prevBalances.current = current
+    prevScores.current = current
     if (Object.keys(next).length === 0) return
     // Defer to a callback so the flash lands outside the effect body.
     const timer = window.setTimeout(() => setFlashes((old) => ({ ...old, ...next })), 0)
