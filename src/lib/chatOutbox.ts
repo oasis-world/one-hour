@@ -1,5 +1,5 @@
 import { idbDelete, idbGetAll, idbPut, OUTBOX_STORE } from './idb'
-import type { MessageReply } from './chatTypes'
+import type { ChatAuthorOverride, MessageReply } from './chatTypes'
 
 /**
  * Durable outbox for chat sends (oasis-game pattern, moved to IndexedDB so
@@ -34,6 +34,7 @@ export interface ChatOutboxItem {
   imageBlob?: Blob
   whisperTo?: string | null
   whisperToName?: string | null
+  authorOverride?: ChatAuthorOverride
 }
 
 export const CHAT_OUTBOX_MAX_ATTEMPTS = 5

@@ -51,6 +51,7 @@ import { getCompanionIfAlive, clearCompanionProfile, subscribeCompanion, type Co
 import { clearCompanionMessages, loadCompanionMessages, saveCompanionMessage, createUserCompanionMessage, createCompanionReply, pruneCompanionMessages, companionMessageExpiresAt, removeCompanionMessage } from './lib/companionStore'
 import type { CompanionMessage } from './lib/companionStore'
 import { requestCompanionGreeting, requestCompanionReply, toHistory } from './lib/companionChat'
+import { createCompanionEmojiArt } from './lib/companionEmojiArt'
 import { containsCompanionMention } from './lib/mention'
 import { createCompanionGame, gameTitle } from './lib/companionGame'
 import { isEnterPrivateChatIntent } from './lib/privateChatIntent'
@@ -79,6 +80,7 @@ type FoldState = 'open' | 'folding' | 'folded' | 'unfolding'
 
 const FOLD_MS = 500
 const UNFOLD_MS = 540
+const COMPANION_EMOJI_ART_TEST_ENABLED = false
 
 function distributePoints(balance: number, candidates: { userId: string; displayName: string }[]) {
   const shuffled = [...candidates].sort(() => Math.random() - 0.5).slice(0, Math.min(3, balance))
@@ -412,6 +414,38 @@ export default function App() {
   const [userTyping, setUserTyping] = useState(false)
   const privateMessagesRef = useRef<CompanionMessage[]>([])
   useEffect(() => { privateMessagesRef.current = privateMessages }, [privateMessages])
+  const companionRoomStatus = room.status
+  const companionRoomUserId = room.identity?.userId
+  useEffect(() => {
+    if (!COMPANION_EMOJI_ART_TEST_ENABLED || !companion || !companionRoomUserId || companionRoomStatus !== 'online') return
+    const owner = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)
+    const key = `one-hour-companion-art-lease:${companion.id}`
+    const claimLease = () => {
+      try {
+        const lease = JSON.parse(globalThis.localStorage?.getItem(key) ?? 'null') as { owner?: string; until?: number } | null
+        if (lease && lease.owner !== owner && (lease.until ?? 0) > Date.now()) return false
+        globalThis.localStorage?.setItem(key, JSON.stringify({ owner, until: Date.now() + 45_000 }))
+        return JSON.parse(globalThis.localStorage?.getItem(key) ?? 'null')?.owner === owner
+      } catch {
+        return true
+      }
+    }
+    const postArt = () => {
+      if (Date.now() >= companion.expiresAt || !claimLease()) return
+      sendRoomMessage(createCompanionEmojiArt(companion.name), undefined, null, {
+        authorOverride: {
+          displayName: companion.name,
+          avatar: { style: companion.style, seed: companion.seed },
+          avatarUrl: companion.avatarUrl ?? null,
+          authorRole: companion.role,
+          authorExpiresAt: companion.expiresAt,
+        },
+      })
+    }
+    claimLease()
+    const timer = window.setInterval(postArt, 30_000)
+    return () => window.clearInterval(timer)
+  }, [companion, companionRoomStatus, companionRoomUserId, sendRoomMessage])
   const enterPrivateChat = useCallback(() => {
     setPrivateMode(true)
     const el = document.querySelector('.composer-input') as HTMLTextAreaElement | null

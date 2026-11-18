@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ChatEntry, ChatStatus, MessageReply, PresenceMember } from '../lib/chatTypes'
 import type { GamePopularity } from '../lib/gamePopularity'
 import { setPopoverOpen } from '../lib/popoverGuard'
@@ -19,6 +19,7 @@ import AvatarBadge from './AvatarBadge'
 import { parsePollRef } from '../lib/pollTypes'
 import { deletePoll } from '../lib/pollRemote'
 import StarScore, { type StarReward } from './StarScore'
+import { parseCompanionNewsCard } from '../lib/newsCard'
 
 interface Props {
   entries: ChatEntry[]
@@ -98,7 +99,14 @@ export default function MessageList({
   onStartGame,
   gamePopularity = {},
 }: Props) {
-  useLang() // re-render on language flips
+  const lang = useLang()
+  const visibleEntries = useMemo(
+    () => entries.filter((entry) => {
+      const news = parseCompanionNewsCard(entry.content, entry.userId)
+      return !news || news.lang === lang
+    }),
+    [entries, lang],
+  )
   const logRef = useRef<HTMLDivElement>(null)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [hasOlder, setHasOlder] = useState(true)
@@ -118,7 +126,7 @@ export default function MessageList({
   const autoProbeRef = useRef(false)
   const previousStatusRef = useRef(status)
 
-  const scroll = useChatScroll({ scrollRef: logRef, entries, incomingMessageSequence, layoutKey })
+  const scroll = useChatScroll({ scrollRef: logRef, entries: visibleEntries, incomingMessageSequence, layoutKey })
   const { scrollToEnd } = scroll
   const seenSentMessageRef = useRef(sentMessageSequence)
 
@@ -138,7 +146,7 @@ export default function MessageList({
     const el = logRef.current
     if (!el || loadingRef.current || !hasOlder) return
     loadingRef.current = true
-    anchorRef.current = { height: el.scrollHeight, firstId: entries[0]?.id }
+    anchorRef.current = { height: el.scrollHeight, firstId: visibleEntries[0]?.id }
     setLoadingOlder(true)
     void onLoadOlder()
       .then((result) => {
@@ -150,7 +158,7 @@ export default function MessageList({
         loadingRef.current = false
         setLoadingOlder(false)
       })
-  }, [entries, hasOlder, onLoadOlder])
+  }, [visibleEntries, hasOlder, onLoadOlder])
 
   const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
     scroll.handleScroll()
@@ -167,33 +175,33 @@ export default function MessageList({
     previousStatusRef.current = status
     const el = logRef.current
     if (
-      !el || loadingOlder || !hasOlder || entries.length === 0 ||
+      !el || loadingOlder || !hasOlder || visibleEntries.length === 0 ||
       status === 'offline' || autoProbeRef.current || el.scrollHeight > el.clientHeight + 1
     ) return
     autoProbeRef.current = true
     requestOlder()
-  }, [entries.length, hasOlder, loadingOlder, requestOlder, status])
+  }, [visibleEntries.length, hasOlder, loadingOlder, requestOlder, status])
 
   // Keep the viewport anchored on the same oldest row after a page prepend.
   useLayoutEffect(() => {
     const anchor = anchorRef.current
     const el = logRef.current
     if (!anchor || !el || loadingOlder) return
-    if (entries[0]?.id === anchor.firstId) {
+    if (visibleEntries[0]?.id === anchor.firstId) {
       anchorRef.current = null
       return
     }
     el.scrollTop += el.scrollHeight - anchor.height
     anchorRef.current = null
-  }, [entries, loadingOlder])
+  }, [visibleEntries, loadingOlder])
 
   // First paint: start at the newest line.
   const startedRef = useRef(scroll.hasSavedPosition)
   useLayoutEffect(() => {
-    if (startedRef.current || entries.length === 0) return
+    if (startedRef.current || visibleEntries.length === 0) return
     startedRef.current = true
     scroll.scrollToEnd()
-  }, [entries, scroll])
+  }, [visibleEntries, scroll])
 
   const copyEntry = (entry: ChatEntry) => {
     setMenu(null)
@@ -277,10 +285,10 @@ export default function MessageList({
             {t('正在加载更早的消息…', 'Loading earlier messages…')}
           </div>
         )}
-        {!hasOlder && entries.length > 0 && (
+        {!hasOlder && visibleEntries.length > 0 && (
           <div className="chat-top-hint">{t('已经到顶部了', 'You’re at the top')}</div>
         )}
-        {entries.length === 0 && (
+        {visibleEntries.length === 0 && (
           <div className="chat-empty">
             <span className="chat-empty-logo">
               <HourglassIcon size={28} />
@@ -296,7 +304,7 @@ export default function MessageList({
             </p>
           </div>
         )}
-        {entries.map((entry) => (
+        {visibleEntries.map((entry) => (
           <MessageRow
             key={entry.id}
             entry={entry}

@@ -40,6 +40,9 @@ alter table public.chat_messages add column if not exists edited_at timestamptz;
 alter table public.chat_messages add column if not exists farewell boolean not null default false;
 alter table public.chat_messages add column if not exists whisper_to uuid references auth.users (id) on delete cascade;
 alter table public.chat_messages add column if not exists whisper_to_name text;
+-- Server-published system cards use a reserved non-auth UUID. Client inserts
+-- remain bound to auth.uid() by RLS; the Edge Function uses service_role.
+alter table public.chat_messages drop constraint if exists chat_messages_user_id_fkey;
 
 -- Full replica identity so Realtime UPDATE/DELETE payloads carry every column
 -- (including edited_at) instead of just the primary key.
@@ -742,6 +745,38 @@ begin
   );
 exception
   when others then null; -- pg_net absent or vault secrets not set up yet
+end $$;
+
+-- ── Scheduled companion news publisher ─────────────────────────────────────
+-- Publishes one localized card per supported language every three minutes. Uses the
+-- existing Vault project_url plus companion_news_secret_key, which must hold
+-- the current sb_secret_* key (not the deprecated service_role JWT key).
+do $$
+begin
+  perform cron.unschedule('companion-news');
+exception
+  when others then null;
+end $$;
+
+do $$
+begin
+  perform cron.schedule(
+    'companion-news',
+    '*/3 * * * *',
+    $sql$
+    select net.http_post(
+      url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url')
+             || '/functions/v1/companion-news',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'companion_news_secret_key')
+      ),
+      body := '{}'::jsonb
+    );
+    $sql$
+  );
+exception
+  when others then null;
 end $$;
 
 -- ── Slot machine jackpot ────────────────────────────────────────────────────

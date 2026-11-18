@@ -9,6 +9,11 @@ verify_jwt = false
 [functions.purge-chat-images]
 verify_jwt = false
 
+[functions.companion-news]
+# The scheduled caller authenticates with the service-role key; the function
+# compares it against SUPABASE_SERVICE_ROLE_KEY before doing any work.
+verify_jwt = false
+
 [functions.unsplash-background]
 # OPTIONS preflight has no user JWT; the function validates JWTs on POST itself.
 verify_jwt = false

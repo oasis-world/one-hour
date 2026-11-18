@@ -41,6 +41,22 @@ export interface MessageReply {
   hasImage: boolean
 }
 
+export interface ChatAuthorOverride {
+  displayName: string
+  avatar?: { style: string; seed: string }
+  avatarUrl?: string | null
+  authorRole?: string | null
+  authorExpiresAt?: number | null
+}
+
+export interface ChatSendOptions {
+  expiresAt?: number
+  farewell?: boolean
+  whisperTo?: string | null
+  whisperToName?: string | null
+  authorOverride?: ChatAuthorOverride
+}
+
 export type ChatSendState = 'pending' | 'failed'
 
 export interface ChatEntry extends ChatMessage {

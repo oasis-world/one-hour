@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { enterChat, type ChatApi } from '../lib/chatSync'
-import type { ChatEntry, ChatStatus, MessageReply, PresenceMember } from '../lib/chatTypes'
+import type { ChatEntry, ChatSendOptions, ChatStatus, MessageReply, PresenceMember } from '../lib/chatTypes'
 import { resolveChatIdentity, type ChatIdentity } from '../lib/identity'
 import { recordInteraction } from '../lib/lifetimeStats'
 import { useAccount } from '../lib/useAccount'
@@ -76,7 +76,7 @@ export function useChatRoom(enabled: boolean) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, displayName, avatarKey, avatarUrl, profileDetails])
 
-  const send = useCallback((text: string, imageBlob?: Blob, replyTo?: MessageReply | null, options?: { expiresAt?: number; farewell?: boolean; whisperTo?: string | null; whisperToName?: string | null }) => {
+  const send = useCallback((text: string, imageBlob?: Blob, replyTo?: MessageReply | null, options?: ChatSendOptions) => {
     return apiRef.current?.send(text, imageBlob, replyTo, options) ?? null
   }, [])
   const retry = useCallback(() => apiRef.current?.retry(), [])

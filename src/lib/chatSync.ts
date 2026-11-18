@@ -25,9 +25,10 @@ import {
   type ChatOutboxItem,
 } from './chatOutbox'
 import { isExpired } from './expiry'
-import type { ChatEntry, ChatStatus, ChatMessage, MessageReply, PresenceMember } from './chatTypes'
+import type { ChatEntry, ChatStatus, ChatMessage, ChatSendOptions, MessageReply, PresenceMember } from './chatTypes'
 import type { ChatIdentity } from './identity'
 import type { RoomReactionChange, RoomReactionRecord } from './chatReactions'
+import { NEWS_BOT_USER_ID } from './newsCard'
 
 /**
  * Chat sync facade (oasis-game architecture): writes land locally first —
@@ -56,7 +57,7 @@ export interface ChatCallbacks {
 }
 
 export interface ChatApi {
-  send(content: string, imageBlob?: Blob, replyTo?: MessageReply | null, options?: { expiresAt?: number; farewell?: boolean; whisperTo?: string | null; whisperToName?: string | null }): string | null
+  send(content: string, imageBlob?: Blob, replyTo?: MessageReply | null, options?: ChatSendOptions): string | null
   /** Retry every failed/pending message right now. */
   retry(): void
   /** Load and prepend the page older than the current oldest message. */
@@ -79,6 +80,12 @@ const DISSOLVE_MS = 1050
 const SWEEP_INTERVAL_MS = 1000
 /** Client-side purge fallback cadence (pg_cron stays the primary). */
 const PURGE_INTERVAL_MS = 120_000
+
+function isForeignNews(entry: Pick<ChatMessage, 'content' | 'userId'>, lang?: string | null): boolean {
+  if (entry.userId !== NEWS_BOT_USER_ID || !entry.content.startsWith('NEWS:')) return false
+  const separator = entry.content.indexOf(':', 5)
+  return separator >= 0 && entry.content.slice(5, separator) !== (lang ?? 'en')
+}
 
 export function enterChat(
   initialIdentity: ChatIdentity,
@@ -225,6 +232,7 @@ export function enterChat(
   }
 
   const mergeServerMessage = (message: ChatMessage) => {
+    if (isForeignNews(message, currentIdentity.lang)) return
     const existing = entries.find((e) => e.id === message.id)
     if (existing && existing.expiring) return
     if (existing && existing.serverCreatedAt) {
@@ -314,11 +322,11 @@ export function enterChat(
               id: item.id,
               content: item.content,
               replyTo: item.replyTo,
-              displayName: item.displayName,
-              avatar: item.avatar,
-              avatarUrl: item.avatarUrl ?? null,
-              authorRole: item.authorRole ?? null,
-              authorExpiresAt: item.authorExpiresAt ?? null,
+              displayName: item.authorOverride?.displayName ?? item.displayName,
+              avatar: item.authorOverride?.avatar ?? item.avatar,
+              avatarUrl: item.authorOverride?.avatarUrl ?? item.avatarUrl ?? null,
+              authorRole: item.authorOverride?.authorRole ?? item.authorRole ?? null,
+              authorExpiresAt: item.authorOverride?.authorExpiresAt ?? item.authorExpiresAt ?? null,
               imageBlob: item.imageBlob,
               expiresAt: item.expiresAt,
               farewell: item.farewell,
@@ -385,19 +393,19 @@ export function enterChat(
       }
       validCached = cached.filter((entry) => entry.state || existing.has(entry.id))
     }
-    const live = validCached.filter((entry) => !isExpired(entry)).slice(-INITIAL_PAGE)
+    const live = validCached.filter((entry) => !isExpired(entry) && !isForeignNews(entry, currentIdentity.lang)).slice(-INITIAL_PAGE)
     // Unsent drafts come back as pending entries with their photo preview.
     const pending: ChatEntry[] = []
     for (const item of outbox) {
       const optimistic: ChatEntry = {
         id: item.id,
         userId: currentIdentity.userId,
-        displayName: item.displayName,
-        avatarStyle: item.avatar?.style ?? null,
-        avatarSeed: item.avatar?.seed ?? null,
-        avatarUrl: item.avatarUrl ?? null,
-        authorRole: item.authorRole ?? null,
-        authorExpiresAt: item.authorExpiresAt,
+        displayName: item.authorOverride?.displayName ?? item.displayName,
+        avatarStyle: item.authorOverride?.avatar?.style ?? item.avatar?.style ?? null,
+        avatarSeed: item.authorOverride?.avatar?.seed ?? item.avatar?.seed ?? null,
+        avatarUrl: item.authorOverride?.avatarUrl ?? item.avatarUrl ?? null,
+        authorRole: item.authorOverride?.authorRole ?? item.authorRole ?? null,
+        authorExpiresAt: item.authorOverride?.authorExpiresAt ?? item.authorExpiresAt,
         content: item.content,
         replyTo: item.replyTo ?? null,
         at: item.at,
@@ -439,7 +447,7 @@ export function enterChat(
       }
     }
     if (closed) return
-    const page = await fetchChatPage()
+    const page = await fetchChatPage(undefined, currentIdentity.lang ?? 'en')
     if (closed || !page) return
     hasMoreOlder = page.hasMore
     if (page.messages.length > 0) {
@@ -538,28 +546,29 @@ export function enterChat(
         id: newId(),
         content: trimmed,
         replyTo: replyTo ?? null,
-        displayName: currentIdentity.displayName,
-        avatar: currentIdentity.avatar ?? undefined,
-        avatarUrl: currentIdentity.avatarUrl,
-        authorRole: currentIdentity.role,
-        authorExpiresAt: currentIdentity.profileExpiresAt,
+        displayName: options?.authorOverride?.displayName ?? currentIdentity.displayName,
+        avatar: options?.authorOverride?.avatar ?? currentIdentity.avatar ?? undefined,
+        avatarUrl: options?.authorOverride?.avatarUrl ?? currentIdentity.avatarUrl,
+        authorRole: options?.authorOverride?.authorRole ?? currentIdentity.role,
+        authorExpiresAt: options?.authorOverride?.authorExpiresAt ?? currentIdentity.profileExpiresAt,
         at: Date.now(),
         attempts: 0,
         expiresAt: options?.expiresAt,
         farewell: options?.farewell,
         whisperTo: options?.whisperTo ?? null,
         whisperToName: options?.whisperToName ?? null,
+        authorOverride: options?.authorOverride,
       }
       if (imageBlob) item.imageBlob = imageBlob
       const entry: ChatEntry = {
         id: item.id,
         userId: currentIdentity.userId,
-        displayName: currentIdentity.displayName,
-        avatarStyle: currentIdentity.avatar?.style ?? null,
-        avatarSeed: currentIdentity.avatar?.seed ?? null,
-        avatarUrl: currentIdentity.avatarUrl,
-        authorRole: currentIdentity.role,
-        authorExpiresAt: currentIdentity.profileExpiresAt,
+        displayName: item.displayName,
+        avatarStyle: item.avatar?.style ?? null,
+        avatarSeed: item.avatar?.seed ?? null,
+        avatarUrl: item.avatarUrl,
+        authorRole: item.authorRole,
+        authorExpiresAt: item.authorExpiresAt,
         content: trimmed,
         replyTo: replyTo ?? null,
         at: item.at,
@@ -649,7 +658,7 @@ export function enterChat(
             { createdAt: new Date(displayBefore.createdAt).getTime(), id: displayBefore.id },
             60,
           )
-        ).filter((entry) => !isExpired(entry))
+        ).filter((entry) => !isExpired(entry) && !isForeignNews(entry, currentIdentity.lang))
         if (cachedPage.length > 0 && !entries.some((e) => e.id === cachedPage[0].id)) {
           const byId = new Map(entries.map((entry) => [entry.id, entry]))
           for (const entry of cachedPage) byId.set(entry.id, entry)
@@ -657,7 +666,7 @@ export function enterChat(
           callbacks.onSnapshot(entries)
           return { loaded: cachedPage.length, hasMore: true }
         }
-        const page = await fetchChatPage(serverCursor ?? displayBefore)
+        const page = await fetchChatPage(serverCursor ?? displayBefore, currentIdentity.lang ?? 'en')
         if (!page || closed) {
           hasMoreOlder = cachedPage.length >= 60 || hasMoreOlder
           return { loaded: cachedPage.length, hasMore: hasMoreOlder }
@@ -684,8 +693,15 @@ export function enterChat(
       }
     },
     updateIdentity(next) {
+      const languageChanged = currentIdentity.lang !== next.lang
       currentIdentity = next
       handle?.track(next)
+      if (languageChanged) {
+        entries = entries.filter((entry) => !isForeignNews(entry, next.lang))
+        callbacks.onSnapshot(entries)
+        void saveChatCache(entries)
+        void syncFromServer()
+      }
     },
     expireUserMessages,
     leave() {

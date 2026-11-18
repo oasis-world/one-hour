@@ -23,6 +23,8 @@ import MessageAuthorCard from './MessageAuthorCard'
 import CompanionGreetingActions from './CompanionGreetingActions'
 import CompanionGreetingGames from './CompanionGreetingGames'
 import { parseMentions } from '../lib/mention'
+import { parseCompanionNewsCard } from '../lib/newsCard'
+import NewsCard from './NewsCard'
 
 interface Props {
   entry: ChatEntry
@@ -164,6 +166,7 @@ export default function MessageRow({
   const imageSrc = entry.imageUrl ?? entry.localImage ?? null
   const messageMedia = findMessageMedia(entry.content)
   const displayContent = stripRenderedMediaMarkup(entry.content)
+  const newsCard = parseCompanionNewsCard(entry.content, entry.userId)
   const gameRef = parseGameRef(entry.content)
   const pollRef = parsePollRef(entry.content)
   const mentionNames = (onlineMembers ?? []).map((m) => m.displayName).filter(Boolean)
@@ -375,7 +378,9 @@ export default function MessageRow({
           </button>
         )}
         <div className="msg-body">
-          {gameRef ? (
+          {newsCard ? (
+            <NewsCard news={newsCard} />
+          ) : gameRef ? (
             <GameMessage content={entry.content} hostUserId={entry.userId} onlineMembers={onlineMembers} />
           ) : pollRef ? (
             <PollCard pollId={pollRef.pollId} hostUserId={entry.userId} selfId={selfId ?? null} onlineMembers={onlineMembers} />
