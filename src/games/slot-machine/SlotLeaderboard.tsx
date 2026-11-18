@@ -48,7 +48,7 @@ export default function SlotLeaderboard({ players, total, flashes, jackpot, dir 
       <div className={`slot-jackpot${jackpot.payoutFlash > 0 ? ' is-paid' : ''}${counting ? ' is-counting' : ''}`} key={`payout-${jackpot.payoutFlash}`}>
         <span className="slot-jackpot-coin"><CoinIcon /></span>
         <span className="slot-jackpot-text">
-          <small>{s('幸运奖池 · 每 5 分钟开奖', 'LUCKY JACKPOT · DRAWS EVERY 5 MIN')}</small>
+          <small>{s('幸运奖池', 'LUCKY JACKPOT')}</small>
           <strong key={jackpot.gainFlash} className={jackpot.gainFlash > 0 ? 'is-bumping' : ''}>✦ {jackpot.pool.toLocaleString()}</strong>
         </span>
         {counting && <span className="slot-jackpot-timer" aria-label={`${s('开奖倒计时', 'DRAW IN')} ${countdown}`}>
