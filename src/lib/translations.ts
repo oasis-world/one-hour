@@ -7,6 +7,16 @@ const SLOT_GAME_NAMES: Record<Exclude<Lang, 'zh' | 'en'>, string> = {
   de: 'Spielautomat', ko: '슬롯머신', it: 'Slot Machine', ar: 'ماكينة الحظ',
 }
 
+const MATCH3_GAME_NAMES: Record<Exclude<Lang, 'zh' | 'en'>, string> = {
+  'zh-TW': '三消', ja: 'マッチ3', fr: 'Jeu de match-3', es: 'Combina 3',
+  de: '3-Gewinnt', ko: '매치 3', it: 'Abbina 3', ar: 'مطابقة 3',
+}
+
+const PLAY_GAMES_LABELS: Record<Exclude<Lang, 'zh' | 'en'>, string> = {
+  'zh-TW': '玩遊戲', ja: 'ゲームで遊ぶ', fr: 'Jouer', es: 'Jugar',
+  de: 'Spiele spielen', ko: '게임하기', it: 'Gioca', ar: 'العب',
+}
+
 const BLACKJACK_TRANSLATIONS: Record<Exclude<Lang, 'zh' | 'en'>, Record<string, string>> = {
   'zh-TW': {
     Blackjack: '21 點／黑傑克', 'Classic table · play your hand': '經典牌桌 · 叫牌定勝負', 'THE CLASSIC TABLE · TWENTY-ONE': '經典牌桌 · 21 點', 'TABLE OPEN': '牌桌開放',
@@ -1762,5 +1772,8 @@ for (const lang of Object.keys(SLOT_GAME_NAMES) as (keyof typeof SLOT_GAME_NAMES
     ...TRANSLATIONS[lang],
     ...BLACKJACK_TRANSLATIONS[lang],
     'Slot Machine': SLOT_GAME_NAMES[lang],
+    'Match-3': MATCH3_GAME_NAMES[lang],
+    'Play Games': PLAY_GAMES_LABELS[lang],
+    'Play games': PLAY_GAMES_LABELS[lang],
   }
 }
