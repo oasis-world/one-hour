@@ -245,19 +245,19 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     setCaptureToastIsWinner(false)
     if (captureToastTimerRef.current !== null) window.clearTimeout(captureToastTimerRef.current)
     captureToastTimerRef.current = window.setTimeout(() => setCaptureToast(''), 3000)
-  }, [myColor])
+  }, [myColor, setCaptureToast, setCaptureToastIsCheck, setCaptureToastIsWinner])
 
   const showStartToast = useCallback(() => {
     setStartToast(t('游戏开始', 'Game start'))
     if (startToastTimerRef.current !== null) window.clearTimeout(startToastTimerRef.current)
     startToastTimerRef.current = window.setTimeout(() => setStartToast(''), 3000)
-  }, [])
+  }, [setStartToast])
 
   const showHintToast = useCallback((msg: string) => {
     setHintToast(msg)
     if (hintToastTimerRef.current !== null) window.clearTimeout(hintToastTimerRef.current)
     hintToastTimerRef.current = window.setTimeout(() => setHintToast(''), 2000)
-  }, [])
+  }, [setHintToast])
 
   useEffect(() => {
     if (!stateLoadedRef.current) return
@@ -369,7 +369,7 @@ export default function XiangqiGame({ instanceId, hostUserId, onlineMembers = []
     stateRef.current = next
     setState(next)
     sendGameBroadcast(channelRef.current, 'state', next)
-  }, [])
+  }, [setState])
 
   const requestAiMove = useCallback((board: number[][], color: 1 | 2) => {
     const worker = aiWorkerRef.current

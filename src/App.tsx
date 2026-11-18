@@ -394,16 +394,19 @@ export default function App() {
   const [companion, setCompanion] = useState<CompanionProfile | null>(() => getCompanionIfAlive())
   const PRIVATE_MODE_KEY = 'one-hour-private-mode'
   const [privateMode, setPrivateMode] = useState<boolean>(() => {
+    if (!getCompanionIfAlive()) return false
     try { return globalThis.localStorage?.getItem(PRIVATE_MODE_KEY) === '1' } catch { return false }
   })
+  const syncCompanion = useCallback((next: CompanionProfile | null) => {
+    setCompanion(next)
+    if (!next) setPrivateMode(false)
+  }, [])
   useEffect(() => {
     try {
       if (privateMode) globalThis.localStorage?.setItem(PRIVATE_MODE_KEY, '1')
       else globalThis.localStorage?.removeItem(PRIVATE_MODE_KEY)
     } catch { /* noop */ }
   }, [privateMode])
-  // Companion expiry clears private mode
-  useEffect(() => { if (!companion) setPrivateMode(false) }, [companion])
   const [privateMessages, setPrivateMessages] = useState<CompanionMessage[]>([])
   const [companionTyping, setCompanionTyping] = useState(false)
   const [userTyping, setUserTyping] = useState(false)
@@ -414,7 +417,7 @@ export default function App() {
     const el = document.querySelector('.composer-input') as HTMLTextAreaElement | null
     if (el) {
       el.focus()
-      try { const len = el.value.length; el.setSelectionRange(len, len) } catch {}
+      try { const len = el.value.length; el.setSelectionRange(len, len) } catch { /* Selection ranges may be unsupported. */ }
       requestAnimationFrame(() => {
         const el2 = document.querySelector('.composer-input') as HTMLTextAreaElement | null
         el2?.focus()
@@ -442,14 +445,14 @@ export default function App() {
   }, [room.identity, companion, enterPrivateChat])
   const consumeInsert = useCallback(() => setPendingInsertName(null), [])
   // Reactions for local messages (companion chats + MUD card) — persisted in IndexedDB
-  useEffect(() => subscribeCompanion(setCompanion), [])
+  useEffect(() => subscribeCompanion(syncCompanion), [syncCompanion])
   useEffect(() => {
-    const tick = () => { const alive = getCompanionIfAlive(); setCompanion((prev) => (prev?.id !== alive?.id || prev?.expiresAt !== alive?.expiresAt ? alive : prev)) }
+    const tick = () => syncCompanion(getCompanionIfAlive())
     const id = window.setInterval(tick, 2000)
     const onStorage = () => tick()
     window.addEventListener('storage', onStorage)
     return () => { window.clearInterval(id); window.removeEventListener('storage', onStorage) }
-  }, [])
+  }, [syncCompanion])
   useEffect(() => {
     let alive = true
     void loadCompanionMessages().then((rows) => {
@@ -467,10 +470,10 @@ export default function App() {
   useEffect(() => {
     const id = window.setInterval(() => {
       void pruneCompanionMessages().then(() => loadCompanionMessages().then(setPrivateMessages).catch(() => {}))
-      if (getCompanionIfAlive() == null && companion) setCompanion(null)
+      if (getCompanionIfAlive() == null && companion) syncCompanion(null)
     }, 10_000)
     return () => window.clearInterval(id)
-  }, [companion])
+  }, [companion, syncCompanion])
   // Local reactions for companion / MUD card messages — load once and prune dangling rows
   useEffect(() => {
     void loadLocalReactions().then(setLocalReactionRows).catch(() => {})
@@ -492,10 +495,10 @@ export default function App() {
     if (globalThis.localStorage?.getItem(key)) { greetedRef.current = companion.id; return }
     greetedRef.current = companion.id
     globalThis.localStorage?.setItem(key, '1')
-    setCompanionTyping(true)
+    const typingFrame = window.requestAnimationFrame(() => setCompanionTyping(true))
     const typingStart = Date.now()
     void (async () => {
-      let greetingText = ''
+      let greetingText: string
       try {
         greetingText = await requestCompanionGreeting(companion)
       } catch {
@@ -517,7 +520,11 @@ export default function App() {
       await new Promise<void>((r) => window.setTimeout(r, 300))
       setCompanionTyping(false)
     })()
-    return () => { setCompanionTyping(false); setUserTyping(false) }
+    return () => {
+      window.cancelAnimationFrame(typingFrame)
+      setCompanionTyping(false)
+      setUserTyping(false)
+    }
   }, [profile, companion, privateMessages.length, hasRevealed])
   const handleSummaryComplete = () => {
     if (currentUserId) expireUserMessages(currentUserId)
@@ -527,7 +534,7 @@ export default function App() {
     void clearLocalReactions()
     setPrivateMessages([])
     setLocalReactionRows([])
-    setCompanion(null)
+    syncCompanion(null)
     resetStats()
     setStarPoints(100)
     clearPendingSummary()
@@ -807,7 +814,7 @@ export default function App() {
         recordInteraction(entry.userId, entry.displayName, selfId)
       }
     }
-  }, [currentUserId, profile?.nickname, room.entries])
+  }, [currentUserId, profile, room.entries])
   // Merge local reactions (IndexedDB) with cloud reactions for display
   const mergedReactions = useMemo(() => {
     const selfId = room.identity?.userId ?? null
@@ -835,7 +842,7 @@ export default function App() {
     if (privateIds.has(messageId)) handleLocalReact(messageId, emoji)
     else room.toggleReaction(messageId, emoji)
   }, [privateIds, handleLocalReact, room])
-  const displayPresence = useMemo(() => { // eslint-disable-line react-hooks/preserve-manual-memoization
+  const displayPresence = useMemo(() => {
     if (!companion) return room.presence
     const companionMember = {
       userId: companion.id,
