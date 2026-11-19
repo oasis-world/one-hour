@@ -9,9 +9,8 @@ import {
   type NewsSourceArticle,
 } from './news.ts'
 
-const MODEL = 'muse-spark-1.3-contributor'
-const ENDPOINT = 'https://opencode.ai/inference/go/openai/v1/responses'
-const SESSION_ID = stableSessionId('one-hour-companion-news')
+const GEMINI_MODEL = 'gemini-3.5-flash-lite'
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 
@@ -19,7 +18,7 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
   const serviceKey = getSecretKey()
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
-  const apiKey = Deno.env.get('OPENCODE_API_KEY')
+  const apiKey = Deno.env.get('GEMINI_API_KEY')
   if (!serviceKey || !supabaseUrl || !apiKey) return json({ error: 'Required Edge Function secrets are missing' }, 503)
   const requestKey = req.headers.get('apikey')
     ?? req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
@@ -118,25 +117,20 @@ async function summarize(articles: NewsSourceArticle[], apiKey: string): Promise
     'Supported language codes: zh (Simplified Chinese), zh-TW (Traditional Chinese), en, ja, fr, es, de, ko, it, ar.',
   ].join(' ')
   try {
-    const response = await fetch(ENDPOINT, {
+    const response = await fetch(GEMINI_ENDPOINT, {
       method: 'POST',
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        'content-type': 'application/json',
-        'x-opencode-session': await SESSION_ID,
-      },
+      headers: { 'x-goog-api-key': apiKey, 'content-type': 'application/json' },
       body: JSON.stringify({
-        model: MODEL,
-        instructions,
-        input: JSON.stringify(articles.map(({ lang, title, description, source, publishedAt }) => ({ lang, title, description, source, publishedAt }))),
-        max_output_tokens: 2500,
-        reasoning: { effort: 'minimal' },
+        systemInstruction: { parts: [{ text: instructions }] },
+        contents: [{ role: 'user', parts: [{ text: JSON.stringify(articles.map(({ lang, title, description, source, publishedAt }) => ({ lang, title, description, source, publishedAt }))) }] }],
+        generationConfig: { maxOutputTokens: 2500, responseMimeType: 'application/json' },
       }),
       signal: AbortSignal.timeout(25_000),
     })
-    if (!response.ok) throw new Error(`OpenCode returned ${response.status}`)
-    const body = await response.json() as { output?: Array<{ content?: Array<{ type?: string; text?: string }> }> }
-    const text = (body.output ?? []).flatMap((item) => item.content ?? []).filter((item) => item.type === 'output_text').map((item) => item.text ?? '').join('')
+    if (!response.ok) throw new Error(`Gemini returned ${response.status}`)
+    const body = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> }
+    const parts = body.candidates?.[0]?.content?.parts
+    const text = Array.isArray(parts) ? parts.map((part) => (typeof part?.text === 'string' ? part.text : '')).join('') : ''
     const parsed = parseOutput(text)
     for (const item of parsed) {
       if (typeof item.lang !== 'string' || typeof item.title !== 'string' || typeof item.summary !== 'string') continue
@@ -145,7 +139,7 @@ async function summarize(articles: NewsSourceArticle[], apiKey: string): Promise
       output.set(item.lang, item.summary.trim())
     }
   } catch (error) {
-    console.warn('[companion-news] OpenCode summary failed; using RSS snippets', (error as Error)?.message)
+    console.warn('[companion-news] Gemini summary failed; using RSS snippets', (error as Error)?.message)
   }
   return output
 }
@@ -170,10 +164,4 @@ function parseOutput(text: string): Array<Record<string, unknown>> {
 function fallbackSummary(article: NewsSourceArticle): string {
   const snippet = article.description.replace(/\s+/g, ' ').trim()
   return snippet || article.title
-}
-
-async function stableSessionId(seed: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seed))
-  const hex = Array.from(new Uint8Array(digest).slice(0, 16), (byte) => byte.toString(16).padStart(2, '0')).join('')
-  return `ses_${hex}`
 }

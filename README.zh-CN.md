@@ -42,19 +42,20 @@ npm run dev
 
 ### 云端 AI（可选）
 
-伙伴聊天、游戏 AI 和世界叙事只走 **OpenCode Go 的 Muse Spark 1.3 Contributor**（`OPENCODE_API_KEY`）；请求失败时伙伴聊天走本地模板、游戏走本地 AI、世界走模板回退。模型只会收到当前棋盘/当前行动等任务上下文，不会收到玩家昵称或完整聊天记录之外的信息。该 Contributor 模型可能使用请求内容改进模型。
+伙伴聊天、游戏 AI 和每小时新闻卡片都走 **Google Gemini 免费层的 `gemini-3.5-flash-lite`**（`GEMINI_API_KEY`，Gemini Developer API）。请求失败时伙伴聊天走本地模板、游戏走本地 AI、新闻摘要走 RSS 原文片段。模型只会收到当前棋盘/当前行动、伙伴系统提示词与新闻 RSS 条目等任务上下文；伙伴聊天会附带最多 12 条聊天历史，新闻条目里的标题/描述/链接均作为不可信源数据处理。
 
-1. 在 Supabase 项目设置中启用 Anonymous sign-ins，并在 OpenCode Go 工作区隐私设置中允许使用请求数据训练的付费端点（模型仅在支持的地区提供）。
-2. 本地开发时，将 `supabase/functions/.env.example` 复制为 `supabase/functions/.env`，填入 `OPENCODE_API_KEY`。该文件已加入 `.gitignore`。
+1. 在 Supabase 项目设置中启用 Anonymous sign-ins；在 [Google AI Studio](https://aistudio.google.com/apikey) 创建免费 API key。
+2. 本地开发时，将 `supabase/functions/.env.example` 复制为 `supabase/functions/.env`，填入 `GEMINI_API_KEY`。该文件已加入 `.gitignore`。
 3. 部署函数并设置生产密钥：
 
    ```bash
    supabase functions deploy game-ai-move --project-ref <你的 Supabase project ref>
    supabase functions deploy companion-chat --project-ref <你的 Supabase project ref>
-   supabase secrets set OPENCODE_API_KEY=oc_sk_你的密钥
+   supabase functions deploy companion-news --project-ref <你的 Supabase project ref>
+   supabase secrets set GEMINI_API_KEY=你的密钥
    ```
 
-   也可以在 Supabase Dashboard → Edge Functions → Secrets 中添加 `OPENCODE_API_KEY`。密钥只供 Edge Function 使用，不能放进 `VITE_` 前端变量。部署时要使用与 `VITE_SUPABASE_URL` 相同的 project ref；函数配置会让 CORS 预检通过，再由函数本身验证真实请求的 Supabase 用户 JWT。
+   也可以在 Supabase Dashboard → Edge Functions → Secrets 中添加 `GEMINI_API_KEY`。密钥只供 Edge Function 使用，不能放进 `VITE_` 前端变量。部署时要使用与 `VITE_SUPABASE_URL` 相同的 project ref；函数配置会让 CORS 预检通过，再由函数本身验证真实请求的 Supabase 用户 JWT。
 
 ## 目录结构
 

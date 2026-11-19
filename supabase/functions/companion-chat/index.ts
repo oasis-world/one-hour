@@ -1,7 +1,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 
-const OPENCODE_MODEL = 'muse-spark-1.3-contributor'
-const OPENCODE_ENDPOINT = 'https://opencode.ai/inference/go/openai/v1/responses'
+const GEMINI_MODEL = 'gemini-3.5-flash-lite'
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 const VALID_GAMES = new Set(['gomoku', 'xiangqi', 'chess'])
 
 function isRecord(v: unknown): v is Record<string, unknown> { return Boolean(v && typeof v === 'object' && !Array.isArray(v)) }
@@ -11,18 +11,11 @@ function parseJsonObject(text: string): Record<string, unknown> | null {
   if (s < 0 || e <= s) return null
   try { const p: unknown = JSON.parse(text.slice(s, e + 1)); return isRecord(p) ? p : null } catch { return null }
 }
-function extractOpenCodeText(result: Record<string, unknown>): string {
-  const output = result.output as Array<{ content?: Array<{ type?: string; text?: string }> }> | undefined
-  if (!Array.isArray(output)) return ''
-  return output
-    .flatMap((it) => it.content ?? [])
-    .filter((it) => it.type === 'output_text')
-    .map((it) => it.text ?? '')
-    .join('')
-}
-async function stableSessionId(seed: string): Promise<string> {
-  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seed))
-  return `ses_${Array.from(new Uint8Array(hash).slice(0, 16), (b) => b.toString(16).padStart(2, '0')).join('')}`
+function extractGeminiText(result: Record<string, unknown>): string {
+  const candidates = result.candidates as Array<{ content?: { parts?: Array<{ text?: unknown }> } }> | undefined
+  const parts = candidates?.[0]?.content?.parts
+  if (!Array.isArray(parts)) return ''
+  return parts.map((part) => (typeof part?.text === 'string' ? part.text : '')).join('')
 }
 
 Deno.serve(async (req) => {
@@ -41,11 +34,11 @@ Deno.serve(async (req) => {
     } catch {
       return json({ error: 'Invalid JSON' }, 400)
     }
-    const { systemPrompt, history, userText, companionName, userName, isGreeting } = body as Record<string, unknown>
+    const { systemPrompt, history, userText, userName, isGreeting } = body as Record<string, unknown>
     if (typeof systemPrompt !== 'string' || typeof userText !== 'string') return json({ error: 'Invalid payload' }, 400)
-    const apiKey = Deno.env.get('OPENCODE_API_KEY')
+    const apiKey = Deno.env.get('GEMINI_API_KEY')
     if (!apiKey) {
-      console.error('[companion-chat] missing OPENCODE_API_KEY')
+      console.error('[companion-chat] missing GEMINI_API_KEY')
       return json({ error: 'AI not configured' }, 503)
     }
     const hist: Array<{ role: string; content: string }> = Array.isArray(history) ? (history as unknown[]).slice(-12).filter((h: unknown) => h && typeof (h as { role?: unknown }).role === 'string' && typeof (h as { content?: unknown }).content === 'string') as Array<{ role: string; content: string }> : []
@@ -53,7 +46,6 @@ Deno.serve(async (req) => {
     const needMention = Boolean(isGreeting)
     const extra = needMention ? ` You MUST start reply with "@${userName ?? ''} " exactly.` : ''
     const instructions = extra ? `${hardenedSystem}${extra}` : hardenedSystem
-    void companionName
 
     const shouldSearch = typeof userText === 'string' && /搜索|新闻|最近|最新|飞机失事|news|search|latest/i.test(userText as string)
     let searchContext = ''
@@ -86,31 +78,27 @@ Deno.serve(async (req) => {
       }
     }
     const userTextWithSearch = searchContext ? `${userText}${searchContext}` : (userText as string)
-    const sessionSeed = JSON.stringify([companionName ?? '', userName ?? ''])
-    const sessionId = await stableSessionId(sessionSeed).catch(() => 'companion-chat')
 
     let upstream: Response
     try {
-      upstream = await fetch(OPENCODE_ENDPOINT, {
+      upstream = await fetch(GEMINI_ENDPOINT, {
         method: 'POST',
-        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json', 'x-opencode-session': sessionId },
+        headers: { 'x-goog-api-key': apiKey, 'content-type': 'application/json' },
         body: JSON.stringify({
-          model: OPENCODE_MODEL,
-          instructions,
-          input: JSON.stringify({ history: hist, userText: userTextWithSearch }),
-          max_output_tokens: 2048,
-          reasoning: { effort: 'minimal' },
+          systemInstruction: { parts: [{ text: instructions }] },
+          contents: [{ role: 'user', parts: [{ text: JSON.stringify({ history: hist, userText: userTextWithSearch }) }] }],
+          generationConfig: { maxOutputTokens: 2048, responseMimeType: 'application/json' },
         }),
         signal: AbortSignal.timeout(45_000),
       })
     } catch (e) {
-      console.error('[companion-chat] fetch to OpenCode threw', (e as Error)?.message)
+      console.error('[companion-chat] fetch to Gemini threw', (e as Error)?.message)
       return json({ error: 'Upstream fetch failed', reason: (e as Error)?.message }, 502)
     }
     if (!upstream.ok) {
       const text = await upstream.text().catch(() => '')
       let code: string | undefined
-      try { const f = JSON.parse(text); code = typeof f?.error?.code === 'string' ? f.error.code : typeof f?.error?.type === 'string' ? f.error.type : undefined } catch { /* not JSON */ }
+      try { const f = JSON.parse(text); code = typeof f?.error?.message === 'string' ? f.error.message : typeof f?.error?.code === 'string' ? String(f.error.code) : typeof f?.error?.status === 'string' ? f.error.status : undefined } catch { /* not JSON */ }
       console.error('[companion-chat] upstream failed', upstream.status, code ?? text.slice(0, 500))
       return json({ error: 'Upstream failed', upstreamStatus: upstream.status, upstreamCode: code, bodySnippet: text.slice(0, 500) }, 502)
     }
@@ -121,16 +109,11 @@ Deno.serve(async (req) => {
       console.error('[companion-chat] upstream JSON parse failed', (e as Error)?.message)
       return json({ error: 'Upstream returned invalid JSON' }, 502)
     }
-    if (result.status && result.status !== 'completed') {
-      const reason = (result.incomplete_details as Record<string, unknown> | undefined)?.reason ?? result.status
-      console.error('[companion-chat] OpenCode incomplete', reason, JSON.stringify(result).slice(0, 800))
-      return json({ error: 'Upstream response was incomplete', reason }, 502)
-    }
-    const text = extractOpenCodeText(result).trim()
+    const text = extractGeminiText(result).trim()
     if (!text) {
       console.error('[companion-chat] empty reply, using fallback', JSON.stringify(result).slice(0, 800))
       const fallback = userName ? `@${userName} 收到～ 我们继续聊呀，刚才那条我没太跟上，你再说说？` : '收到～ 我们继续聊呀！'
-      return json({ reply: fallback, game: null, model: OPENCODE_MODEL, provider: 'opencode', fallback: true })
+      return json({ reply: fallback, game: null, model: GEMINI_MODEL, provider: 'gemini', fallback: true })
     }
     // Structured JSON expected: {reply, game}
     let reply = text
@@ -144,7 +127,7 @@ Deno.serve(async (req) => {
       // Fallback: plain text reply, try to infer game via keyword scan
       game = inferGameFromText(userText as string)
     }
-    return json({ reply, game, model: OPENCODE_MODEL, provider: 'opencode' })
+    return json({ reply, game, model: GEMINI_MODEL, provider: 'gemini' })
   } catch (e) {
     const err = e as Error & Record<string, unknown>
     console.error('[companion-chat] error', err?.message ?? String(e), err?.stack?.slice(0, 1000))
