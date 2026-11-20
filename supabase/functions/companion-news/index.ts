@@ -8,6 +8,7 @@ import {
   type NewsCardData,
   type NewsSourceArticle,
 } from './news.ts'
+import { hourRoleExpiresAt, roleDisplayName, roleForHour, roleLabel } from './hourRole.ts'
 
 const GEMINI_MODEL = 'gemini-3.5-flash-lite'
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
@@ -64,6 +65,9 @@ Deno.serve(async (req) => {
     }
 
     const summaries = await summarize(selected, apiKey)
+    const hourRole = roleForHour()
+    const roleExpiresAt = hourRoleExpiresAt()
+    console.info('[companion-news] hourly role', { key: hourRole.key, name: hourRole.name, roleExpiresAt })
     const rows = selected.flatMap((article) => {
       const summary = summaries.get(article.lang) ?? fallbackSummary(article)
       const card: NewsCardData = {
@@ -75,12 +79,16 @@ Deno.serve(async (req) => {
       }
       const content = makeNewsContent(article.lang, card)
       if (content.length > 1000) return []
-      const locale = NEWS_LOCALES.find((item) => item.lang === article.lang)!
       return [{
         id: crypto.randomUUID(),
         user_id: NEWS_BOT_ID,
-        display_name: locale.name,
-        author_role: 'AI News',
+        // Presented under the rotating hourly broadcaster persona,
+        // localized to the news card's language (no emoji).
+        display_name: roleDisplayName(hourRole, article.lang),
+        avatar_style: hourRole.avatarStyle,
+        avatar_seed: hourRole.avatarSeed,
+        author_role: roleLabel(hourRole, article.lang),
+        author_expires_at: new Date(roleExpiresAt).toISOString(),
         content,
         expires_at: new Date(Date.now() + 60 * 60_000).toISOString(),
       }]

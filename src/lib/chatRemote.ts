@@ -5,6 +5,7 @@ import { withTimeout } from './withTimeout'
 import type { ChatMessage, MessageReply, PresenceMember } from './chatTypes'
 import type { RoomReactionChange, RoomReactionRecord } from './chatReactions'
 import { NEWS_BOT_USER_ID } from './newsCard'
+import { sysNoticeLang } from './sysNotice'
 import { fetchRoomReactionSnapshot, persistRoomReaction } from './chatReactionRemote'
 
 /**
@@ -186,15 +187,17 @@ export async function fetchChatPage(before?: ChatCursor, lang = 'en'): Promise<C
         `created_at.lt.${before.createdAt},and(created_at.eq.${before.createdAt},id.lt.${before.id})`,
       )
     }
-    // Each minute's scheduled news run publishes one card per locale. Read
-    // past those hidden variants so every client still gets a full page.
+    // Each scheduled news run publishes one card per locale. Read past those
+    // hidden variants so every client still gets a full page.
     const rawPageSize = CHAT_PAGE_SIZE * 10 + 1
     const { data, error } = await query.limit(rawPageSize)
     if (error) return null
     const rows = (data ?? []) as MessageRow[]
     const matching = rows.filter((row) => {
       const newsLang = row.user_id === NEWS_BOT_USER_ID ? readNewsLanguage(row.content) : null
-      return !newsLang || newsLang === lang
+      if (newsLang && newsLang !== lang) return false
+      const sysLang = sysNoticeLang(row.content)
+      return !sysLang || sysLang === lang
     })
     const hasMore = matching.length > CHAT_PAGE_SIZE || rows.length === rawPageSize
     return {

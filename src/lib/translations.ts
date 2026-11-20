@@ -1767,6 +1767,17 @@ export const TRANSLATIONS: TranslationDict = {
   },
 }
 
+const RESONANCE_NAMES: Record<Exclude<Lang, 'zh' | 'en'>, { name: string; tagline: string }> = {
+  'zh-TW': { name: '同頻', tagline: 'AI 出題 · 秒懂彼此' },
+  ja: { name: 'シンクロ', tagline: 'AI 出題 · 意気投合' },
+  fr: { name: 'En phase', tagline: 'Questions IA · trouvez vos semblables' },
+  es: { name: 'En sintonía', tagline: 'Preguntas IA · encuentra tu frecuencia' },
+  de: { name: 'Im Einklang', tagline: 'KI-Fragen · findet euch' },
+  ko: { name: '동기', tagline: 'AI 문제 · 취향 맞추기' },
+  it: { name: 'In sintonia', tagline: 'Domande IA · trovati affine' },
+  ar: { name: 'على نفس الموجة', tagline: 'أسئلة ذكية · اعثر على من يشبهك' },
+}
+
 for (const lang of Object.keys(SLOT_GAME_NAMES) as (keyof typeof SLOT_GAME_NAMES)[]) {
   TRANSLATIONS[lang] = {
     ...TRANSLATIONS[lang],
@@ -1775,5 +1786,7 @@ for (const lang of Object.keys(SLOT_GAME_NAMES) as (keyof typeof SLOT_GAME_NAMES
     'Match-3': MATCH3_GAME_NAMES[lang],
     'Play Games': PLAY_GAMES_LABELS[lang],
     'Play games': PLAY_GAMES_LABELS[lang],
+    'In Sync': RESONANCE_NAMES[lang].name,
+    'AI polls · find your people': RESONANCE_NAMES[lang].tagline,
   }
 }

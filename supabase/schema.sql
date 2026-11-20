@@ -253,20 +253,75 @@ exception
   when duplicate_object then null;
 end $$;
 
+-- ── Resonance: AI icebreaker polls (DB-backed, one card = one row) ──────────
+-- Questions are generated once and cycled client-side by round. Votes are
+-- one row per (card, round, voter) and stream live via postgres_changes.
+
+create table if not exists public.resonance_rounds (
+  instance_id text primary key,
+  questions jsonb not null check (jsonb_typeof(questions) = 'array'),
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default (now() + interval '1 hour')
+);
+create index if not exists resonance_rounds_expiry on public.resonance_rounds (expires_at);
+alter table public.resonance_rounds enable row level security;
+
+drop policy if exists "resonance rounds readable by signed-in players" on public.resonance_rounds;
+create policy "resonance rounds readable by signed-in players"
+  on public.resonance_rounds for select using (auth.uid() is not null);
+drop policy if exists "signed-in players may create resonance rounds" on public.resonance_rounds;
+create policy "signed-in players may create resonance rounds"
+  on public.resonance_rounds for insert with check (auth.uid() is not null);
+
+create table if not exists public.resonance_votes (
+  instance_id text not null references public.resonance_rounds (instance_id) on delete cascade,
+  round int not null check (round >= 0 and round < 10000),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  option_index int not null check (option_index >= 0 and option_index < 8),
+  display_name text,
+  avatar_style text,
+  avatar_seed text,
+  avatar_url text,
+  created_at timestamptz not null default now(),
+  primary key (instance_id, round, user_id)
+);
+create index if not exists resonance_votes_instance on public.resonance_votes (instance_id);
+alter table public.resonance_votes enable row level security;
+
+drop policy if exists "resonance votes readable by signed-in players" on public.resonance_votes;
+create policy "resonance votes readable by signed-in players"
+  on public.resonance_votes for select using (auth.uid() is not null);
+drop policy if exists "players may cast their own resonance votes" on public.resonance_votes;
+create policy "players may cast their own resonance votes"
+  on public.resonance_votes for insert with check (auth.uid() = user_id);
+drop policy if exists "players may change their own resonance votes" on public.resonance_votes;
+create policy "players may change their own resonance votes"
+  on public.resonance_votes for delete using (auth.uid() = user_id);
+
+grant select, insert on public.resonance_rounds to authenticated;
+grant select, insert, delete on public.resonance_votes to authenticated;
+revoke all on public.resonance_rounds, public.resonance_votes from anon;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.resonance_votes;
+exception when duplicate_object then null;
+end $$;
+
 -- ── Shared game popularity ──────────────────────────────────────────────────
 -- A single atomic counter per game keeps the all-time hot-game ranking small
 -- and avoids lost updates when several players select the same game.
 
 create table if not exists public.game_popularity (
   game_id text primary key check (game_id in (
-    'gomoku', 'xiangqi', 'chess', 'solitaire', 'sudoku', 'slot-machine', 'match3', 'blackjack'
+    'gomoku', 'xiangqi', 'chess', 'solitaire', 'sudoku', 'slot-machine', 'match3', 'blackjack', 'resonance'
   )),
   click_count bigint not null default 0 check (click_count >= 0),
   updated_at timestamptz not null default now()
 );
 alter table public.game_popularity drop constraint if exists game_popularity_game_id_check;
 alter table public.game_popularity add constraint game_popularity_game_id_check
-  check (game_id in ('gomoku', 'xiangqi', 'chess', 'solitaire', 'sudoku', 'slot-machine', 'match3', 'blackjack'));
+  check (game_id in ('gomoku', 'xiangqi', 'chess', 'solitaire', 'sudoku', 'slot-machine', 'match3', 'blackjack', 'resonance'));
 
 alter table public.game_popularity enable row level security;
 drop policy if exists "game popularity is readable by signed-in players" on public.game_popularity;
@@ -287,7 +342,7 @@ declare
 begin
   if auth.uid() is null then raise exception 'authentication required'; end if;
   if p_game_id is null or p_game_id not in (
-    'gomoku', 'xiangqi', 'chess', 'solitaire', 'sudoku', 'slot-machine', 'match3', 'blackjack'
+    'gomoku', 'xiangqi', 'chess', 'solitaire', 'sudoku', 'slot-machine', 'match3', 'blackjack', 'resonance'
   ) then raise exception 'invalid game id'; end if;
   insert into public.game_popularity as popularity (game_id, click_count, updated_at)
     values (p_game_id, 1, now())
@@ -514,6 +569,13 @@ begin
      or not exists (
        select 1 from public.chat_messages cm
        where cm.content like '%' || p.poll_id::text || '%'
+     );
+  -- Resonance rows follow their card's one-hour life. Votes cascade on delete.
+  delete from public.resonance_rounds rr
+  where rr.expires_at <= now()
+     or not exists (
+       select 1 from public.chat_messages cm
+       where cm.content like '%' || rr.instance_id || '%'
      );
 end;
 $$;
@@ -748,7 +810,7 @@ exception
 end $$;
 
 -- ── Scheduled companion news publisher ─────────────────────────────────────
--- Publishes one localized card per supported language every three minutes. Uses the
+-- Publishes one localized card per supported language every six minutes. Uses the
 -- existing Vault project_url plus companion_news_secret_key, which must hold
 -- the current sb_secret_* key (not the deprecated service_role JWT key).
 do $$
@@ -762,7 +824,7 @@ do $$
 begin
   perform cron.schedule(
     'companion-news',
-    '*/3 * * * *',
+    '*/6 * * * *',
     $sql$
     select net.http_post(
       url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url')

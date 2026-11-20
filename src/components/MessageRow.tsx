@@ -16,6 +16,7 @@ import { parsePollRef } from '../lib/pollTypes'
 import { userAvatarTint, userNameColor } from '../lib/identity'
 import AvatarBadge from './AvatarBadge'
 import CountdownRing from './CountdownRing'
+import RoleDutyChip from './RoleDutyChip'
 import { TravelerGlyph } from './icons'
 import MsgHoverBar from './MsgHoverBar'
 import MsgReactions from './MsgReactions'
@@ -24,6 +25,9 @@ import CompanionGreetingActions from './CompanionGreetingActions'
 import CompanionGreetingGames from './CompanionGreetingGames'
 import { parseMentions } from '../lib/mention'
 import { parseCompanionNewsCard } from '../lib/newsCard'
+import { sysNoticeBody, sysNoticeLang } from '../lib/sysNotice'
+import { isSyncWhisper } from '../lib/syncWhisper'
+import SyncWhisperCard from './SyncWhisperCard'
 import NewsCard from './NewsCard'
 
 interface Props {
@@ -165,13 +169,30 @@ export default function MessageRow({
 }: Props) {
   const imageSrc = entry.imageUrl ?? entry.localImage ?? null
   const messageMedia = findMessageMedia(entry.content)
-  const displayContent = stripRenderedMediaMarkup(entry.content)
+  const isSysNotice = sysNoticeLang(entry.content) !== null
+  const isSync = isSyncWhisper(entry.content)
+  const sysBody = isSysNotice ? sysNoticeBody(entry.content) : null
+  const displayContent = stripRenderedMediaMarkup(sysBody ?? entry.content)
   const newsCard = parseCompanionNewsCard(entry.content, entry.userId)
   const gameRef = parseGameRef(entry.content)
   const pollRef = parsePollRef(entry.content)
   const mentionNames = (onlineMembers ?? []).map((m) => m.displayName).filter(Boolean)
-  const authorCanPrivateChat = Boolean(isPrivate && !mine)
-    || onlineMembers.some((member) => member.userId === entry.userId)
+  // A system notice / sync whisper's author is the hourly role, not the real
+  // sender (whose userId is bound to the caller's JWT by RLS).
+  const isRoleAuthored = isSysNotice || isSync
+  const personaAuthor = isRoleAuthored ? {
+    userId: entry.userId,
+    displayName: entry.displayName,
+    avatarStyle: entry.avatarStyle ?? null,
+    avatarSeed: entry.avatarSeed ?? null,
+    avatarUrl: entry.avatarUrl ?? null,
+    role: entry.authorRole ?? '',
+    profileExpiresAt: entry.authorExpiresAt ?? null,
+    enteredAt: entry.at,
+  } : null
+  const effectiveAuthor = personaAuthor ?? author
+  const authorCanPrivateChat = !isRoleAuthored && (Boolean(isPrivate && !mine)
+    || onlineMembers.some((member) => member.userId === entry.userId))
   const isMentioned = (() => {
     try {
       const nick = localStorage.getItem('one-hour-user-profile') ? JSON.parse(localStorage.getItem('one-hour-user-profile')!).nickname : null
@@ -290,7 +311,7 @@ export default function MessageRow({
         entry.state ? `is-${entry.state}` : '',
         entry.expiring ? 'is-expiring' : '',
         menuOpen ? 'is-menu-open' : '',
-        entry.isWhisper ? 'is-whisper' : isPrivate ? 'is-private' : '',
+        isSync ? 'is-sync' : entry.isWhisper ? 'is-whisper' : isPrivate ? 'is-private' : '',
         !entry.isWhisper && isMentioned ? 'is-mentioned' : '',
       ].join(' ')}
       onContextMenu={(e) => {
@@ -360,6 +381,7 @@ export default function MessageRow({
           >
             {entry.displayName}
           </button>
+          <RoleDutyChip authorExpiresAt={entry.authorExpiresAt} />
           <span className="msg-dot" aria-hidden="true" />
           <CountdownRing entry={entry} />
         </div>
@@ -378,7 +400,9 @@ export default function MessageRow({
           </button>
         )}
         <div className="msg-body">
-          {newsCard ? (
+          {isSync ? (
+            <SyncWhisperCard content={entry.content} selfId={selfId ?? null} />
+          ) : newsCard ? (
             <NewsCard news={newsCard} />
           ) : gameRef ? (
             <GameMessage content={entry.content} hostUserId={entry.userId} onlineMembers={onlineMembers} />
@@ -457,10 +481,11 @@ export default function MessageRow({
           style={{ left: authorPosition.left, top: authorPosition.top }}
         >
             <MessageAuthorCard
-              member={author}
+              member={effectiveAuthor}
               expired={Boolean(entry.farewell)}
               onPrivateChat={authorCanPrivateChat ? handleEnterPrivate : undefined}
               selfId={selfId}
+              noCloud={isRoleAuthored}
             />
         </div>,
         portalRoot ?? document.body,

@@ -9,7 +9,7 @@ import {
   type SlotJackpotState,
 } from '../../lib/slotJackpot'
 import { buildSlotJackpotNotice } from '../../lib/slotJackpotNotice'
-import { sendGameNotice } from '../../lib/gameNotice'
+import { sendSysNotice } from '../../lib/sysNotice'
 import { flashStarPointsDelta } from '../../lib/starPoints'
 import { MESSAGE_TTL_MS } from '../../lib/expiry'
 
@@ -132,7 +132,7 @@ export function useSlotJackpot(
       )
       if (!result?.paid) return
       const total = result.total ?? winners.reduce((sum, winner) => sum + winner.amount, 0)
-      sendGameNotice(buildSlotJackpotNotice(winners, total), Date.now() + MESSAGE_TTL_MS)
+      sendSysNotice((lang) => buildSlotJackpotNotice(winners, total, lang), Date.now() + MESSAGE_TTL_MS)
     } finally {
       payingRef.current = false
     }

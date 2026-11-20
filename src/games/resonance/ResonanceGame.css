@@ -1,0 +1,205 @@
+
+.res-board {
+  position: relative;
+  overflow: hidden;
+  padding: 16px 16px 13px;
+  border-radius: 16px;
+  border: 1px solid #ffffff1f;
+  background: radial-gradient(130% 120% at 12% 0%, #3a2f6e 0%, #26254a 46%, #1d1c36 100%);
+  box-shadow: 0 8px 26px #0005, inset 0 1px #ffffff14;
+  color: #f4f1ff;
+}
+
+.res-head { margin-bottom: 12px; padding-right: 56px; }
+.res-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 15px; font-weight: 800; letter-spacing: .04em;
+  color: #e9e2ff;
+}
+.res-pulse {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #b69cff; box-shadow: 0 0 0 0 #b69cff99;
+  animation: res-pulse 2s ease-out infinite;
+}
+@keyframes res-pulse {
+  0% { box-shadow: 0 0 0 0 #b69cff99; }
+  70% { box-shadow: 0 0 0 9px #b69cff00; }
+  100% { box-shadow: 0 0 0 0 #b69cff00; }
+}
+.res-sub { margin-top: 3px; font-size: 11px; color: #b9b0dd; }
+
+.res-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; font-size: 11px; }
+.res-phase {
+  padding: 2px 8px; border-radius: 999px; font-weight: 800; letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.res-phase.is-voting { background: #b69cff26; color: #d9c9ff; border: 1px solid #b69cff55; }
+.res-phase.is-reveal { background: #ffcf5e26; color: #ffe0a0; border: 1px solid #ffcf5e66; }
+.res-round { color: #a79fd0; }
+.res-corner-timer {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid #ffffff26;
+  background: #00000038;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: .03em;
+  color: #e9e2ff;
+}
+.is-reveal .res-corner-timer { color: #ffe0a0; border-color: #ffcf5e66; }
+
+.res-question {
+  font-size: 16px; line-height: 1.5; font-weight: 700;
+  margin-bottom: 4px;
+}
+.res-hint { font-size: 11.5px; color: #b9b0dd; margin-bottom: 13px; min-height: 16px; }
+.is-reveal .res-hint { color: #ffe0a0; }
+
+.res-options { display: flex; flex-direction: column; gap: 8px; }
+.res-option {
+  position: relative; isolation: isolate;
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; min-height: 44px;
+  padding: 9px 12px;
+  border-radius: 11px;
+  border: 1px solid #ffffff26;
+  background: #ffffff0d;
+  color: #f4f1ff;
+  font-size: 13.5px; text-align: left;
+  cursor: pointer;
+  transition: border-color .16s, background .16s, transform .12s;
+  overflow: hidden;
+}
+.res-option:not(:disabled):hover { background: #ffffff18; border-color: #b69cff88; }
+.res-option:not(:disabled):active { transform: scale(.99); }
+.res-option:disabled { cursor: default; }
+/* Dimmed while locked after voting, except the one you picked. */
+.res-option:disabled:not(.is-mine) { opacity: .5; }
+/* Your pick: a distinct mint-green treatment that reads at a glance. */
+.res-option.is-mine {
+  border-color: #5fe0b0;
+  background: linear-gradient(100deg, #1f6f5a55, #1a5a4a22);
+  box-shadow: inset 0 0 0 1px #5fe0b055, 0 0 18px #2fc48d22;
+  opacity: 1;
+}
+.res-option.is-mine .res-option-label { color: #c9ffe8; }
+.res-option.is-top { border-color: #ffcf5e88; }
+.res-option.is-mine.is-top { border-color: #5fe0b0; }
+
+.res-bar {
+  position: absolute; inset: 0 auto 0 0; z-index: -1;
+  background: linear-gradient(90deg, #b69cff66, #b69cff22);
+  transition: width .5s cubic-bezier(.2,.8,.2,1);
+}
+.is-reveal .res-option.is-top .res-bar { background: linear-gradient(90deg, #ffcf5e77, #ffcf5e22); }
+
+.res-option-emoji { font-size: 20px; flex: none; }
+.res-option-label { flex: 1; min-width: 0; font-weight: 600; }
+.res-option-right { flex: none; font-size: 12px; color: #cfc6f5; }
+.res-check {
+  display: inline-grid; place-items: center;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #5fe0b0; color: #103b2e;
+  font-weight: 900; font-size: 12px;
+}
+.res-count { font-variant-numeric: tabular-nums; font-weight: 700; }
+.res-voters { position: absolute; right: 10px; bottom: -9px; }
+
+.res-avatars { display: inline-flex; align-items: center; }
+.res-avatar { border: 2px solid #26254a; border-radius: 50%; margin-left: -6px; }
+.res-avatar:first-child { margin-left: 0; }
+.res-avatar-more {
+  margin-left: 4px; font-size: 10px; color: #cfc6f5;
+  background: #ffffff1a; border-radius: 999px; padding: 1px 5px;
+}
+
+.res-footer { margin-top: 12px; font-size: 11px; color: #a79fd0; min-height: 15px; }
+.res-you b { color: #ffe0a0; }
+.res-change {
+  appearance: none;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border: 1px solid #b69cff80;
+  border-radius: 999px;
+  background: #b69cff1a;
+  color: #d9c9ff;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background .16s, border-color .16s, color .16s;
+}
+.res-change:hover { background: #b69cff33; border-color: #c3adff; color: #fff; }
+.res-change:active { transform: scale(.96); }
+@media (hover: none), (pointer: coarse) {
+  .res-change:hover { background: #b69cff1a; border-color: #b69cff80; color: #d9c9ff; }
+}
+.res-offline { color: #ffb3b3; }
+
+@media (max-width: 520px) {
+  .res-board { padding: 13px 12px 11px; }
+  .res-question { font-size: 15px; }
+  .res-option { font-size: 13px; min-height: 42px; }
+}
+
+/* ── Warm theme ─────────────────────────────────────────────────────────── */
+.app-shell.theme-warm .res-board {
+  border-color: rgba(75, 48, 20, .22);
+  background: radial-gradient(130% 120% at 12% 0%, rgba(214, 158, 74, .16) 0%, transparent 55%),
+    linear-gradient(150deg, #fbf3e0, #efe0c2 72%, #e7d4ae);
+  box-shadow: 0 8px 26px rgba(90, 60, 15, .18), inset 0 1px #fff;
+  color: #43301c;
+}
+.app-shell.theme-warm .res-title { color: #5a3d14; }
+.app-shell.theme-warm .res-pulse { background: #b9822f; box-shadow: 0 0 0 0 #b9822f88; }
+.app-shell.theme-warm .res-sub,
+.app-shell.theme-warm .res-hint { color: #7a6244; }
+.app-shell.theme-warm .is-reveal .res-hint { color: #9a6a17; }
+.app-shell.theme-warm .res-phase.is-voting { background: rgba(150, 100, 30, .12); color: #6b4a1c; border-color: rgba(140, 100, 30, .28); }
+.app-shell.theme-warm .res-phase.is-reveal { background: rgba(180, 130, 20, .16); color: #6b4a0e; border-color: rgba(150, 105, 15, .34); }
+.app-shell.theme-warm .res-round { color: #8a7557; }
+.app-shell.theme-warm .res-corner-timer {
+  color: #5a3d14;
+  border-color: rgba(120, 85, 25, .28);
+  background: rgba(120, 85, 25, .08);
+}
+.app-shell.theme-warm .is-reveal .res-corner-timer { color: #8a5e12; border-color: rgba(150, 105, 15, .34); }
+.app-shell.theme-warm .res-option {
+  border-color: rgba(75, 48, 20, .18);
+  background: rgba(255, 255, 255, .5);
+  color: #43301c;
+}
+.app-shell.theme-warm .res-option:not(:disabled):hover { background: rgba(255, 255, 255, .78); border-color: rgba(150, 105, 30, .5); }
+.app-shell.theme-warm .res-option.is-mine {
+  border-color: #2f9c73;
+  background: linear-gradient(100deg, rgba(47, 156, 115, .18), rgba(47, 156, 115, .07));
+  box-shadow: inset 0 0 0 1px rgba(47, 156, 115, .3);
+}
+.app-shell.theme-warm .res-option.is-mine .res-option-label { color: #14684a; }
+.app-shell.theme-warm .res-option.is-top { border-color: rgba(180, 130, 20, .6); }
+.app-shell.theme-warm .res-option.is-mine.is-top { border-color: #2f9c73; }
+.app-shell.theme-warm .res-bar { background: linear-gradient(90deg, rgba(150, 105, 30, .38), rgba(150, 105, 30, .12)); }
+.app-shell.theme-warm .is-reveal .res-option.is-top .res-bar { background: linear-gradient(90deg, rgba(190, 135, 20, .5), rgba(190, 135, 20, .16)); }
+.app-shell.theme-warm .res-option-right { color: #7a6244; }
+.app-shell.theme-warm .res-check { background: #2f9c73; color: #f2fff9; }
+.app-shell.theme-warm .res-avatar { border-color: #efe0c2; }
+.app-shell.theme-warm .res-avatar-more { color: #6b4a1c; background: rgba(90, 60, 15, .08); }
+.app-shell.theme-warm .res-footer { color: #7a6244; }
+.app-shell.theme-warm .res-you b { color: #9a6a17; }
+.app-shell.theme-warm .res-change {
+  border-color: rgba(120, 85, 25, .4); background: rgba(150, 105, 30, .1); color: #6b4a1c;
+}
+.app-shell.theme-warm .res-change:hover { background: rgba(150, 105, 30, .2); border-color: rgba(120, 85, 25, .65); color: #43301c; }
+.app-shell.theme-warm .res-offline { color: #b0392f; }
+
+@media (prefers-reduced-motion: reduce) {
+  .res-pulse, .res-bar { animation: none; transition: none; }
+}

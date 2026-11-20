@@ -29,6 +29,7 @@ import type { ChatEntry, ChatStatus, ChatMessage, ChatSendOptions, MessageReply,
 import type { ChatIdentity } from './identity'
 import type { RoomReactionChange, RoomReactionRecord } from './chatReactions'
 import { NEWS_BOT_USER_ID } from './newsCard'
+import { isForeignSysNotice } from './sysNotice'
 
 /**
  * Chat sync facade (oasis-game architecture): writes land locally first —
@@ -85,6 +86,11 @@ function isForeignNews(entry: Pick<ChatMessage, 'content' | 'userId'>, lang?: st
   if (entry.userId !== NEWS_BOT_USER_ID || !entry.content.startsWith('NEWS:')) return false
   const separator = entry.content.indexOf(':', 5)
   return separator >= 0 && entry.content.slice(5, separator) !== (lang ?? 'en')
+}
+
+/** Hide foreign-language news AND system notices (each viewer sees own language only). */
+function isForeignLocalized(entry: Pick<ChatMessage, 'content' | 'userId'>, lang?: string | null): boolean {
+  return isForeignNews(entry, lang) || isForeignSysNotice(entry, lang)
 }
 
 export function enterChat(
@@ -232,7 +238,7 @@ export function enterChat(
   }
 
   const mergeServerMessage = (message: ChatMessage) => {
-    if (isForeignNews(message, currentIdentity.lang)) return
+    if (isForeignLocalized(message, currentIdentity.lang)) return
     const existing = entries.find((e) => e.id === message.id)
     if (existing && existing.expiring) return
     if (existing && existing.serverCreatedAt) {
@@ -393,7 +399,7 @@ export function enterChat(
       }
       validCached = cached.filter((entry) => entry.state || existing.has(entry.id))
     }
-    const live = validCached.filter((entry) => !isExpired(entry) && !isForeignNews(entry, currentIdentity.lang)).slice(-INITIAL_PAGE)
+    const live = validCached.filter((entry) => !isExpired(entry) && !isForeignLocalized(entry, currentIdentity.lang)).slice(-INITIAL_PAGE)
     // Unsent drafts come back as pending entries with their photo preview.
     const pending: ChatEntry[] = []
     for (const item of outbox) {
@@ -658,7 +664,7 @@ export function enterChat(
             { createdAt: new Date(displayBefore.createdAt).getTime(), id: displayBefore.id },
             60,
           )
-        ).filter((entry) => !isExpired(entry) && !isForeignNews(entry, currentIdentity.lang))
+        ).filter((entry) => !isExpired(entry) && !isForeignLocalized(entry, currentIdentity.lang))
         if (cachedPage.length > 0 && !entries.some((e) => e.id === cachedPage[0].id)) {
           const byId = new Map(entries.map((entry) => [entry.id, entry]))
           for (const entry of cachedPage) byId.set(entry.id, entry)
@@ -697,7 +703,7 @@ export function enterChat(
       currentIdentity = next
       handle?.track(next)
       if (languageChanged) {
-        entries = entries.filter((entry) => !isForeignNews(entry, next.lang))
+        entries = entries.filter((entry) => !isForeignLocalized(entry, next.lang))
         callbacks.onSnapshot(entries)
         void saveChatCache(entries)
         void syncFromServer()

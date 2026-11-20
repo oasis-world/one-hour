@@ -16,12 +16,15 @@ export default function MessageAuthorCard({
   expired = false,
   onPrivateChat,
   selfId,
+  noCloud = false,
 }: {
   member: PresenceMember
   className?: string
   expired?: boolean
   onPrivateChat?: (member: PresenceMember) => void
   selfId?: string | null
+  /** Role/persona author: use the message snapshot, never fetch a real user. */
+  noCloud?: boolean
 }) {
   const [now, setNow] = useState(() => Date.now())
   const [cloudProfile, setCloudProfile] = useState<CloudProfileSnapshot | null>(null)
@@ -30,12 +33,13 @@ export default function MessageAuthorCard({
     return () => window.clearInterval(id)
   }, [])
   useEffect(() => {
+    if (noCloud) return
     let active = true
     void fetchCloudProfile(member.userId).then((snapshot) => {
       if (active && snapshot) setCloudProfile(snapshot)
     })
     return () => { active = false }
-  }, [member.userId])
+  }, [member.userId, noCloud])
   const profile = cloudProfile?.profile ?? {
     nickname: member.displayName,
     role: member.role ?? '',

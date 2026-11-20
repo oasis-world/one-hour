@@ -1,0 +1,49 @@
+.sync-whisper {
+  display: inline;
+}
+.sync-whisper-text {
+  line-height: 1.7;
+}
+.sync-whisper-q {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  opacity: .7;
+  font-style: italic;
+}
+.sync-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 2px;
+  padding: 1px 7px 1px 2px;
+  border: 1px solid #5fe0b066;
+  border-radius: 999px;
+  background: #5fe0b01a;
+  color: #bff3dc;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background .16s, border-color .16s;
+}
+.sync-chip:hover { background: #5fe0b033; border-color: #5fe0b0; }
+.sync-chip-avatar { flex: none; }
+.sync-chip-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The whole whisper row gets a distinct tint (see index.css .msg-row.is-sync). */
+.app-shell.theme-warm .sync-chip {
+  border-color: rgba(47, 156, 115, .5);
+  background: rgba(47, 156, 115, .12);
+  color: #14684a;
+}
+.app-shell.theme-warm .sync-chip:hover {
+  background: rgba(47, 156, 115, .22);
+  border-color: #2f9c73;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sync-chip { transition: none; }
+}

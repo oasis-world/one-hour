@@ -1,4 +1,4 @@
-import type { MessageReply } from './chatTypes'
+import type { ChatAuthorOverride, MessageReply } from './chatTypes'
 
 /**
  * Tiny bridge so self-contained game components can post a notice to the
@@ -13,7 +13,7 @@ type RoomSender = (
   text: string,
   imageBlob?: Blob,
   replyTo?: MessageReply | null,
-  options?: { expiresAt?: number; farewell?: boolean; whisperTo?: string | null; whisperToName?: string | null },
+  options?: { expiresAt?: number; farewell?: boolean; whisperTo?: string | null; whisperToName?: string | null; authorOverride?: ChatAuthorOverride },
 ) => string | null
 
 let sender: RoomSender | null = null
@@ -23,6 +23,17 @@ export function registerGameNoticeSender(next: RoomSender | null): void {
 }
 
 /** Returns the optimistic message id, or null when the room is unavailable. */
-export function sendGameNotice(text: string, expiresAt: number): string | null {
-  return sender?.(text, undefined, null, { expiresAt }) ?? null
+export function sendGameNotice(text: string, expiresAt: number, authorOverride?: ChatAuthorOverride): string | null {
+  return sender?.(text, undefined, null, { expiresAt, authorOverride }) ?? null
+}
+
+/** Post a private whisper to one user, presented under the given author persona. */
+export function sendGameWhisper(
+  text: string,
+  expiresAt: number,
+  whisperTo: string,
+  whisperToName: string,
+  authorOverride?: ChatAuthorOverride,
+): string | null {
+  return sender?.(text, undefined, null, { expiresAt, whisperTo, whisperToName, authorOverride }) ?? null
 }

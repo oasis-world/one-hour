@@ -2,6 +2,10 @@
 # OPTIONS preflight has no user JWT; the function validates JWTs on POST itself.
 verify_jwt = false
 
+[functions.resonance-questions]
+# OPTIONS preflight has no user JWT; the function validates JWTs on POST itself.
+verify_jwt = false
+
 [functions.companion-chat]
 # Same as game-ai-move: OPTIONS has no JWT, POST validates via SUPABASE_URL/ANON_KEY
 verify_jwt = false

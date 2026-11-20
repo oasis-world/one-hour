@@ -12,8 +12,22 @@ import SlotMachineIcon from './slot-machine/SlotMachineIcon'
 import Match3Game from './match3/Match3Game'
 import Match3Icon from './match3/Match3Icon'
 import BlackjackGame from './blackjack/BlackjackGame'
+import ResonanceGame from './resonance/ResonanceGame'
+import ResonanceIcon from './resonance/ResonanceIcon'
 
 export const GAMES: GameDefinition[] = [
+  {
+    id: 'resonance',
+    name: '同频',
+    nameEn: 'In Sync',
+    icon: '🎯',
+    Icon: ResonanceIcon,
+    tagline: 'AI 出题 · 秒懂彼此',
+    taglineEn: 'AI polls · find your people',
+    minPlayers: 1,
+    maxPlayers: 20,
+    Component: ResonanceGame,
+  },
   {
     id: 'gomoku',
     name: '五子棋',

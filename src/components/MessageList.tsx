@@ -20,6 +20,8 @@ import { parsePollRef } from '../lib/pollTypes'
 import { deletePoll } from '../lib/pollRemote'
 import StarScore, { type StarReward } from './StarScore'
 import { parseCompanionNewsCard } from '../lib/newsCard'
+import { isForeignSysNotice } from '../lib/sysNotice'
+import { isSyncWhisper } from '../lib/syncWhisper'
 
 interface Props {
   entries: ChatEntry[]
@@ -102,10 +104,14 @@ export default function MessageList({
   const lang = useLang()
   const visibleEntries = useMemo(
     () => entries.filter((entry) => {
+      // A sync whisper is private: show it only to its intended recipient,
+      // never to the author (who authored every copy) or anyone else.
+      if (isSyncWhisper(entry.content)) return entry.whisperTo === selfId
       const news = parseCompanionNewsCard(entry.content, entry.userId)
-      return !news || news.lang === lang
+      if (news && news.lang !== lang) return false
+      return !isForeignSysNotice(entry, lang)
     }),
-    [entries, lang],
+    [entries, lang, selfId],
   )
   const logRef = useRef<HTMLDivElement>(null)
   const [loadingOlder, setLoadingOlder] = useState(false)

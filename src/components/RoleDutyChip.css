@@ -1,0 +1,45 @@
+.role-duty-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 160px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid #ffcf5e66;
+  background: #ffcf5e1a;
+  color: #ffe0a0;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.role-duty-dot {
+  width: 5px; height: 5px; flex: none;
+  border-radius: 50%;
+  background: #ffcf5e;
+  box-shadow: 0 0 6px #ffcf5e;
+  animation: role-duty-blink 2s ease-in-out infinite;
+}
+.role-duty-left {
+  font-variant-numeric: tabular-nums;
+  opacity: .8;
+}
+@keyframes role-duty-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
+}
+
+.app-shell.theme-warm .role-duty-chip {
+  border-color: rgba(150, 105, 15, .34);
+  background: rgba(180, 130, 20, .12);
+  color: #8a5e12;
+}
+.app-shell.theme-warm .role-duty-dot {
+  background: #b9822f;
+  box-shadow: 0 0 6px #b9822f;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .role-duty-dot { animation: none; }
+}
